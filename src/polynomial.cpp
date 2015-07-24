@@ -135,6 +135,7 @@ void Polynomial::icrt(){
     icrt += step;
   }
 
+  std::cout << (icrt.get_phi().to_string()) << std::endl;
   icrt %= icrt.get_phi();
   this->set_coeffs(icrt.get_coeffs());
   return;
@@ -169,4 +170,51 @@ void Polynomial::DivRem(Polynomial a,Polynomial b,Polynomial *quot,Polynomial *r
   }else{
     throw "I don't know how to div this!";
   }
+}
+
+int isPowerOfTwo (unsigned int x)
+{
+  return ((x != 0) && !(x & (x - 1)));
+}
+
+void Polynomial::BuildNthCyclotomic(Polynomial *phi,int n){
+
+  for(int i =0; i <= phi->deg(); i++)
+    phi->set_coeff(i,0);
+  if(isPowerOfTwo(n)){
+    #ifdef VERBOSE
+    std::cout << n << " is power of 2" << std::endl;
+    #endif
+    phi->set_coeff(0,1);
+    phi->set_coeff(n,1);
+    return;
+  }else{
+    #ifdef VERBOSE
+    std::cout << n << " is not power of 2" << std::endl;
+    #endif
+
+    std::vector<Polynomial> aux_phi( n+1);
+
+    for (long i = 1; i <= n; i++) {
+       Polynomial t;
+       t.set_coeff(0,ZZ(1));
+
+       for (long j = 1; j <= i-1; j++)
+          if (i % j == 0)
+             t *= aux_phi[j];
+
+       Polynomial mono;
+       mono.set_coeff(i,ZZ(1));
+       aux_phi[i] = (mono - 1)/t;
+
+      //  cout << aux_phi[i] << "\n";
+    }
+    *phi = aux_phi[n];
+ }
+}
+
+Polynomial Polynomial::get_phi(){
+  // Returns a copy of phi
+  std::cout << "getphi!" << std::endl;
+  return *(this->phi);
 }

@@ -20,6 +20,7 @@ struct PolySuite
 
         Polynomial::global_mod = conv<ZZ>("1171313591017775093490277364417"); // Defines default GF(q)
         Polynomial::BuildNthCyclotomic(&phi,degree);
+        Polynomial::global_phi = &phi;
 
         srand (36251);
 

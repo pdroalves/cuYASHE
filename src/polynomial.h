@@ -2,6 +2,7 @@
 #define POLYNOMIAL_H
 #include <stdio.h>
 #include <vector>
+#include <sstream>
 #include <NTL/ZZ.h>
 #include <cuda_runtime.h>
 #include "cuda_functions.h"
@@ -102,7 +103,7 @@ class Polynomial{
       this->set_host_updated(true);
       this->set_device_updated(false);
       this->mod = ZZ(p);// Copy
-      *(this->phi) = Polynomial(P);// Copy
+      this->phi = &P;// Copy
 
       // CRT Spacing set to spacing
       this->CRTSPACING = spacing;
@@ -129,6 +130,18 @@ class Polynomial{
     }
     // Functions and methods
     // Operators
+    // std::ostream &operator<<(std::ostream &os, Polynomial &m) {
+    //   for(int i = 0; i <=  m.deg();i++)
+    //     os << m.get_coeff(i);
+    //   return os;
+    // }
+
+    std::string to_string(){
+      stringstream ss;
+      for(int i = 0; i <=  this->deg();i++)
+        ss << this->get_coeff(i) << ", ";
+      return ss.str();;
+    }
     Polynomial operator=(Polynomial b){//Copy
         this->CRTSPACING = b.CRTSPACING;
         this->set_host_updated(b.get_host_updated());
@@ -394,10 +407,7 @@ class Polynomial{
         std::cout << "Polynomial mod set to " << this->mod << std::endl;
       #endif
     }
-    Polynomial get_phi(){
-      // Returns a copy of phi
-      return *(this->phi);
-    }
+    Polynomial get_phi();
     void set_phi(Polynomial p){
       *(this->phi) = Polynomial(p);
       #ifdef VERBOSE
@@ -406,7 +416,7 @@ class Polynomial{
     }
 
 
-    ZZ get_coeff(int index){
+    ZZ get_coeff(const int index){
       // Returns a copy of coefficient at this index
       if(index > this->deg())
         return conv<ZZ>(0);
@@ -421,8 +431,7 @@ class Polynomial{
 
         this->coefs.resize(index+1);
       }
-      std::vector<ZZ>::iterator it = this->coefs.begin();
-      this->coefs.insert(it+index,value);
+      this->coefs[index] = value;
 
       this->expected_degree = this->coefs.size()-1;
       #ifdef VERBOSE
@@ -552,25 +561,7 @@ class Polynomial{
       // To-do
       throw "Not implemented!";
     }
-    static void BuildNthCyclotomic(Polynomial *phi, int n){
-      std::vector<Polynomial> aux_phi( n+1);
-
-      for (long i = 1; i <= n; i++) {
-         Polynomial t;
-         t.set_coeff(0,ZZ(1));
-
-         for (long j = 1; j <= i-1; j++)
-            if (i % j == 0)
-               t *= aux_phi[j];
-
-         Polynomial mono;
-         mono.set_coeff(i,ZZ(1));
-         aux_phi[i] = (mono - 1)/t;
-
-        //  cout << aux_phi[i] << "\n";
-      }
-       *phi = aux_phi[n];
-    }
+    static void BuildNthCyclotomic(Polynomial *phi, int n);
     static void random(Polynomial *a,int degree){
       if(a->global_mod > 0)
         for(int i = 0;i <= degree;i++)

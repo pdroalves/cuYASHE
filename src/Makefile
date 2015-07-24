@@ -1,4 +1,4 @@
-CUDA_CC = nvcc -O2 -G -g
+CUDA_CC = nvcc -O0 -G -g
 CC = g++ -std=c++11 -g -Wall
 
 OPENMP = -fopenmp
