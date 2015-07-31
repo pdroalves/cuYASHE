@@ -51,7 +51,7 @@ __host__ long* CUDAFunctions::callRealignCRTResidues(cudaStream_t stream,int old
 
 ///////////////////////////////////////
 /// ADD
-__global__ void polynomialAdd(const long *a,const long *b,long *c,const int size){
+__global__ void polynomialAddSub(const int OP,const long *a,const long *b,long *c,const int size){
   // We have one thread per polynomial coefficient on 32 threads-block.
   // For CRT polynomial adding, all representations should be concatenated aligned
   const int tid = threadIdx.x + blockDim.x*blockIdx.x;
@@ -63,13 +63,16 @@ __global__ void polynomialAdd(const long *a,const long *b,long *c,const int size
       a_value = a[tid];
       b_value = b[tid];
 
-      a_value += b_value;
+      if(OP == ADD)
+        a_value += b_value;
+      else
+        a_value -= b_value;
 
       c[tid] = a_value;
   }
 }
 
-__host__ long* CUDAFunctions::callPolynomialAdd(cudaStream_t stream,long *a,long *b,int size){
+__host__ long* CUDAFunctions::callPolynomialAddSub(cudaStream_t stream,long *a,long *b,int size,int OP){
   // This method expects that both arrays are aligned
   int ADDGRIDXDIM = (size%ADDBLOCKXDIM == 0? size/ADDBLOCKXDIM : size/ADDBLOCKXDIM + 1);
   dim3 gridDim(ADDGRIDXDIM);
@@ -82,7 +85,8 @@ __host__ long* CUDAFunctions::callPolynomialAdd(cudaStream_t stream,long *a,long
   #endif
   assert(result == cudaSuccess);
 
-  polynomialAdd <<< gridDim,blockDim,1,stream >>> (a,b,d_new_array,size);
+  // polynomialAdd <<< gridDim,blockDim, 0, stream >>> (a,b,d_new_array,size);
+  polynomialAddSub <<< gridDim,blockDim >>> (OP,a,b,d_new_array,size);
   #ifdef VERBOSE
   std::cout << gridDim.x << " " << blockDim.x << std::endl;
   std::cout << "polynomialAdd kernel:" << cudaGetErrorString(cudaGetLastError()) << std::endl;

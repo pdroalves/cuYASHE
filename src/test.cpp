@@ -20,12 +20,15 @@ struct PolySuite
 
         Polynomial::global_mod = conv<ZZ>("1171313591017775093490277364417"); // Defines default GF(q)
         Polynomial::BuildNthCyclotomic(&phi,degree);
+        // std::cout << phi.to_string() << std::endl;
+        phi.set_mod(Polynomial::global_mod);
         Polynomial::global_phi = &phi;
 
         srand (36251);
 
         ZZ_p::init(Polynomial::global_mod);
 
+        Polynomial::gen_crt_primes(Polynomial::global_mod,degree);
     }
 
     ~PolySuite()
@@ -46,6 +49,8 @@ BOOST_AUTO_TEST_CASE(justCRT)
     a.crt();
     a.update_device_data();
     a.set_host_updated(false);
+    // std::cout << std::endl << a.get_phi().to_string() << " == " << std::endl;
+
     a.icrt();
     #ifdef VERBOSE
     std::cout << std::endl << a << " == " << std::endl<< b << std::endl;

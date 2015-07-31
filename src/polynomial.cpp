@@ -91,19 +91,22 @@ void Polynomial::crt(){
 
     // We pick each prime
     for(std::vector<long>::iterator iter_prime = P.begin(); iter_prime != P.end(); iter_prime++){
-        int P_i = iter_prime - P.begin();//Debug
+        int index = iter_prime - P.begin();//Debug
 
         // Apply mod at each coefficient
-        std::vector<long> rep = this->polyCRT[P_i];
+        std::vector<long> rep = this->polyCRT[index];
         rep.resize(array.size());
         for(std::vector<ZZ>::iterator iter = array.begin();iter != array.end();iter++){
+          // std::cout << "Prime: " << *iter_prime << std::endl;
           int array_i = iter-array.begin();//Debug
           rep[array_i] = conv<long>(*iter % (*iter_prime));
+          // std::cout << "rep : " << rep[array_i] << ", ";
         }
 
-         polyCRT[P_i] = (rep);
+         polyCRT[index] = (rep);
     }
 
+    this->set_host_updated(true);
     this->set_device_updated(false);
 }
 
@@ -118,25 +121,32 @@ void Polynomial::icrt(){
   std::vector<long> P = this->CRTPrimes;
   ZZ M = this->CRTProduct;
 
-  Polynomial icrt(this->get_mod(),this->get_phi(),this->get_crt_spacing());
+  // std::cout << this->get_phi().to_string() << std::endl;
+
+  Polynomial icrt(this);
   for(unsigned int i = 0; i < this->polyCRT.size();i++){
-  // Convert CRT representations to Polynomial
-    std::vector<ZZ> residue;
-    std::copy ( (this->polyCRT[i]).begin(), (this->polyCRT[i]).begin() +7, residue.begin() );
-    Polynomial xi(this->get_mod(),this->get_phi(),this->get_crt_spacing());
-    xi.set_coeffs(residue);
+    // Convert CRT representations to Polynomial
+    // Polynomial xi(this->get_mod(),this->get_phi(),this->get_crt_spacing());
+    Polynomial xi(Polynomial::global_mod,Polynomial::global_phi,this->get_crt_spacing());
+    xi.set_coeffs(this->polyCRT[i]);
 
     ZZ pi = ZZ(P[i]);
     ZZ Mpi= M/pi;
     ZZ InvMpi = NTL::InvMod(Mpi%pi,pi);
 
-    Polynomial step = ((xi*InvMpi % pi)*Mpi) % M;
+    // Polynomial step = ((xi*InvMpi % pi)*Mpi) % M;
+    Polynomial step(xi);
+
+    step *= InvMpi;
+    step %= pi;
+    step *= Mpi;
+    step %= M;
 
     icrt += step;
   }
 
-  std::cout << (icrt.get_phi().to_string()) << std::endl;
-  icrt %= icrt.get_phi();
+  // std::cout << (icrt.get_phi().to_string()) << std::endl;
+  icrt %= Polynomial::global_phi;
   this->set_coeffs(icrt.get_coeffs());
   return;
 }
@@ -168,7 +178,7 @@ void Polynomial::DivRem(Polynomial a,Polynomial b,Polynomial *quot,Polynomial *r
     // std::cout << "lower_half: " << lower_half << std::endl;
     *rem = lower_half - (*quot);
   }else{
-    throw "I don't know how to div this!";
+    throw "DivRem: I don't know how to div this!";
   }
 }
 
@@ -215,6 +225,11 @@ void Polynomial::BuildNthCyclotomic(Polynomial *phi,int n){
 
 Polynomial Polynomial::get_phi(){
   // Returns a copy of phi
-  std::cout << "getphi!" << std::endl;
+  // std::cout << "getphi!" << std::endl;
+  if(this->phi == NULL){
+    // std::cout << "Using global phi." << std::endl;
+    return *(this->global_phi);
+  }
+  // std::cout << "Using local phi: " << this->phi->to_string() << std::endl;
   return *(this->phi);
 }
