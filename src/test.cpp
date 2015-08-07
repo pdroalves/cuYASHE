@@ -46,14 +46,12 @@ BOOST_AUTO_TEST_CASE(justCRT)
     Polynomial::random(&a,degree-1);
 
     Polynomial b(a);//Copy
-    a.crt();
-    a.update_device_data();
-    a.set_host_updated(false);
-    // std::cout << std::endl << a.get_phi().to_string() << " == " << std::endl;
+    b.crt();
+    b.update_device_data();
+    b.set_host_updated(false);
 
-    a.icrt();
     #ifdef VERBOSE
-    std::cout << std::endl << a << " == " << std::endl<< b << std::endl;
+    std::cout << std::endl << a.to_string() << " == " << std::endl<< b.to_string() << std::endl;
     #endif
     BOOST_REQUIRE(a == b);
   }
@@ -68,9 +66,54 @@ BOOST_AUTO_TEST_CASE(simpleAdd)
 
   Polynomial b(a);//Copy
   Polynomial c = a+b;
-  c.icrt();//
+  // c.icrt();//
 
+  #ifdef VERBOSE
+  std::cout << "a: " << a.to_string() << std::endl;
+  std::cout << "b: " << b.to_string() << std::endl;
+  std::cout << "c: " << c.to_string() << std::endl;
+  #endif
   BOOST_REQUIRE(c == a*2);
+}
+
+BOOST_AUTO_TEST_CASE(multipleAdds)
+{
+
+  Polynomial a;
+  Polynomial::random(&a,degree-1);
+
+  Polynomial b;
+  for(int count = 0; count < NTESTS;count ++)
+    b += a;
+
+  #ifdef VERBOSE
+  std::cout << "a: " << a.to_string() << std::endl;
+  std::cout << "b: " << b.to_string() << std::endl;
+  #endif
+  BOOST_REQUIRE(b == a*NTESTS);
+}
+
+BOOST_AUTO_TEST_CASE(multipleAddsWithDifferentDegrees)
+{
+
+  Polynomial b;
+  ZZ_pEX b_ntl;
+
+  for(int count = 0; count < NTESTS;count ++){
+    Polynomial a;
+    Polynomial::random(&a,rand() % (degree-1));
+
+    ZZ_pEX a_ntl;
+    for(int i = 0;i <= a.deg();i++)
+      NTL::SetCoeff(a_ntl,i,conv<ZZ_p>(a.get_coeff(i)));
+
+    b += a;
+    b_ntl += a_ntl;
+  }
+
+  BOOST_REQUIRE(NTL::deg(b_ntl) == b.deg());
+  for(int i = 0;i <= b.deg();i++)
+    BOOST_REQUIRE(conv<ZZ>(NTL::rep(b_ntl[i])[0]) == b.get_coeff(i));
 }
 
 BOOST_AUTO_TEST_CASE(zeroAdd)
@@ -81,7 +124,7 @@ BOOST_AUTO_TEST_CASE(zeroAdd)
   Polynomial::random(&a,degree-1);
 
   Polynomial r = a + b;
-  r.icrt();
+  // r.icrt();
 
   #ifdef VERBOSE
   std::cout << "r: " << r << std::endl;

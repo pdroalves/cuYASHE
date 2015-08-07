@@ -72,7 +72,7 @@ void Polynomial::update_host_data(){
     }
 
     result = cudaDeviceSynchronize();
-    //assert(result == cudaSuccess);
+    assert(result == cudaSuccess);
 
     this->set_host_updated(true);
 }
@@ -117,17 +117,15 @@ void Polynomial::icrt(){
   }else{
       this->update_host_data();
   }
-
+  
   std::vector<long> P = this->CRTPrimes;
   ZZ M = this->CRTProduct;
 
-  // std::cout << this->get_phi().to_string() << std::endl;
-
-  Polynomial icrt(this);
+  Polynomial icrt(this->get_mod(),this->get_phi(),this->get_crt_spacing());
   for(unsigned int i = 0; i < this->polyCRT.size();i++){
     // Convert CRT representations to Polynomial
     // Polynomial xi(this->get_mod(),this->get_phi(),this->get_crt_spacing());
-    Polynomial xi(Polynomial::global_mod,Polynomial::global_phi,this->get_crt_spacing());
+    Polynomial xi(this->get_mod(),this->get_phi(),this->get_crt_spacing());
     xi.set_coeffs(this->polyCRT[i]);
 
     ZZ pi = ZZ(P[i]);
@@ -140,50 +138,55 @@ void Polynomial::icrt(){
     step *= InvMpi;
     step %= pi;
     step *= Mpi;
-    step %= M;
 
-    icrt += step;
+    icrt.CPUAddition(&step);
   }
-
-  // std::cout << (icrt.get_phi().to_string()) << std::endl;
+  icrt %= M;
+  icrt %= this->get_mod();
   icrt %= Polynomial::global_phi;
-  this->set_coeffs(icrt.get_coeffs());
+  icrt.normalize();
+  this->copy(icrt);
+  this->set_host_updated(true);
   return;
 }
-void Polynomial::DivRem(Polynomial a,Polynomial b,Polynomial *quot,Polynomial *rem){
+
+void Polynomial::DivRem(Polynomial a,Polynomial b,Polynomial &quot,Polynomial &rem){
   // Returns x = a % b
 
-  if(!a.HOST_IS_UPDATED){
-      a.update_host_data();
-      a.icrt();
-  }
-
-  if(!b.HOST_IS_UPDATED){
-      b.update_host_data();
-      b.icrt();
-  }
-
-  if(check_special_rem_format(b)){
-    #ifdef VERBOSE
-    std::cout << "Rem in special mode."<<std::endl;
-    #endif
-
-    Polynomial lower_half;
-    int half = b.deg()-1;
-    for(int i = a.deg(); i > half; i--)
-      quot->set_coeff(i-b.deg(),a.get_coeff(i));
-      // std::cout << "(*quot): " << (*quot) << std::endl;
-    for(int i = half;i >= 0;i--)
-      lower_half.set_coeff(i,a.get_coeff(i));
-    // std::cout << "lower_half: " << lower_half << std::endl;
-    *rem = lower_half - (*quot);
+  if(a.get_host_updated() == false && b.get_host_updated() == false){
+    // Operates on GPU
+    throw "DivRem for GPU not implemented yet";
   }else{
-    throw "DivRem: I don't know how to div this!";
+    if(!a.get_host_updated()){
+        a.update_host_data();
+        a.icrt();
+    }
+
+    if(!b.get_host_updated()){
+        b.update_host_data();
+        b.icrt();
+    }
+
+    if(check_special_rem_format(b)){
+      #ifdef VERBOSE
+      std::cout << "Rem in special mode."<<std::endl;
+      #endif
+
+      Polynomial lower_half;
+      int half = b.deg()-1;
+      for(int i = a.deg(); i > half; i--)
+        quot.set_coeff(i-b.deg(),a.get_coeff(i));
+      for(int i = half;i >= 0;i--)
+        lower_half.set_coeff(i,a.get_coeff(i));
+      lower_half.CPUSubtraction(&quot);
+      rem = lower_half;
+    }else{
+      throw "DivRem: I don't know how to div this!";
+    }
   }
 }
 
-int isPowerOfTwo (unsigned int x)
-{
+int isPowerOfTwo (unsigned int x){
   return ((x != 0) && !(x & (x - 1)));
 }
 
@@ -226,10 +229,13 @@ void Polynomial::BuildNthCyclotomic(Polynomial *phi,int n){
 Polynomial Polynomial::get_phi(){
   // Returns a copy of phi
   // std::cout << "getphi!" << std::endl;
-  if(this->phi == NULL){
-    // std::cout << "Using global phi." << std::endl;
-    return *(this->global_phi);
-  }
+  // if(this->phi == NULL){
+  //   // std::cout << "Using global phi." << std::endl;
+  //   return *(this->global_phi);
+  // }
   // std::cout << "Using local phi: " << this->phi->to_string() << std::endl;
-  return *(this->phi);
+  // // return *(this->phi);
+  // return *(this->phi);
+
+  return *(Polynomial::global_phi);
 }

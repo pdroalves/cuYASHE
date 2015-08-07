@@ -134,16 +134,20 @@ class Polynomial{
     }
     Polynomial(Polynomial *b){
       // Copy
+      this->copy(*b);
+    }
 
-      this->CRTSPACING = b->CRTSPACING;
-      this->set_host_updated(b->get_host_updated());
-      this->set_device_updated(b->get_device_updated());
-      this->set_coeffs(b->get_coeffs());
-      this->polyCRT = b->get_crt_residues();
-      this->d_polyCRT = b->get_device_crt_residues();
-      this->set_mod(b->get_mod());
-      this->expected_degree = b->deg();
-      this->set_phi(b->get_phi());
+    void copy(Polynomial b){
+      this->CRTSPACING = b.CRTSPACING;
+      this->set_host_updated(b.get_host_updated());
+      this->set_device_updated(b.get_device_updated());
+      this->set_coeffs(b.get_coeffs());
+      this->polyCRT = b.get_crt_residues();
+      this->d_polyCRT = b.get_device_crt_residues();
+      this->set_mod(b.get_mod());
+      this->expected_degree = b.deg();
+      if(this != Polynomial::global_phi)
+        this->set_phi(b.get_phi());
     }
     // Functions and methods
     // Operators
@@ -154,21 +158,17 @@ class Polynomial{
     // }
 
     std::string to_string(){
+      if(!this->get_host_updated()){
+        this->icrt();
+      }
+
       stringstream ss;
       for(int i = 0; i <=  this->deg();i++)
         ss << this->get_coeff(i) << ", ";
       return ss.str();;
     }
     Polynomial operator=(Polynomial b){//Copy
-        this->CRTSPACING = b.CRTSPACING;
-        this->set_host_updated(b.get_host_updated());
-        this->set_device_updated(b.get_device_updated());
-        this->set_coeffs(b.get_coeffs());
-        this->polyCRT = b.get_crt_residues();
-        this->d_polyCRT = b.get_device_crt_residues();
-        this->set_mod(b.get_mod());
-        this->expected_degree = b.deg();
-        this->set_phi(b.get_phi());
+        this->copy(&b);
 
         #ifdef VERBOSE
           std::cout << "Polynomial copied. " << std::endl;
@@ -186,7 +186,7 @@ class Polynomial{
       #ifdef VERBOSE
       std::cout << "Adding:" << std::endl;
       std::cout << "this: " << *this << std::endl;
-      std::cout << "other " << other << std::endl;
+      std::cout << "other " << b << std::endl;
       #endif
 
       // Apply CRT and copy data to global memory, if needed
@@ -215,12 +215,14 @@ class Polynomial{
 
       Polynomial c(this->get_mod(),this->get_phi(),this->CRTSPACING);
       c.set_device_crt_residues(d_result);
-
+      c.set_host_updated(false);
+      c.set_device_updated(true);
       cudaDeviceSynchronize();
       return c;
     }
     Polynomial operator+=(Polynomial b){
-      return (*this)+b;
+      this->copy( ((*this)+b));
+      return *this;
     }
     Polynomial operator-(Polynomial b){
       // Check align
@@ -233,7 +235,7 @@ class Polynomial{
       #ifdef VERBOSE
       std::cout << "Sub:" << std::endl;
       std::cout << "this: " << *this << std::endl;
-      std::cout << "other " << other << std::endl;
+      std::cout << "other " << b << std::endl;
       #endif
 
       // Apply CRT and copy data to global memory, if needed
@@ -257,30 +259,32 @@ class Polynomial{
           }
       }
 
-
       long *d_result = CUDAFunctions::callPolynomialAddSub(this->stream,this->get_device_crt_residues(),b.get_device_crt_residues(),(int)(this->CRTSPACING*this->polyCRT.size()),SUB);
 
       Polynomial c(this->get_mod(),this->get_phi(),this->CRTSPACING);
       c.set_device_crt_residues(d_result);
-
+      c.set_host_updated(false);
+      c.set_device_updated(true);
       cudaDeviceSynchronize();
       return c;
     }
     Polynomial operator-=(Polynomial b){
-      return (*this)-b;
+      this->copy( ((*this)-b));
+      return *this;
     }
     Polynomial operator*(Polynomial b){
       // To-do
       throw "Polynomial multiplication not implemented!";
     }
     Polynomial operator*=(Polynomial b){
-      return (*this)*b;
+      this->copy( ((*this)*b));
+      return *this;
     }
     Polynomial operator/(Polynomial b){
       Polynomial quot;
       Polynomial rem;
 
-      #pragma omp sections
+      #pragma omp parallel sections
       {
           #pragma omp section
           {
@@ -294,11 +298,40 @@ class Polynomial{
           }
       }
 
-      Polynomial::DivRem((*this),b,(&quot),(&rem));
+      Polynomial::DivRem((*this),b,quot, rem);
       return quot;
     }
     Polynomial operator/=(Polynomial b){
-      return (*this)/b;
+      this->copy( ((*this)/b));
+      return *this;
+    }
+    Polynomial operator%(Polynomial b){
+      Polynomial quot;
+      Polynomial rem;
+
+      #pragma omp parallel sections
+      {
+          #pragma omp section
+          {
+            if(!this->get_host_updated())
+              this->icrt();
+          }
+          #pragma omp section
+          {
+            if(!b.get_host_updated())
+              b.icrt();
+          }
+      }
+
+      Polynomial::DivRem((*this),b,quot, rem);
+      // rem.icrt();
+      // std::cout << rem.to_string() << std::endl;
+      this->copy(&rem);
+      return *this;
+    }
+    Polynomial operator%=(Polynomial b){
+      this->copy( ((*this)%b));
+      return *this;
     }
 
     Polynomial operator+(ZZ b){
@@ -309,7 +342,8 @@ class Polynomial{
       return p;
     }
     Polynomial operator+=(ZZ b){
-      return (*this)+b;
+      this->set_coeffs( ((*this)+b).get_coeffs());
+      return *this;
     }
     Polynomial operator-(ZZ b){
       Polynomial p(*this);
@@ -319,7 +353,8 @@ class Polynomial{
       return p;
     }
     Polynomial operator-=(ZZ b){
-      return (*this)-b;
+      this->set_coeffs( ((*this)-b).get_coeffs());
+      return *this;
     }
     Polynomial operator*(ZZ b){
       Polynomial p(*this);
@@ -332,7 +367,8 @@ class Polynomial{
       return p;
     }
     Polynomial operator*=(ZZ b){
-      return (*this)*b;
+      this->set_coeffs( ((*this)*b).get_coeffs());
+      return *this;
     }
     Polynomial operator%(ZZ b){
       #ifdef VERBOSE
@@ -349,7 +385,8 @@ class Polynomial{
       return p;
     }
     Polynomial operator/=(ZZ b){
-      return (*this)/b;
+      this->set_coeffs( ((*this)/b).get_coeffs());
+      return *this;
     }
     Polynomial operator/(ZZ b){
       #ifdef VERBOSE
@@ -366,7 +403,8 @@ class Polynomial{
       return p;
     }
     Polynomial operator%=(ZZ b){
-      return (*this)%b;
+      this->set_coeffs( ((*this)%b).get_coeffs());
+      return *this;
     }
     Polynomial operator+(int b){
       if(!this->get_host_updated()){
@@ -383,7 +421,8 @@ class Polynomial{
 
     }
     Polynomial operator+=(int b){
-      return (*this)+b;
+      this->set_coeffs( ((*this)+b).get_coeffs());
+      return *this;
     }
     Polynomial operator-(int b){
       if(!this->get_host_updated()){
@@ -400,7 +439,8 @@ class Polynomial{
 
     }
     Polynomial operator-=(int b){
-      return (*this)-b;
+      this->set_coeffs( ((*this)-b).get_coeffs());
+      return *this;
     }
     Polynomial operator*(int b){
       if(!this->get_host_updated()){
@@ -417,7 +457,8 @@ class Polynomial{
       }
     }
     Polynomial operator*=(int b){
-      return (*this)+b;
+      this->set_coeffs( ((*this)*b).get_coeffs());
+      return *this;
     }
     Polynomial operator/(int b){
       if(!this->get_host_updated()){
@@ -434,34 +475,18 @@ class Polynomial{
       }
     }
     Polynomial operator/=(int b){
-      return (*this)+b;
+      this->set_coeffs( ((*this)/b).get_coeffs());
+      return *this;
     }
 
-    Polynomial operator%(Polynomial b){
-      Polynomial quot;
-      Polynomial rem;
-
-      #pragma omp sections
-      {
-          #pragma omp section
-          {
-            if(!this->get_host_updated())
-              this->icrt();
-          }
-          #pragma omp section
-          {
-            if(!b.get_host_updated())
-              b.icrt();
-          }
+  bool operator==(Polynomial b){
+      if(!this->get_host_updated()){
+          this->icrt();
+      }
+      if(!b.get_host_updated()){
+        b.icrt();
       }
 
-      Polynomial::DivRem((*this),b,(&quot),(&rem));
-      return rem;
-    }
-    Polynomial operator%=(Polynomial b){
-      return (*this)%b;
-    }
-    bool operator==(Polynomial b){
       if(this->deg() != b.deg())
         return false;
 
@@ -475,7 +500,31 @@ class Polynomial{
       return !((*this) == b);
     }
 
+    void CPUAddition(Polynomial *b){
+      // Forces the addition to be executed by CPU
+      // This method supposes that there is no need to apply CRT/ICRT on operands
+      for(unsigned int i = 0; i <= b->deg(); i++)
+        this->set_coeff(i,this->get_coeff(i) + b->get_coeff(i));
+    }
 
+    void CPUSubtraction(Polynomial *b){
+      // Forces the subtraction to be executed by CPU
+      // This method supposes that there is no need to apply CRT/ICRT on operands
+      for(unsigned int i = 0; i <= b->deg(); i++)
+        this->set_coeff(i,this->get_coeff(i) - b->get_coeff(i));
+    }
+
+    void normalize(){
+      if(!this->get_host_updated()){
+        this->icrt();
+      }
+
+      // Remove last 0-coefficients
+      while(this->deg() >= 0 && 
+            this->get_coeff(this->deg()) == ZZ(0))
+        this->coefs.pop_back();
+      
+    }
     // gets and sets
     ZZ get_mod(){
       // Returns a copy of mod
@@ -497,6 +546,11 @@ class Polynomial{
 
 
     ZZ get_coeff(const int index){
+
+      if(!this->get_host_updated()){
+        this->icrt();
+      }
+
       // Returns a copy of coefficient at this index
       if(index > this->deg())
         return conv<ZZ>(0);
@@ -504,6 +558,11 @@ class Polynomial{
         return this->coefs.at(index);
     }
     void set_coeff(int index,ZZ value){
+
+      if(!this->get_host_updated()){
+        this->icrt();
+      }
+
       if((unsigned int)(index) >= this->coefs.size()){
         #if VERBOSE
           std::cout << "Resizing from "<< this->coefs.size() << " to " << index+1 << std::endl;
@@ -519,14 +578,25 @@ class Polynomial{
       #endif
     }
     void set_coeff(int index,int value){
+
       this->set_coeff(index,ZZ(value));
     }
     std::vector<ZZ> get_coeffs(){
+
+      if(!this->get_host_updated()){
+        this->icrt();
+      }
+
       // Returns a copy of all coefficients
       std::vector<ZZ> coefs_copy(this->coefs);
       return coefs_copy;
     }
     void set_coeffs(std::vector<long> values){
+
+      if(!this->get_host_updated()){
+        this->icrt();
+      }
+
       // Replaces all coefficients
       this->coefs.resize(values.size());
       for(std::vector<long>::iterator iter = values.begin();iter != values.end();iter++){
@@ -536,6 +606,11 @@ class Polynomial{
 
     }
     void set_coeffs(std::vector<ZZ> values){
+
+      if(!this->get_host_updated()){
+        this->icrt();
+      }
+
       // Replaces all coefficients
       this->coefs = values;
       this->expected_degree = this->coefs.size()-1;
@@ -645,16 +720,16 @@ class Polynomial{
     int get_expected_degre(){
       return expected_degree;
     }
-    static void DivRem(Polynomial a,Polynomial b,Polynomial *quot,Polynomial *rem);
+    static void DivRem(Polynomial a,Polynomial b,Polynomial &quot,Polynomial &rem);
     static Polynomial InvMod(Polynomial a,Polynomial b){
       // To-do
       throw "Polynomial InvMod not implemented!";
     }
     static void BuildNthCyclotomic(Polynomial *phi, int n);
     static void random(Polynomial *a,int degree){
-      if(a->global_mod > 0)
+      if(a->get_mod() > 0)
         for(int i = 0;i <= degree;i++)
-          a->set_coeff(i,ZZ(rand()));
+          a->set_coeff(i,ZZ(rand())%a->get_mod());
       else
         for(int i = 0;i <= degree;i++)
           a->set_coeff(i,ZZ(rand()) % a->global_mod);

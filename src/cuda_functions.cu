@@ -55,8 +55,8 @@ __global__ void polynomialAddSub(const int OP,const long *a,const long *b,long *
   // We have one thread per polynomial coefficient on 32 threads-block.
   // For CRT polynomial adding, all representations should be concatenated aligned
   const int tid = threadIdx.x + blockDim.x*blockIdx.x;
-  int a_value;
-  int b_value;
+  long a_value;
+  long b_value;
 
   if(tid < size ){
       // Coalesced access to global memory. Doing this way we reduce required bandwich.
