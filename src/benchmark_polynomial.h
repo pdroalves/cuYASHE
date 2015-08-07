@@ -1,0 +1,4 @@
+#ifndef BENCHMARK_POLYNOMIAL_H
+#define BENCHMARK_POLYNOMIAL_H
+
+#endif

@@ -19,7 +19,7 @@ BENCHMARKPOLYBIN= $(INSTALL)/benchmark_poly
 BENCHMARKYASHEBIN= $(INSTALL)/benchmark_yashe
 
 # all:main all-tests benchmark
-all: tests
+all: tests benchmarkpoly
 
 tests: polynomial.o cuda_functions.o test.o
 	$(CUDA_CC) $(LCUDA) $(ICUDA)  -G -g -o $(TESTBIN) test.o polynomial.o cuda_functions.o -Xcompiler $(OPENMP) $(NTL) -lboost_unit_test_framework
@@ -27,19 +27,15 @@ tests: polynomial.o cuda_functions.o test.o
 # main:main.o polynomial.o ciphertext.o cuda_functions.o kernels.o distribution.o yashe.o
 # 	$(CUDA_CC) $(LCUDA) $(ICUDA)  -G -g -o $(BIN) main.o polynomial.o ciphertext.o cuda_functions.o kernels.o distribution.o yashe.o -lcufft -Xcompiler $(OPENMP) $(NTL)
 
-# benchmark:benchmark_polynomial.o benchmark_yashe.o polynomial.o ciphertext.o cuda_functions.o kernels.o distribution.o yashe.o
-# 		$(CUDA_CC) $(LCUDA) $(ICUDA)  -G -g -o $(BENCHMARKPOLYBIN) benchmark_polynomial.o polynomial.o ciphertext.o cuda_functions.o kernels.o distribution.o yashe.o -lcufft -Xcompiler $(OPENMP) $(NTL) $(LTIME_MEASURE)
-# 		$(CUDA_CC) $(LCUDA) $(ICUDA)  -G -g -o $(BENCHMARKYASHEBIN) benchmark_yashe.o polynomial.o ciphertext.o cuda_functions.o kernels.o distribution.o yashe.o -lcufft -Xcompiler $(OPENMP) $(NTL) $(LTIME_MEASURE)
-#
-# all-tests:tests.o polynomial.o ciphertext.o cuda_functions.o kernels.o distribution.o yashe.o
-# 		$(CUDA_CC) $(LCUDA) $(ICUDA)  -G -g -o $(TESTBIN) tests.o polynomial.o ciphertext.o cuda_functions.o kernels.o distribution.o yashe.o -lcufft -Xcompiler $(OPENMP) $(NTL) -lboost_unit_test_framework
-#
+benchmarkpoly:benchmark_polynomial.o polynomial.o cuda_functions.o 
+		$(CUDA_CC) $(LCUDA) $(ICUDA)  -G -g -o $(BENCHMARKPOLYBIN) benchmark_polynomial.o polynomial.o cuda_functions.o  -Xcompiler $(OPENMP) $(NTL) $(LTIME_MEASURE)
+
 # main.o:main.cpp
 # 	$(CC) -c main.cpp -o main.o $(LCUDA) $(ICUDA)
-#
-# benchmark_polynomial.o:benchmark_polynomial.cpp
-# 		$(CC) -c benchmark_polynomial.cpp -o benchmark_polynomial.o $(LCUDA) $(ICUDA) $(LTIME_MEASURE)
-#
+
+benchmark_polynomial.o:benchmark_polynomial.cpp
+		$(CC) -c benchmark_polynomial.cpp -o benchmark_polynomial.o $(OPENMP) $(LCUDA) $(ICUDA) $(LTIME_MEASURE)
+
 # benchmark_yashe.o:benchmark_yashe.cpp
 # 		$(CC) -c benchmark_yashe.cpp -o benchmark_yashe.o $(LCUDA) $(ICUDA) $(LTIME_MEASURE)
 

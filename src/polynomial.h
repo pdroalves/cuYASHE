@@ -185,12 +185,12 @@ class Polynomial{
 
       #ifdef VERBOSE
       std::cout << "Adding:" << std::endl;
-      std::cout << "this: " << *this << std::endl;
-      std::cout << "other " << b << std::endl;
+      // std::cout << "this: " << this->to_string() << std::endl;
+      // std::cout << "other " << b.to_string() << std::endl;
       #endif
 
       // Apply CRT and copy data to global memory, if needed
-      #pragma omp parallel sections
+      #pragma omp parallel sections num_threads(2)
       {
           #pragma omp section
           {
@@ -234,8 +234,8 @@ class Polynomial{
 
       #ifdef VERBOSE
       std::cout << "Sub:" << std::endl;
-      std::cout << "this: " << *this << std::endl;
-      std::cout << "other " << b << std::endl;
+      // std::cout << "this: " << this->to_string() << std::endl;
+      // std::cout << "other " << b.to_string() << std::endl;
       #endif
 
       // Apply CRT and copy data to global memory, if needed
@@ -564,7 +564,7 @@ class Polynomial{
       }
 
       if((unsigned int)(index) >= this->coefs.size()){
-        #if VERBOSE
+        #ifdef VERBOSE
           std::cout << "Resizing from "<< this->coefs.size() << " to " << index+1 << std::endl;
         #endif
 
@@ -639,7 +639,7 @@ class Polynomial{
         std::vector<long> P;
 
         // long q_size = conv<long>(NTL::NumBytes(q))*8;
-        int primes_size = 63;
+        int primes_size = CRTPRIMESIZE;
         // long nprimes = (degree*2*q_size)/primes_size+1;
         long n;
 

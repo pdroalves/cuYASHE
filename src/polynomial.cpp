@@ -43,12 +43,10 @@ void Polynomial::update_device_data(){
     }
 
     result = cudaDeviceSynchronize();
-    #ifdef VERBOSE
-    std::cout << cudaGetErrorString(result) << std::endl;
-    #endif
     assert(result == cudaSuccess);
     this->ON_COPY = false;
     this->set_device_updated(true);
+    assert(this->get_device_updated() == true);
 }
 
 void Polynomial::update_host_data(){
