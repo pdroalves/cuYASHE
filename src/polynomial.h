@@ -311,7 +311,7 @@ class Polynomial{
       // To-do
       throw "Polynomial multiplication not implemented!";
       long *d_result;
-      
+
       Polynomial c(this->get_mod(),this->get_phi(),this->CRTSPACING);
       c.set_device_crt_residues(d_result);
       c.set_host_updated(false);
@@ -387,6 +387,7 @@ class Polynomial{
       }
 
       p.set_coeff(0,p.get_coeff(0)+b);
+      p.set_device_updated(false;)
       return p;
     }
     Polynomial operator+=(ZZ b){
@@ -402,6 +403,7 @@ class Polynomial{
         return p-B;
       }
       p.set_coeff(0,p.get_coeff(0)-b);
+      p.set_device_updated(false;)
       return p;
     }
     Polynomial operator-=(ZZ b){
@@ -420,6 +422,7 @@ class Polynomial{
       #pragma omp parallel for
       for(int i = 0; i <= this->deg();i++)
         p.set_coeff(i,conv<ZZ>(p.get_coeff(i)*b));
+      p.set_device_updated(false;)
       return p;
     }
     Polynomial operator*=(ZZ b){
@@ -435,6 +438,7 @@ class Polynomial{
       #pragma omp parallel for
       for(int i = 0; i <= p.deg();i++)
         p.set_coeff(i,p.get_coeff(i)%b);
+      p.set_device_updated(false;)
 
       return p;
     }
@@ -451,6 +455,7 @@ class Polynomial{
       #pragma omp parallel for
       for(int i = 0; i <= p.deg();i++)
         p.set_coeff(i,p.get_coeff(i)/b);
+      p.set_device_updated(false;)
 
       return p;
     }
