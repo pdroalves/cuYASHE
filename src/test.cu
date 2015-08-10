@@ -5,11 +5,28 @@
 
 #include "polynomial.h"
 #include "common.h"
+#include "cuda_functions.h"
+#include <cuda.h>
+#include <cuda_runtime_api.h>
+#include <cuda_runtime.h>
 
 #define NTESTS 100
 
+struct CUDASuite
+{
+  // Test CUDA functions
+    CUDASuite(){
+    }
+
+    ~CUDASuite()
+    {
+        BOOST_TEST_MESSAGE("teardown mass");
+    }
+};
+
 struct PolySuite
 {
+  // Test polynomial functions
     int degree;
     Polynomial phi;
 
@@ -135,8 +152,88 @@ BOOST_AUTO_TEST_CASE(zeroAdd)
 
 }
 
+BOOST_AUTO_TEST_CASE(multiplyByZZOnCPU)
+{
+  Polynomial a;
+  ZZ b;
 
-BOOST_AUTO_TEST_CASE(multiply)
+  for(int count = 0; count < NTESTS; count++){
+
+    a.set_device_updated(false);
+    Polynomial::random(&a,degree-1);
+    a.set_host_updated(true);
+
+    ZZ_pEX a_ntl;
+    for(int i = 0;i <= a.deg();i++)
+      NTL::SetCoeff(a_ntl,i,conv<ZZ_p>(a.get_coeff(i)));
+    NTL::RandomBnd(b,ZZ(42));
+    // b = ZZ(0);
+
+    Polynomial c = a*b % Polynomial::global_mod;
+    c.icrt();
+    c.normalize();
+
+    ZZ_pEX c_ntl = a_ntl*conv<ZZ_p>(b);
+
+    #ifdef VERBOSE
+    std::cout << "a: " << a.to_string() << " degree: " << a.deg() <<std::endl;
+    std::cout << "b: " << b <<std::endl;
+    std::cout << "c: " << c.to_string() << " degree: " << c.deg() <<std::endl;
+    std::cout << ": " << c_ntl << " degree: " << NTL::deg(c_ntl) << std::endl << std::endl;
+    std::cout << "c_ntl: " << c_ntl << " degree: " << NTL::deg(c_ntl) << std::endl << std::endl;
+    std::cout << "count: " << count << std::endl;
+    #endif
+    BOOST_REQUIRE(NTL::deg(c_ntl) == c.deg());
+    for(int i = 0;i <= c.deg();i++)
+      BOOST_REQUIRE(conv<ZZ>(NTL::rep(c_ntl[i])[0]) == c.get_coeff(i));
+  }
+}
+
+BOOST_AUTO_TEST_CASE(multiplyByZZOnGPU)
+{
+  Polynomial a;
+  ZZ b;
+
+  for(int count = 0; count < NTESTS; count++){
+
+    a.set_device_updated(false);
+    Polynomial::random(&a,degree-1);
+    a.set_host_updated(true);
+
+    ZZ_pEX a_ntl;
+    for(int i = 0;i <= a.deg();i++)
+      NTL::SetCoeff(a_ntl,i,conv<ZZ_p>(a.get_coeff(i)));
+    NTL::RandomBnd(b,ZZ(42));
+    // b = ZZ(0);
+
+    // This will force the execution on GPU
+    a.crt();
+    a.update_device_data();
+    a.set_host_updated(false);
+
+    Polynomial c = a*b % Polynomial::global_mod;
+    c.icrt();
+    c.normalize();
+
+    ZZ_pEX c_ntl = a_ntl*conv<ZZ_p>(b);
+
+    #ifdef VERBOSE
+    std::cout << "a: " << a.to_string() << " degree: " << a.deg() <<std::endl;
+    std::cout << "b: " << b <<std::endl;
+    std::cout << "c: " << c.to_string() << " degree: " << c.deg() <<std::endl;
+    std::cout << ": " << c_ntl << " degree: " << NTL::deg(c_ntl) << std::endl << std::endl;
+    std::cout << "c_ntl: " << c_ntl << " degree: " << NTL::deg(c_ntl) << std::endl << std::endl;
+    std::cout << "count: " << count << std::endl;
+    #endif
+    BOOST_REQUIRE(NTL::deg(c_ntl) == c.deg());
+    for(int i = 0;i <= c.deg();i++)
+      BOOST_REQUIRE(conv<ZZ>(NTL::rep(c_ntl[i])[0]) == c.get_coeff(i));
+  }
+}
+
+
+
+BOOST_AUTO_TEST_CASE(multiplyByPolynomial)
 {
   Polynomial a;
   Polynomial b;
@@ -178,47 +275,6 @@ BOOST_AUTO_TEST_CASE(multiply)
   }
 }
 
-BOOST_AUTO_TEST_CASE(severalMultiplications)
-{
-  Polynomial a;
-  Polynomial b;
-
-  a.set_device_updated(false);
-  b.set_device_updated(false);
-  Polynomial::random(&a,degree-1);
-  Polynomial::random(&b,degree-1);
-  a.set_host_updated(true);
-  b.set_host_updated(true);
-
-  ZZ_pEX b_ntl;
-  ZZ_pEX a_ntl;
-  for(int i = 0;i <= a.deg();i++)
-    NTL::SetCoeff(a_ntl,i,conv<ZZ_p>(a.get_coeff(i)));
-  for(int i = 0;i <= b.deg();i++)
-    NTL::SetCoeff(b_ntl,i,conv<ZZ_p>(b.get_coeff(i)));
-
-  Polynomial c = a*b;
-  ZZ_pEX c_ntl = a_ntl*b_ntl;
-
-  for(int count = 0; count < NTESTS; count++){
-    c *= c;
-    c_ntl *= c_ntl;
-  }
-  c.icrt();
-
-  #ifdef DEBUG
-  if(c_ntl != c){
-    std::cout << "a: " << a << " degree: " << NTL::deg(a) <<std::endl;
-    std::cout << "b: " << b << " degree: " << NTL::deg(b) <<std::endl;
-    std::cout << "c: " << c << " degree: " << NTL::deg(c) <<std::endl;
-    std::cout << "c_ntl: " << c_ntl << " degree: " << NTL::deg(c_ntl) << std::endl << std::endl;
-  }
-  std::cout << "count: " << count << std::endl;
-  #endif
-  BOOST_REQUIRE(NTL::deg(c_ntl) == c.deg());
-  for(int i = 0;i <= c.deg();i++)
-    BOOST_REQUIRE(conv<ZZ>(NTL::rep(c_ntl[i])[0]) == c.get_coeff(i));
-}
 
 BOOST_AUTO_TEST_CASE(modularInversion)
 {
@@ -249,4 +305,72 @@ BOOST_AUTO_TEST_CASE(expectedDegree)
 
 }
 
+BOOST_AUTO_TEST_SUITE_END()
+
+BOOST_FIXTURE_TEST_SUITE(CUDAFixture, CUDASuite)
+
+BOOST_AUTO_TEST_CASE(bitreverse)
+{
+  int N = 4096;
+  int NPOLYS = 30;
+
+
+  long *h_a;
+  long *d_a;
+  long *h_b;
+
+  // Alloc memory
+  h_a = (long*)malloc(N*NPOLYS*sizeof(long));
+  h_b = (long*)malloc(N*NPOLYS*sizeof(long));
+  cudaError_t result = cudaMalloc((void**)&d_a,N*NPOLYS*sizeof(long));
+  assert(result == cudaSuccess);
+
+  // Generates random values
+  for(int i = 0; i < N*NPOLYS; i++){
+    h_a[i] = rand() % 1024;
+  }
+
+
+  // Copy to GPU
+    result = cudaMemcpy(d_a,h_a , N*NPOLYS*sizeof(long), cudaMemcpyHostToDevice);
+  assert(result == cudaSuccess);
+
+  // Bit reverse
+  dim3 blockDim(32);
+  dim3 gridDim(NPOLYS/32+1);
+  host_bitreverse(gridDim,blockDim,d_a,N,NPOLYS);
+  assert(cudaGetLastError() == cudaSuccess);
+
+  // Verify if the values were really shuffled
+  result = cudaMemcpy(h_b,d_a , N*NPOLYS*sizeof(long), cudaMemcpyDeviceToHost);
+  assert(result == cudaSuccess);
+
+  int count = 0;
+  for(int i = 0; i < N*NPOLYS; i++){
+    if(h_b[i] == h_a[i]){
+      count++;
+    }
+  }
+  float ratio = float(count)/(N*NPOLYS);
+  BOOST_CHECK(ratio < 0.02);
+
+  // Bit reverse
+  host_bitreverse(gridDim,blockDim,d_a,N,NPOLYS);
+  assert(cudaGetLastError() == cudaSuccess);
+
+  // Verify if the values were shuffled to the original position
+  count = 0;
+  result = cudaMemcpy(h_b,d_a , N*NPOLYS*sizeof(long), cudaMemcpyDeviceToHost);
+  assert(result == cudaSuccess);
+  for(int i = 0; i < N*NPOLYS; i++){
+    if(h_b[i] != h_a[i]){
+      count++;
+    }
+  }
+  BOOST_REQUIRE(count == 0);
+
+  cudaFree(d_a);
+  free(h_a);
+  free(h_b);
+}
 BOOST_AUTO_TEST_SUITE_END()

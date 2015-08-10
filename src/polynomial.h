@@ -178,7 +178,7 @@ class Polynomial{
     Polynomial operator+(Polynomial b){
       // Check align
       if(this->CRTSPACING != b.CRTSPACING){
-        int new_spacing = max(this->CRTSPACING,b.CRTSPACING);
+        int new_spacing = std::max(this->CRTSPACING,b.CRTSPACING);
         this->update_crt_spacing(new_spacing);
         b.update_crt_spacing(new_spacing);
       }
@@ -227,7 +227,7 @@ class Polynomial{
     Polynomial operator-(Polynomial b){
       // Check align
       if(this->CRTSPACING != b.CRTSPACING){
-        int new_spacing = max(this->CRTSPACING,b.CRTSPACING);
+        int new_spacing = std::max(this->CRTSPACING,b.CRTSPACING);
         this->update_crt_spacing(new_spacing);
         b.update_crt_spacing(new_spacing);
       }
@@ -273,8 +273,51 @@ class Polynomial{
       return *this;
     }
     Polynomial operator*(Polynomial b){
+
+      // Check align
+      if(this->CRTSPACING != b.CRTSPACING){
+        int new_spacing = std::max(this->CRTSPACING,b.CRTSPACING);
+        this->update_crt_spacing(new_spacing);
+        b.update_crt_spacing(new_spacing);
+      }
+
+      #ifdef VERBOSE
+      std::cout << "Mul:" << std::endl;
+      // std::cout << "this: " << this->to_string() << std::endl;
+      // std::cout << "other " << b.to_string() << std::endl;
+      #endif
+
+      // Apply CRT and copy data to global memory, if needed
+      #pragma omp parallel sections
+      {
+          #pragma omp section
+          {
+
+              if(!this->get_device_updated()){
+                this->crt();
+                this->update_device_data();
+              }
+
+          }
+          #pragma omp section
+          {
+              if(!b.get_device_updated()){
+                  b.crt();
+                  b.update_device_data();
+              }
+          }
+      }
+
       // To-do
       throw "Polynomial multiplication not implemented!";
+      long *d_result;
+      
+      Polynomial c(this->get_mod(),this->get_phi(),this->CRTSPACING);
+      c.set_device_crt_residues(d_result);
+      c.set_host_updated(false);
+      c.set_device_updated(true);
+      cudaDeviceSynchronize();
+      return c;
     }
     Polynomial operator*=(Polynomial b){
       this->copy( ((*this)*b));
@@ -336,8 +379,13 @@ class Polynomial{
 
     Polynomial operator+(ZZ b){
       Polynomial p(*this);
-      if(!p.get_host_updated())
-        p.icrt();
+      if(!this->get_host_updated()){
+        // Convert to polynomial and send to device
+        Polynomial B(this->get_mod(),this->get_phi(),this->get_crt_spacing());
+        B.set_coeff(0,b);
+        return p+B;
+      }
+
       p.set_coeff(0,p.get_coeff(0)+b);
       return p;
     }
@@ -347,8 +395,12 @@ class Polynomial{
     }
     Polynomial operator-(ZZ b){
       Polynomial p(*this);
-      if(!p.get_host_updated())
-        p.icrt();
+      if(!this->get_host_updated()){
+        // Convert to polynomial and send to device
+        Polynomial B(this->get_mod(),this->get_phi(),this->get_crt_spacing());
+        B.set_coeff(0,b);
+        return p-B;
+      }
       p.set_coeff(0,p.get_coeff(0)-b);
       return p;
     }
@@ -358,11 +410,15 @@ class Polynomial{
     }
     Polynomial operator*(ZZ b){
       Polynomial p(*this);
-      if(!p.get_host_updated())
-        p.icrt();
+      if(!this->get_host_updated()){
+        // Convert to polynomial and send to device
+        Polynomial B(this->get_mod(),this->get_phi(),this->get_crt_spacing());
+        B.set_coeff(0,b);
+        return p*B;
+      }
 
-      #pragma omp for
-      for(int i = 0; i <= p.deg();i++)
+      #pragma omp parallel for
+      for(int i = 0; i <= this->deg();i++)
         p.set_coeff(i,conv<ZZ>(p.get_coeff(i)*b));
       return p;
     }
@@ -371,34 +427,14 @@ class Polynomial{
       return *this;
     }
     Polynomial operator%(ZZ b){
-      #ifdef VERBOSE
-        std::cout << "This operations is slower than a division by an integer." << std::endl;
-      #endif
       Polynomial p(*this);
-      if(!p.get_host_updated())
-        p.icrt();
+      if(!this->get_host_updated()){
+        throw "Polynomial mod on device not implemented!"; 
+      }
 
-      #pragma omp for
+      #pragma omp parallel for
       for(int i = 0; i <= p.deg();i++)
         p.set_coeff(i,p.get_coeff(i)%b);
-
-      return p;
-    }
-    Polynomial operator/=(ZZ b){
-      this->set_coeffs( ((*this)/b).get_coeffs());
-      return *this;
-    }
-    Polynomial operator/(ZZ b){
-      #ifdef VERBOSE
-        std::cout << "This operations is slower than a division by an integer." << std::endl;
-      #endif
-      Polynomial p(*this);
-      if(!p.get_host_updated())
-        p.icrt();
-
-      #pragma omp for
-      for(int i = 0; i <= p.deg();i++)
-        p.set_coeff(i,p.get_coeff(i)/b);
 
       return p;
     }
@@ -406,76 +442,48 @@ class Polynomial{
       this->set_coeffs( ((*this)%b).get_coeffs());
       return *this;
     }
-    Polynomial operator+(int b){
+    Polynomial operator/(ZZ b){
+      Polynomial p(*this);
       if(!this->get_host_updated()){
-        // If host data isn't updated, it is faster to convert b to Polynomial and operates on GPU
-        Polynomial other(this->get_mod(),this->get_phi(),this->get_crt_spacing());
-        // Polynomial other(this->get_mod(),this->get_crt_spacing());
-        return (*this) + b;
-      }else{
-        Polynomial p(*this);
-
-        p.set_coeff(0,conv<ZZ>(p.get_coeff(0)+b));
-        return p;
+        throw "Polynomial division on device not implemented!"; 
       }
 
+      #pragma omp parallel for
+      for(int i = 0; i <= p.deg();i++)
+        p.set_coeff(i,p.get_coeff(i)/b);
+
+      return p;
+    }
+    Polynomial operator/=(ZZ b){
+      this->set_coeffs( ((*this)/b).get_coeffs());
+      return *this;
+    }
+    Polynomial operator+(int b){
+      return (*this)+ZZ(b);
     }
     Polynomial operator+=(int b){
       this->set_coeffs( ((*this)+b).get_coeffs());
       return *this;
     }
     Polynomial operator-(int b){
-      if(!this->get_host_updated()){
-        // If host data isn't updated, it is faster to convert b to Polynomial and operates on GPU
-        Polynomial other(this->get_mod(),this->get_phi(),this->get_crt_spacing());
-        // Polynomial other(this->get_mod(),this->get_crt_spacing());
-        return (*this) - b;
-      }else{
-        Polynomial p(*this);
-
-        p.set_coeff(0,conv<ZZ>(p.get_coeff(0)-b));
-        return p;
-      }
-
+      return (*this)-ZZ(b);
     }
     Polynomial operator-=(int b){
       this->set_coeffs( ((*this)-b).get_coeffs());
       return *this;
     }
     Polynomial operator*(int b){
-      if(!this->get_host_updated()){
-        // If host data isn't updated, it is faster to operates on GPU
-        // To-do
-        throw "Polynomial multiplication by integer on device not implemented!";
-      }else{
-        Polynomial p(*this);
-
-        #pragma omp for
-        for(int i = 0; i <= p.deg();i++)
-          p.set_coeff(i,conv<ZZ>(p.get_coeff(i)*b));
-        return p;
-      }
+      return (*this)*ZZ(b);
     }
     Polynomial operator*=(int b){
-      this->set_coeffs( ((*this)*b).get_coeffs());
+      this->set_coeffs( ((*this)*conv<ZZ>(b)).get_coeffs());
       return *this;
     }
     Polynomial operator/(int b){
-      if(!this->get_host_updated()){
-        // If host data isn't updated, it is faster to operates on GPU
-        // To-do
-        throw "Polynomial division by integer on device not implemented!";
-      }else{
-        Polynomial p(*this);
-
-        #pragma omp for
-        for(int i = 0; i <= p.deg();i++)
-          p.set_coeff(i,conv<ZZ>(p.get_coeff(i)/b));
-        return p;
-      }
+      return (*this)/ZZ(b);
     }
     Polynomial operator/=(int b){
-      this->set_coeffs( ((*this)/b).get_coeffs());
+      this->set_coeffs( ((*this)/conv<ZZ>(b)).get_coeffs());
       return *this;
     }
 

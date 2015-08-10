@@ -2,6 +2,7 @@
 #define CUDA_FUNCTIONS_H
 #include <cuda_runtime.h>
 
+void host_bitreverse(dim3 gridDim,dim3 blockDim,long *a,int n,int npolys);
 class CUDAFunctions{
   public:
     static long* callPolynomialAddSub(cudaStream_t stream,long *a,long *b,int size,int OP);

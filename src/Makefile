@@ -57,8 +57,8 @@ cuda_functions.o:cuda_functions.cu
 # yashe.o:yashe.cpp
 # 	$(CC) -c yashe.cpp -o yashe.o $(NTL) $(LCUDA) $(ICUDA)
 
-test.o:test.cpp
-	$(CUDA_CC) -c test.cpp -o test.o  -lboost_unit_test_framework $(NTL)
+test.o:test.cu
+	$(CUDA_CC) -c test.cu -o test.o  -lboost_unit_test_framework $(NTL)
 
 clean:
 	rm -f $(BIN) $(TESTBIN) $(BENCHMARKPOLYBIN) $(BENCHMARKYASHEBIN) main.o benchmark_polynomial.o benchmark_yashe.o polynomial.o tests.o ciphertext.o cuda_functions.o kernels.o distribution.o yashe.o test.o

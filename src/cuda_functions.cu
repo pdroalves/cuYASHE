@@ -95,3 +95,46 @@ __host__ long* CUDAFunctions::callPolynomialAddSub(cudaStream_t stream,long *a,l
   return d_new_array;
 }
 ///////////////////////////////////////
+
+///////////////////////////////////////
+/// MUL
+
+__device__ void swap(long *a,int i,int j){
+  // Input:
+  // a: array to operate
+  // i,j: positions to swap
+  long aux = a[i];
+  a[i] = a[j];
+  a[j] = aux;
+}
+
+__global__ void bitreverse(long *a,int n,int npolys){
+  // Each thread executes the bit reverse for a entire polynomial
+  // This operation occurs inplace
+  //
+  // Input:
+  // a: array to bitreverse
+  // n: number of coefficientes
+  // size: size of array "a"
+  const int tid = threadIdx.x+blockDim.x*blockIdx.x;
+  if(tid < npolys){
+    const int offset = tid*n; 
+    int j = 0;
+    for(int i = 1; i < n; i++){
+      int b = n >> 1;
+      while(j >= b){
+        j -= b;
+        b >>= 1;
+      }
+      j += b;
+      if(j > i){
+        swap(a,i+offset,j+offset);
+      }
+    }
+  }
+}
+
+__host__ void host_bitreverse(dim3 gridDim,dim3 blockDim,long *a,int n,int npolys){
+  // This is a dummy method used by the test framework. Probably unnecessary.
+  bitreverse<<<gridDim,blockDim>>>(a,n,npolys);
+}
