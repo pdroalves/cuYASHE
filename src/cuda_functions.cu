@@ -99,45 +99,6 @@ __host__ long* CUDAFunctions::callPolynomialAddSub(cudaStream_t stream,long *a,l
 ///////////////////////////////////////
 /// MUL
 
-__device__ void swap(long *a,int i,int j){
-  // Input:
-  // a: array to operate
-  // i,j: positions to swap
-  long aux = a[i];
-  a[i] = a[j];
-  a[j] = aux;
-}
-
-__global__ void bitreverse(long *a,int n,int npolys){
-  // Each thread executes the bit reverse for a entire polynomial
-  // This operation occurs inplace
-  //
-  // Input:
-  // a: array to bitreverse
-  // n: number of coefficientes
-  // size: size of array "a"
-  const int tid = threadIdx.x+blockDim.x*blockIdx.x;
-  if(tid < npolys){
-    const int offset = tid*n;
-    int j = 0;
-    for(int i = 1; i < n; i++){
-      int b = n >> 1;
-      while(j >= b){
-        j -= b;
-        b >>= 1;
-      }
-      j += b;
-      if(j > i){
-        swap(a,i+offset,j+offset);
-      }
-    }
-  }
-}
-
-__global__ void polynomialMul(){
-
-}
-
 __device__ void sumReduce(long value,long *a,int i,long q,int N, int NPolis){
   // Sum all elements in array "r" and writes to a, in position i
 
@@ -192,10 +153,6 @@ __global__ void INTT(){
 
 }
 
-__host__ void host_bitreverse(dim3 gridDim,dim3 blockDim,long *a,int n,int npolys){
-  // This is a dummy method used by the test framework. Probably unnecessary.
-  bitreverse<<<gridDim,blockDim>>>(a,n,npolys);
-}
 
 __host__ void host_NTT(dim3 gridDim,dim3 blockDim,long *W,long *a, long *a_hat, long q,int N,int NPolis){
   // This is a dummy method used by the test framework. Probably unnecessary.
@@ -203,20 +160,32 @@ __host__ void host_NTT(dim3 gridDim,dim3 blockDim,long *W,long *a, long *a_hat, 
 }
 
 
-// __host__ long* CUDAFunctions::callPolynomialMul(cudaStream_t stream,long *a,long *b,int N,int size,int OP){
-//   // For CRT polynomial adding, all representations should be concatenated aligned
-//   assert((N>0)&&((n & (n - 1)) == 0));//Check if N is power of 2
-//
-//   // Allocates memory for temporary arrays on device
-//   // Each polynomial's degree gets doubled
-//   long *d_a;
-//   long *d_b;
-//   cudaError_t result = cudaMalloc((void**)&d_a,2*size*sizeof(long));
-//   assert(result == cudaSuccess);
-//   cudaError_t result = cudaMalloc((void**)&d_b,2*size*sizeof(long));
-//   assert(result == cudaSuccess);
-//
-//   dim3 blockDim(32);
-//   dim3 gridDim((2*size)/32+1);
-//   NTT<<<gridDim,blockDim,1,stream>>>(a,d_a,N,size);
-// }
+__host__ long* CUDAFunctions::callPolynomialMul(cudaStream_t stream,long *a,long *b,int N,int NPolis){
+  // All representations should be concatenated aligned
+  assert((N>0)&&((N & (N - 1)) == 0));//Check if N is power of 2
+  long *d_result;
+
+  #ifdef PLAINMUL
+    #ifdef VERBOSE
+        std::cout << "Plain multiplication" << std::endl;
+    #endif
+  #else
+
+    // To-do
+    throw "Polynomial multiplication not implemented!";
+    // Allocates memory for temporary arrays on device
+    // Each polynomial's degree gets doubled
+    long *d_a;
+    long *d_b;
+    cudaError_t result = cudaMalloc((void**)&d_a,2*size*sizeof(long));
+    assert(result == cudaSuccess);
+    cudaError_t result = cudaMalloc((void**)&d_b,2*size*sizeof(long));
+    assert(result == cudaSuccess);
+
+    dim3 blockDim(32);
+    dim3 gridDim((2*size)/32+1);
+    NTT<<<gridDim,blockDim,1,stream>>>(a,d_a,N,size);
+  #endif
+
+  return d_result;
+}

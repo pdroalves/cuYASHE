@@ -8,6 +8,7 @@ void host_NTT(dim3 gridDim,dim3 blockDim,long *W,long *a, long *a_hat, long q,in
 class CUDAFunctions{
   public:
     static long* callPolynomialAddSub(cudaStream_t stream,long *a,long *b,int size,int OP);
+    static long* callPolynomialMul(cudaStream_t stream,long *a,long *b, int N, int NPolis);
     static long* callRealignCRTResidues(cudaStream_t stream,int oldSpacing,int newSpacing, long *array,int residuesSize,int residuesQty);
   private:
 };

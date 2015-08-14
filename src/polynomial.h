@@ -308,17 +308,7 @@ class Polynomial{
           }
       }
 
-      #ifdef PLAINMUL
-        #ifdef VERBOSE
-            std::cout << "Plain multiplication" << std::endl;
-        #endif
-      #else
-
-        // To-do
-        throw "Polynomial multiplication not implemented!";
-        long *d_result;
-        
-      #endif
+      long *d_result = CUDAFunctions::callPolynomialMul(this->stream,this->get_device_crt_residues(),b.get_device_crt_residues(),std::max(this->deg()+1,b.deg()+1),this->CRTPrimes.size());
 
       Polynomial c(this->get_mod(),this->get_phi(),this->CRTSPACING);
       c.set_device_crt_residues(d_result);
