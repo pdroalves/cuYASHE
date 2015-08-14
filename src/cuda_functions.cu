@@ -118,7 +118,7 @@ __global__ void bitreverse(long *a,int n,int npolys){
   // size: size of array "a"
   const int tid = threadIdx.x+blockDim.x*blockIdx.x;
   if(tid < npolys){
-    const int offset = tid*n; 
+    const int offset = tid*n;
     int j = 0;
     for(int i = 1; i < n; i++){
       int b = n >> 1;
@@ -134,7 +134,88 @@ __global__ void bitreverse(long *a,int n,int npolys){
   }
 }
 
+__global__ void polynomialMul(){
+
+}
+
+__device__ void sumReduce(long* r,long *a,int i,int N, int NPolis){
+  // Sum all elements in array "r" and writes to a, in position i
+
+  const int tid = threadIdx.x + blockIdx.x*blockDim.x;
+
+  if(tid < N*NPolis){
+
+    r[threadIdx.x] = a[tid];// Loads all values to shared memory
+    int stage = blockDim.x;
+    while(stage > 0){// Equivalent to for(int i = 0; i < lrint(log2(N))+1;i++)
+      if(threadIdx.x < stage/2){
+        // Only half of the threads are used
+        r[threadIdx.x] += r[2*threadIdx.x];
+      }
+      stage /= 2;
+    }
+    // After this loop, r[0] hold the sum of all block data
+
+    if(threadIdx.x == 0)
+      atomicAdd((unsigned long long int*)(&(a[i])),(unsigned long long int)(r[threadIdx.x]));
+  }
+}
+
+__global__ void NTT(long *W,long *a, long *a_hat, int N,int NPolis){
+  // This algorithm supposes that N is power of 2, divisible by 32
+  // Input:
+  // w: Matrix of wNs
+  // a: residues
+  // a_hat: output
+  // N: # of coefficients of each polynomial
+  // NPolis: # of residues
+
+  const int tid = threadIdx.x + blockIdx.x*blockDim.x;
+  __shared__ long r[ADDBLOCKXDIM];
+
+  if(tid < N*NPolis){
+
+    // In each iteration, computes a_hat[i]
+    for(int i = 0; i < N; i++){
+      int cid = tid % N; // Coefficient id
+
+      r[threadIdx.x] = W[cid + i*N]*a[tid];
+      sumReduce(r,a_hat,cid,N,NPolis);
+    }
+  }
+
+}
+
+__global__ void INTT(){
+  // This algorithm supposes that N is power of 2
+
+}
+
 __host__ void host_bitreverse(dim3 gridDim,dim3 blockDim,long *a,int n,int npolys){
   // This is a dummy method used by the test framework. Probably unnecessary.
   bitreverse<<<gridDim,blockDim>>>(a,n,npolys);
 }
+
+__host__ void host_NTT(dim3 gridDim,dim3 blockDim,long *W,long *a, long *a_hat, int N,int NPolis){
+  // This is a dummy method used by the test framework. Probably unnecessary.
+  NTT<<<gridDim,blockDim>>>(W,a,a_hat,N,NPolis);
+}
+
+
+// __host__ long* CUDAFunctions::callPolynomialMul(cudaStream_t stream,long *a,long *b,int N,int size,int OP){
+//   // For CRT polynomial adding, all representations should be concatenated aligned
+//   assert((N>0)&&((n & (n - 1)) == 0));//Check if N is power of 2
+//
+//   // Allocates memory for temporary arrays on device
+//   // Each polynomial's degree gets doubled
+//   long *d_a;
+//   long *d_b;
+//   cudaError_t result = cudaMalloc((void**)&d_a,2*size*sizeof(long));
+//   assert(result == cudaSuccess);
+//   cudaError_t result = cudaMalloc((void**)&d_b,2*size*sizeof(long));
+//   assert(result == cudaSuccess);
+//
+//   dim3 blockDim(32);
+//   dim3 gridDim((2*size)/32+1);
+//   NTT<<<gridDim,blockDim,1,stream>>>(a,d_a,N,size);
+// }

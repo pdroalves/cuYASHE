@@ -387,7 +387,7 @@ class Polynomial{
       }
 
       p.set_coeff(0,p.get_coeff(0)+b);
-      p.set_device_updated(false;)
+      p.set_device_updated(false);
       return p;
     }
     Polynomial operator+=(ZZ b){
@@ -403,7 +403,7 @@ class Polynomial{
         return p-B;
       }
       p.set_coeff(0,p.get_coeff(0)-b);
-      p.set_device_updated(false;)
+      p.set_device_updated(false);
       return p;
     }
     Polynomial operator-=(ZZ b){
@@ -422,7 +422,7 @@ class Polynomial{
       #pragma omp parallel for
       for(int i = 0; i <= this->deg();i++)
         p.set_coeff(i,conv<ZZ>(p.get_coeff(i)*b));
-      p.set_device_updated(false;)
+      p.set_device_updated(false);
       return p;
     }
     Polynomial operator*=(ZZ b){
@@ -432,13 +432,13 @@ class Polynomial{
     Polynomial operator%(ZZ b){
       Polynomial p(*this);
       if(!this->get_host_updated()){
-        throw "Polynomial mod on device not implemented!"; 
+        throw "Polynomial mod on device not implemented!";
       }
 
       #pragma omp parallel for
       for(int i = 0; i <= p.deg();i++)
         p.set_coeff(i,p.get_coeff(i)%b);
-      p.set_device_updated(false;)
+      p.set_device_updated(false);
 
       return p;
     }
@@ -449,13 +449,13 @@ class Polynomial{
     Polynomial operator/(ZZ b){
       Polynomial p(*this);
       if(!this->get_host_updated()){
-        throw "Polynomial division on device not implemented!"; 
+        throw "Polynomial division on device not implemented!";
       }
 
       #pragma omp parallel for
       for(int i = 0; i <= p.deg();i++)
         p.set_coeff(i,p.get_coeff(i)/b);
-      p.set_device_updated(false;)
+      p.set_device_updated(false);
 
       return p;
     }
@@ -533,10 +533,10 @@ class Polynomial{
       }
 
       // Remove last 0-coefficients
-      while(this->deg() >= 0 && 
+      while(this->deg() >= 0 &&
             this->get_coeff(this->deg()) == ZZ(0))
         this->coefs.pop_back();
-      
+
     }
     // gets and sets
     ZZ get_mod(){
