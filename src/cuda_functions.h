@@ -3,7 +3,7 @@
 #include <cuda_runtime.h>
 
 void host_bitreverse(dim3 gridDim,dim3 blockDim,long *a,int n,int npolys);
-void host_NTT(dim3 gridDim,dim3 blockDim,long *W,long *a, long *a_hat, int N,int NPolis);
+void host_NTT(dim3 gridDim,dim3 blockDim,long *W,long *a, long *a_hat, long q,int N,int NPolis);
 
 class CUDAFunctions{
   public:

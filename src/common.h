@@ -5,4 +5,7 @@
 #define SUB 1
 #define CRTPRIMESIZE 63
 // #define VERBOSE
+#define PLAINMUL
+// #define NTTMUL
+// #define FFTMUL
 #endif

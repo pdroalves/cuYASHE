@@ -308,9 +308,17 @@ class Polynomial{
           }
       }
 
-      // To-do
-      throw "Polynomial multiplication not implemented!";
-      long *d_result;
+      #ifdef PLAINMUL
+        #ifdef VERBOSE
+            std::cout << "Plain multiplication" << std::endl;
+        #endif
+      #else
+
+        // To-do
+        throw "Polynomial multiplication not implemented!";
+        long *d_result;
+        
+      #endif
 
       Polynomial c(this->get_mod(),this->get_phi(),this->CRTSPACING);
       c.set_device_crt_residues(d_result);

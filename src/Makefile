@@ -19,7 +19,7 @@ BENCHMARKPOLYBIN= $(INSTALL)/benchmark_poly
 BENCHMARKYASHEBIN= $(INSTALL)/benchmark_yashe
 
 # all:main all-tests benchmark
-all: tests benchmarkpoly
+all: tests benchmarkpoly test_ntt
 
 tests: polynomial.o cuda_functions.o test.o
 	$(CUDA_CC) $(LCUDA) $(ICUDA)  -G -g -o $(TESTBIN) test.o polynomial.o cuda_functions.o -Xcompiler $(OPENMP) $(NTL) -lboost_unit_test_framework
@@ -27,7 +27,7 @@ tests: polynomial.o cuda_functions.o test.o
 # main:main.o polynomial.o ciphertext.o cuda_functions.o kernels.o distribution.o yashe.o
 # 	$(CUDA_CC) $(LCUDA) $(ICUDA)  -G -g -o $(BIN) main.o polynomial.o ciphertext.o cuda_functions.o kernels.o distribution.o yashe.o -lcufft -Xcompiler $(OPENMP) $(NTL)
 
-benchmarkpoly:benchmark_polynomial.o polynomial.o cuda_functions.o 
+benchmarkpoly:benchmark_polynomial.o polynomial.o cuda_functions.o
 		$(CUDA_CC) $(LCUDA) $(ICUDA)  -G -g -o $(BENCHMARKPOLYBIN) benchmark_polynomial.o polynomial.o cuda_functions.o  -Xcompiler $(OPENMP) $(NTL) $(LTIME_MEASURE)
 
 # main.o:main.cpp
@@ -57,6 +57,8 @@ cuda_functions.o:cuda_functions.cu
 # yashe.o:yashe.cpp
 # 	$(CC) -c yashe.cpp -o yashe.o $(NTL) $(LCUDA) $(ICUDA)
 
+test_ntt: cuda_functions.o
+	nvcc -G -g test_ntt.cu cuda_functions.cu -o ../bin/test_ntt -lntl -lgmp
 test.o:test.cu
 	$(CUDA_CC) -c test.cu -o test.o  -lboost_unit_test_framework $(NTL)
 
