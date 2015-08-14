@@ -19,7 +19,7 @@ BENCHMARKPOLYBIN= $(INSTALL)/benchmark_poly
 BENCHMARKYASHEBIN= $(INSTALL)/benchmark_yashe
 
 # all:main all-tests benchmark
-all: tests benchmarkpoly test_ntt
+all: tests benchmarkpoly 
 
 tests: polynomial.o cuda_functions.o test.o
 	$(CUDA_CC) $(LCUDA) $(ICUDA)  -G -g -o $(TESTBIN) test.o polynomial.o cuda_functions.o -Xcompiler $(OPENMP) $(NTL) -lboost_unit_test_framework

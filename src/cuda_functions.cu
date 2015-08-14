@@ -99,66 +99,9 @@ __host__ long* CUDAFunctions::callPolynomialAddSub(cudaStream_t stream,long *a,l
 ///////////////////////////////////////
 /// MUL
 
-__device__ void sumReduce(long value,long *a,int i,long q,int N, int NPolis){
-  // Sum all elements in array "r" and writes to a, in position i
-
-  const int tid = threadIdx.x + blockIdx.x*blockDim.x;
-  __shared__ long r[ADDBLOCKXDIM];
-  r[threadIdx.x] = value;
-
-  if(tid < N*NPolis){
-
-    int stage = blockDim.x;
-    while(stage > 0){// Equivalent to for(int i = 0; i < lrint(log2(N))+1;i++)
-      if(threadIdx.x < stage/2 && (tid % N) + stage/2 < N){
-        // Only half of the threads are used
-        r[threadIdx.x] += r[threadIdx.x + stage/2];
-      }
-      stage /= 2;
-      __syncthreads();
-    }
-    // After this loop, r[0] hold the sum of all block data
-
-    if(threadIdx.x == 0)
-      atomicAdd((unsigned long long int*)(&(a[i])),(unsigned long long int)(r[threadIdx.x] % q));
-    __syncthreads();
-  }
-}
-
-__global__ void NTT(long *W,long *a, long *a_hat, long q, int N,int NPolis){
-  // This algorithm supposes that N is power of 2, divisible by 32
-  // Input:
-  // w: Matrix of wNs
-  // a: residues
-  // a_hat: output
-  // N: # of coefficients of each polynomial
-  // NPolis: # of residues
-
-  const int tid = threadIdx.x + blockIdx.x*blockDim.x;
-
-  if(tid < N*NPolis){
-
-    // In each iteration, computes a_hat[i]
-    for(int i = 0; i < N; i++){
-      int cid = tid % N; // Coefficient id
-
-      sumReduce(W[cid + i*N]*a[cid],a_hat,i,q,N,NPolis);
-    }
-  }
+__global__ void polynomialPlainMul(long *a,long *b,int N,int NPolis){
 
 }
-
-__global__ void INTT(){
-  // This algorithm supposes that N is power of 2
-
-}
-
-
-__host__ void host_NTT(dim3 gridDim,dim3 blockDim,long *W,long *a, long *a_hat, long q,int N,int NPolis){
-  // This is a dummy method used by the test framework. Probably unnecessary.
-  NTT<<<gridDim,blockDim>>>(W,a,a_hat,q,N,NPolis);
-}
-
 
 __host__ long* CUDAFunctions::callPolynomialMul(cudaStream_t stream,long *a,long *b,int N,int NPolis){
   // All representations should be concatenated aligned
