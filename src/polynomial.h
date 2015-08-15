@@ -32,7 +32,9 @@ class Polynomial{
       if(this->global_phi){
         // If a global phi is defined, use it
         this->phi = this->global_phi; // Doesn't copy. Uses the reference.
-        this->CRTSPACING = 2*(this->global_phi->deg()+1);
+
+        // If the irreductible polynomial have degree N, this polynomial's degree will be limited to N-1
+        this->CRTSPACING = this->global_phi->deg();
       }else{
         // CRT Spacing not set
         this->CRTSPACING = -1;
@@ -70,8 +72,9 @@ class Polynomial{
       this->mod = ZZ(p);// Copy
       *(this->phi) = Polynomial(P);// Copy
 
-      // CRT Spacing set to two times phi degree+1
-      this->CRTSPACING = 2*(this->phi->deg())+1;
+      // CRT Spacing should store the expected number of coefficients
+      // If the irreductible polynomial have degree N, this polynomial's degree will be limited to N-1
+      this->CRTSPACING = this->phi->deg();
 
       coefs.push_back(ZZ(0));
       #ifdef VERBOSE
@@ -308,9 +311,9 @@ class Polynomial{
           }
       }
 
-      long *d_result = CUDAFunctions::callPolynomialMul(this->stream,this->get_device_crt_residues(),b.get_device_crt_residues(),std::max(this->deg()+1,b.deg()+1),this->CRTPrimes.size());
+      long *d_result = CUDAFunctions::callPolynomialMul(this->stream,this->get_device_crt_residues(),b.get_device_crt_residues(),this->CRTSPACING,this->CRTPrimes.size());
 
-      Polynomial c(this->get_mod(),this->get_phi(),this->CRTSPACING);
+      Polynomial c(this->get_mod(),this->get_phi(),2*this->CRTSPACING);
       c.set_device_crt_residues(d_result);
       c.set_host_updated(false);
       c.set_device_updated(true);

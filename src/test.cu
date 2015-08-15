@@ -44,6 +44,11 @@ struct PolySuite
         srand (36251);
 
         ZZ_p::init(Polynomial::global_mod);
+        ZZ_pX NTL_Phi;
+        for(int i = 0; i <= phi.deg();i++){
+          NTL::SetCoeff(NTL_Phi,i,conv<ZZ_p>(phi.get_coeff(i)));
+        }
+        ZZ_pE::init(NTL_Phi);
 
         Polynomial::gen_crt_primes(Polynomial::global_mod,degree);
     }
@@ -268,6 +273,8 @@ BOOST_AUTO_TEST_CASE(multiplyByPolynomial)
     }
     std::cout << "count: " << count << std::endl;
     #endif
+    std::cout << "c: " << c.to_string() << " degree: " << c.deg() << std::endl << std::endl;
+
     BOOST_REQUIRE(NTL::deg(c_ntl) == c.deg());
     for(int i = 0;i <= c.deg();i++)
       BOOST_REQUIRE(conv<ZZ>(NTL::rep(c_ntl[i])[0]) == c.get_coeff(i));

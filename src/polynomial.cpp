@@ -110,12 +110,12 @@ void Polynomial::crt(){
 
 void Polynomial::icrt(){
   // Escapes, if possible
-  if(this->get_host_updated()){
+  if(this->get_host_updated())
     return;
-  }else{
-      this->update_host_data();
-  }
-  
+  else
+    this->update_host_data();
+
+
   std::vector<long> P = this->CRTPrimes;
   ZZ M = this->CRTProduct;
 
@@ -125,8 +125,10 @@ void Polynomial::icrt(){
     // Polynomial xi(this->get_mod(),this->get_phi(),this->get_crt_spacing());
     Polynomial xi(this->get_mod(),this->get_phi(),this->get_crt_spacing());
     xi.set_coeffs(this->polyCRT[i]);
-
+    // Asserts that each residue is in the correct field
     ZZ pi = ZZ(P[i]);
+    xi %= pi;
+    
     ZZ Mpi= M/pi;
     ZZ InvMpi = NTL::InvMod(Mpi%pi,pi);
 

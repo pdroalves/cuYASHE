@@ -99,11 +99,49 @@ __host__ long* CUDAFunctions::callPolynomialAddSub(cudaStream_t stream,long *a,l
 ///////////////////////////////////////
 /// MUL
 
-__global__ void polynomialPlainMul(long *a,long *b,int N,int NPolis){
+__global__ void polynomialPlainMul(const long *a,const long *b,long *c,const int N,const int NPolis){
+  // Each block computes one coefficient of c
+  // 2D-blocks
 
+  const int tidX = threadIdx.x + blockDim.x*blockIdx.x;
+  const int tidY = threadIdx.y + blockDim.y*blockIdx.y;
+
+  // blockDim.x == blockDim.y
+  // const int TILEDIM = blockDim.x;
+  // if(threadIdx.x < DN){
+
+    // Since we cannot create more than 1024 threads per block in our GTX Titan, we use tiles
+    // const int NTILES = (TILEDIM % N == 0? TILEDIM/N : TILEDIM/N+1);
+    // for(int TILE = 0; TILE < NTILES;TILE ++){
+      //               coeff + TILEPosition + residue
+      // int i = threadIdx.x + TILE*TILEDIM + (tid/N)*N;
+      // int j = threadIdx.y + TILE*TILEDIM + (tid/N)*N;
+      // long a_value = a[i];
+      // long b_value = b[j];
+    // }
+
+    int i = (tidX % N) + (tidX/N)*N;
+    int j = (tidY % N) + (tidY/N)*N;
+    if(i+j < N){
+
+      long a_value = a[i];
+      long b_value = b[j];
+      long c_value = a_value*b_value;//Debug
+
+      atomicAdd((unsigned long long int*)(&(c[i+j])),(unsigned long long int)(c_value));
+    }
+  // }
 }
 
 __host__ long* CUDAFunctions::callPolynomialMul(cudaStream_t stream,long *a,long *b,int N,int NPolis){
+  // This method expects that both arrays are aligned
+
+  // Input:
+  // stream: cudaStream
+  // a: first operand
+  // b: second operand
+  // N: number of coefficients for each operand
+  // NPolis: number of residues
   // All representations should be concatenated aligned
   assert((N>0)&&((N & (N - 1)) == 0));//Check if N is power of 2
   long *d_result;
@@ -112,6 +150,17 @@ __host__ long* CUDAFunctions::callPolynomialMul(cudaStream_t stream,long *a,long
     #ifdef VERBOSE
         std::cout << "Plain multiplication" << std::endl;
     #endif
+    cudaError_t result = cudaMalloc((void**)&d_result,(2*N)*NPolis*sizeof(long));
+    assert(result == cudaSuccess);
+    result = cudaMemset((void*)d_result,0,(2*N)*NPolis*sizeof(long));
+    assert(result == cudaSuccess);
+
+
+    dim3 blockDim(ADDBLOCKXDIM,ADDBLOCKXDIM);
+    int blocks = ((2*N*NPolis) % ADDBLOCKXDIM == 0? (2*N*NPolis)/ADDBLOCKXDIM : (2*N*NPolis)/ADDBLOCKXDIM+1);
+    dim3 gridDim(blocks,blocks);
+    polynomialPlainMul<<<gridDim,blockDim,1,stream>>>(a,b,d_result,N,NPolis);
+    assert(cudaGetLastError() == cudaSuccess);
   #else
 
     // To-do
