@@ -7,6 +7,7 @@
 #include <cuda_runtime.h>
 #include "cuda_functions.h"
 #include "common.h"
+#include <algorithm>
 
 NTL_CLIENT
 
@@ -421,7 +422,7 @@ class Polynomial{
       }
 
       #pragma omp parallel for
-      for(int i = 0; i <= this->deg();i++)
+      for(int i = 0; i <= p.deg();i++)
         p.set_coeff(i,conv<ZZ>(p.get_coeff(i)*b));
       p.set_device_updated(false);
       return p;
@@ -437,8 +438,12 @@ class Polynomial{
       }
 
       #pragma omp parallel for
-      for(int i = 0; i <= p.deg();i++)
+      for(int i = 0; i <= p.deg();i++){
+        // ZZ value = p.get_coeff(i)%b;
+        // std::cout << "value: " << value << std::endl << "b: " << b<< std::endl;
+        // p.set_coeff(i,value);
         p.set_coeff(i,p.get_coeff(i)%b);
+      }
       p.set_device_updated(false);
 
       return p;
@@ -517,7 +522,7 @@ class Polynomial{
     void CPUAddition(Polynomial *b){
       // Forces the addition to be executed by CPU
       // This method supposes that there is no need to apply CRT/ICRT on operands
-      for(unsigned int i = 0; i <= b->deg(); i++)
+      for(unsigned int i = 0; i <= std::max(this->deg(),b->deg()); i++)
         this->set_coeff(i,this->get_coeff(i) + b->get_coeff(i));
     }
 
@@ -652,15 +657,16 @@ class Polynomial{
         ZZ M = ZZ(1);
         std::vector<long> P;
 
-        // long q_size = conv<long>(NTL::NumBytes(q))*8;
         int primes_size = CRTPRIMESIZE;
-        // long nprimes = (degree*2*q_size)/primes_size+1;
         long n;
 
-        while( (M < degree*q*q) ){
+        while( (M < (2*degree)*q*q*q) ){
             n = NTL::GenPrime_long(primes_size);
-            P.push_back(n);
-            M *=(n);
+            if( std::find(P.begin(), P.end(), n) == P.end()){
+              // Does not contains
+              P.push_back(n);
+              M *=(n);
+            }
         }
 
         Polynomial::CRTProduct = M;
@@ -672,7 +678,6 @@ class Polynomial{
         // std::cout << "Primes: "<< Polynomial::CRTPrimes << std::endl;
         #endif
     }
-
 
     void update_device_data();
     void set_device_updated(bool b){
