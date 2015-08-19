@@ -25,33 +25,47 @@ double compute_time_ms(struct timespec start,struct timespec stop){
 }
 
 
-__device__ void sumReduce(uint64_t value,uint64_t *a,int i,uint64_t q,int N, int NPolis){
-  // Sum all elements in array "r" and writes to a, in position i
+// __device__ __host__ uint64_t mulmod(uint64_t a, uint64_t b, uint64_t m) {
+//     int64_t res = 0;
+//     while (a != 0) {
+//         if (a & 1) res = (res + b) % m;
+//         a >>= 1;
+//         b = (b << 1) % m;
+//     }
+//     return res;
+// }
 
-  const int tid = threadIdx.x + blockIdx.x*blockDim.x;
-  __shared__ uint64_t r[ADDBLOCKXDIM];
-  r[threadIdx.x] = value;
+__device__ __host__ uint64_t mulmod(uint64_t a, uint64_t b, uint64_t m) {
+    uint64_t res = 0;
+    uint64_t temp_b;
 
-  if(tid < N*NPolis){
-
-    int stage = blockDim.x;
-    while(stage > 0){// Equivalent to for(int i = 0; i < lrint(log2(N))+1;i++)
-      if(threadIdx.x < stage/2 && (tid % N) + stage/2 < N){
-        // Only half of the threads are used
-        r[threadIdx.x] += r[threadIdx.x + stage/2];
-      }
-      stage /= 2;
-      __syncthreads();
+    /* Only needed if b may be >= m */
+    if (b >= m) {
+        if (m > UINT64_MAX / 2u)
+            b -= m;
+        else
+            b %= m;
     }
-    // After this loop, r[0] hold the sum of all block data
 
-    if(threadIdx.x == 0)
-      atomicAdd((unsigned long long*)(&(a[i])),(unsigned long long)(r[threadIdx.x] % q));
-    __syncthreads();
-  }
+    while (a != 0) {
+        if (a & 1) {
+            /* Add b to res, modulo m, without overflow */
+            if (b >= m - res) /* Equiv to if (res + b >= m), without overflow */
+                res -= m;
+            res += b;
+        }
+        a >>= 1;
+
+        /* Double b, modulo m */
+        temp_b = b;
+        if (b >= m - b)       /* Equiv to if (2 * b >= m), without overflow */
+            temp_b -= m;
+        b += temp_b;
+    }
+    return res;
 }
 
-__global__ void NTT(uint64_t *W,uint64_t *a, uint64_t *a_hat, int N,int NPolis){
+__global__ void NTT(uint64_t *W,uint64_t *a, uint64_t *a_hat, int N,int NPolis,uint64_t P){
   // This algorithm supposes that N is power of 2, divisible by 32
   // Input:
   // w: Matrix of wNs
@@ -61,49 +75,199 @@ __global__ void NTT(uint64_t *W,uint64_t *a, uint64_t *a_hat, int N,int NPolis){
   // NPolis: # of residues
 
   const int tid = threadIdx.x + blockIdx.x*blockDim.x;
-  const uint64_t p = 0xffffffff00000001;
-  if(tid < N*NPolis){
+  const int cid = tid & (N-1); // Coefficient id
 
+  // const uint64_t p = 0xffffffff00000001;
+  if(tid < N*NPolis){
+    uint64_t value = 0;
     // In each iteration, computes a_hat[i]
     for(int i = 0; i < N; i++){
-      int cid = tid % N; // Coefficient id
-
-      sumReduce(W[cid + i*N]*a[cid],a_hat,i,p,N,NPolis);
+      value = (value + mulmod(W[i + cid*N],a[i],P)) %P;
     }
+    a_hat[cid] = value % P;
   }
 
 }
 
-uint64_t powerMod(uint64_t x,long h,uint64_t p){
-  unsigned long t;
-  if(h == 0)
-    return 1;
-  else if(h == 1)
-    return x % p;
-  else
-    t = log2((double)(h))+1;
-  ZZ r = ZZ(x);
-  ZZ X = ZZ(x);
-  ZZ P = ZZ(p);
 
-  for(int i = t-1; i >= 0; i--){
-    r = r*r;
-    r %= P;
-    if((h >> i) & 1 == 1)//i-th bit
-      r *= X % P;
+
+__global__ void DOUBLENTT2(uint64_t *W,uint64_t *a, uint64_t *a_hat,uint64_t *b, uint64_t *b_hat, int N,int NPolis,uint64_t P){
+  // This algorithm supposes that N is power of 2, divisible by 32
+  // Input:
+  // w: Matrix of wNs
+  // a: residues
+  // a_hat: output
+  // N: # of coefficients of each polynomial
+  // NPolis: # of residues
+
+  const int tid = threadIdx.x + blockIdx.x*blockDim.x;
+  const int cid = tid & (N-1); // Coefficient id
+
+  // const uint64_t p = 0xffffffff00000001;
+  if(tid < N*NPolis){
+    uint64_t Wvalue;
+    uint64_t Avalue;
+    uint64_t Bvalue;
+    // In each iteration, computes a_hat[i]
+    for(int i = 0; i < N; i++){
+      Wvalue = W[i + cid*N];
+      Avalue = (Avalue + Wvalue*a[i]) ;
+      Bvalue = (Bvalue + Wvalue*b[i]) ;
+    }
+    a_hat[cid] = Avalue;
+    b_hat[cid] = Bvalue;
+  }
+
+}
+
+
+uint64_t SQM_pow (uint64_t b, uint64_t e, uint64_t mod)
+{
+    uint64_t result = 1;
+    unsigned significant = 1;
+    {
+        uint64_t e_t = e;
+
+        while (e_t >>= 1)
+        {
+            ++significant;
+        }
+    }
+
+    for (int pos = significant-1; pos >= 0; --pos)
+    {
+        bool bit = e & (1 << pos);
+        result = mulmod(result, result, mod);
+
+        if (bit)
+            result = mulmod(result,b, mod);
+    }
+
+    return result;
+}
+
+// ZZ ZZFromUint64 (uint64_t value)
+// {
+//     unsigned int unit = 256;
+//     ZZ power;
+//     power = 1;
+//     ZZ res;
+//     res = 0;
+
+//     while (value > 0) {
+//         res = res + ((long int)value % unit) * power;
+//         power = power * unit;
+//         value = value / unit;
+//     }
+//     return res;
+
+// };
+// uint64_t
+// uint64FromZZ(ZZ val)
+// {
+//     uint64_t res = 0;
+//     uint64_t mul = 1;
+//     while (val > 0) {
+//         res = res + mul*(to_int(val % 10));
+//         mul = mul * 10;
+//         val = val / 10;
+//     }
+//     return res;
+// }
+
+uint64_t powerMod(uint64_t x,uint64_t h,uint64_t p){
+  // unsigned long t;
+  // if(h == 0)
+  //   return 1;
+  // else if(h == 1)
+  //   return x % p;
+  // else
+  //   t = log2((double)(h))+1;
+  // ZZ r = ZZ(x);
+  // ZZ X = ZZ(x);
+  // ZZ P = ZZ(p);
+
+  // for(int i = t-1; i >= 0; i--){
+  //   r = r*r;
+  //   r %= P;
+  //   if((h >> i) & 1 == 1)//i-th bit
+  //     r *= X % P;
     
-  }
-  return conv<uint64_t>(r);
+  // }
+  // return conv<uint64_t>(r);
+
+  // return uint64FromZZ(NTL::PowerMod(ZZFromUint64(x),h,ZZFromUint64(p)));
+  return (SQM_pow(x,h,p));
 }
+
+uint64_t invMod(uint64_t x,uint64_t p){
+  // if(x == 0){
+    // std:: cout << "Achei o erro!" << std::endl;
+  // }
+  // std::cout << x << std::endl;
+  // return uint64FromZZ(NTL::InvMod(ZZFromUint64(x),ZZFromUint64(p)));
+  // return uint64FromZZ(NTL::PowerMod(ZZFromUint64(x),p-2,ZZFromUint64(p)));
+
+  return (SQM_pow(x,p-2,p));
+
+}
+
+// uint64_t hi(uint64_t x) {
+//     return x >> 32;
+// }
+
+// uint64_t lo(uint64_t x) {
+//     return ((1 << 32) - 1) & x;
+// }
+
+// void multiply(uint64_t a, uint64_t b) {
+//     // actually uint32_t would do, but the casting is annoying
+//     uint64_t s0, s1, s2, s3; 
+
+//     uint64_t x = lo(a) * lo(b);
+//     s0 = lo(x);
+
+//     x = hi(a) * lo(b) + hi(x);
+//     s1 = lo(x);
+//     s2 = hi(x);
+
+//     x = s1 + lo(a) * hi(b);
+//     s1 = lo(x);
+
+//     x = s2 + hi(a) * hi(b) + hi(x);
+//     s2 = lo(x);
+//     s3 = hi(x);
+
+//     uint64_t result = s1 << 32 | s0;
+//     uint64_t carry = s3 << 32 | s2;
+// }
+
+
 
 int main(void){
 
+  // std:: cout <<  mulmod(6406262673276882058,4,9223372036854829057) << std::endl;
+  // std:: cout <<  NTL::MulMod(6406262673276882058,4,9223372036854829057) << std::endl;
+
+// uint64_t integer = 9223372036854829057L;
+//     ZZ P = ZZ(integer);
+//     ZZ x = Z(6209464568650184525);
+//     ZZ inv = NTL::InvMod(x,P);
+    
+//     cout << integer << "\n" << P << endl;
+    
+//     cout << "PowerMod: " << inv << endl;
+    
+//     cout << "Check: " << NTL::MulMod(inv, Z(6209464568650184525), P) << endl;    
+//   return 0;
   const int N = DEGREE;
-  const uint64_t P = 0xffffffff00000001;
+  // const uint64_t P = 0xffffffff00000001;
+  const uint64_t P = 9223372036854829057;//63 bits
   assert((P-1)%(N) == 0);
-  const uint64_t k = (P-1)/(N);
-  const uint64_t wN = powerMod(7,k,P);
+  const uint64_t k = (P-1)/N;
+  // const uint64_t wN = powerMod(5,k,P);
   // const uint64_t wN = 549755813888;// Hard coded
+  const uint64_t wN = 6209464568650184525;// Hard coded
   std::cout << "wN == " << wN << std::endl;
   std::cout << "k == " << k << std::endl;
   std::cout << "N == " << N << std::endl;
@@ -146,13 +310,18 @@ int main(void){
 
   for(int j = 0; j < N; j++)
     for(int i = 0; i < N; i++)
-        h_WInv[i+j*N] = powerMod(wN,-j*i,P);
-  std::cout << "W computed. " << h_W[1+N] << " == " << wN << std::endl;
-  uint64_t valor1 = pow(2,40);
-  std::cout << "2**40 " << valor1  << std::endl;
-  uint64_t valor2 = powerMod(2,40,P);
-  std::cout << "valor2: "<< valor2 << std::endl;
-  assert(h_W[1+N] == wN);
+        h_WInv[i+j*N] = invMod(h_W[i+j*N],P);
+
+  assert(h_W[1+N] == wN % P);
+  assert(h_W[2+N] == powerMod(wN,2,P) % P);
+  assert(h_W[2+2*N] == powerMod(wN,4,P) % P);
+
+  std::cout << h_W[1+N] << " * " << h_WInv[1+N] << std::endl;
+  std::cout << mulmod(h_W[1+N],h_WInv[1+N],P) << std::endl;
+  assert(mulmod(h_W[1+N],h_WInv[1+N],P) == 1);
+  assert(mulmod(h_W[2+N],h_WInv[2+N],P) == 1);
+  assert(mulmod(h_W[2+2*N],h_WInv[2+2*N],P) == 1);
+
 	// Generates random values
   for(int j = 0; j < NPOLYS;j++)
   	for(int i = 0; i < N/2; i++)
@@ -183,13 +352,17 @@ int main(void){
 
 	// Applies NTT
   // Foward
-  NTT<<<gridDim,blockDim>>>(d_W,d_a,d_b,N,NPOLYS);
+  NTT<<<gridDim,blockDim>>>(d_W,d_a,d_b,N,NPOLYS,P);
   assert(cudaGetLastError() == cudaSuccess);
 
-  result = cudaMemset((void*)d_a,0,N*NPOLYS*sizeof(uint64_t));
+  // result = cudaMemcpy(h_b,d_b ,  N*NPOLYS*sizeof(uint64_t), cudaMemcpyDeviceToHost);
+  // assert(result == cudaSuccess);
+  // for(int i = 0; i < N; i++)
+  //   std::cout << h_b[i] << std::endl;
 
+  result = cudaMemset((void*)d_a,0,N*NPOLYS*sizeof(uint64_t));
   // Inverse
-  NTT<<<gridDim,blockDim>>>(d_WInv,d_b,d_a,N,NPOLYS);
+  NTT<<<gridDim,blockDim>>>(d_WInv,d_b,d_a,N,NPOLYS,P);
   assert(cudaGetLastError() == cudaSuccess);
 
 	// Verify if the values were really shuffled
@@ -198,13 +371,12 @@ int main(void){
 
 	//
   // std::cout << "Output: " << std::endl;
-  uint64_t NInv = NTL::InvMod(N,P);
   int count = 0;
   for(int i = 0; i < N; i++)
-    if((h_b[i]*NInv % P) != h_a[i])
-    std::cout << i << ") "<<(h_b[i]*NInv % P) << " != " << h_a[i] << std::endl;
-      // count++;
-  // std::cout << count << " errors." << std::endl;
+    if(h_b[i]/N != h_a[i])
+    // std::cout << i << ") "<<h_b[i]/N << " != " << h_a[i] << std::endl;
+      count++;
+  std::cout << count << " errors." << std::endl;
 	cudaFree(d_a);
 	free(h_a);
 	free(h_b);
