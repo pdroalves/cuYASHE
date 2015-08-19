@@ -101,35 +101,39 @@ __host__ long* CUDAFunctions::callPolynomialAddSub(cudaStream_t stream,long *a,l
 
 __global__ void polynomialPlainMul(const long *a,const long *b,long *c,const int N,const int NPolis){
   // Each block computes one coefficient of c
+  // We need 2*N blocks for each residue!
   // 2D-blocks
 
-  const int tidX = threadIdx.x + blockDim.x*blockIdx.x;
-  const int tidY = threadIdx.y + blockDim.y*blockIdx.y;
+  // const int tidX = threadIdx.x + blockDim.x*blockIdx.x;
+  // const int tidY = threadIdx.y + blockDim.y*blockIdx.y;
 
   // blockDim.x == blockDim.y
-  // const int TILEDIM = blockDim.x;
-  // if(threadIdx.x < DN){
+  // We suppose that TILEDIM divides 2*N
+  const int TILEDIM = blockDim.x;
+  const int coefficient = blockIdx.x % (2*N);
+  const int residueID = blockIdx.x / (2*N);
+  const int residueOffset = residueID*(2*N);
+  __shared__ long value;
+  value = 0;
 
-    // Since we cannot create more than 1024 threads per block in our GTX Titan, we use tiles
-    // const int NTILES = (TILEDIM % N == 0? TILEDIM/N : TILEDIM/N+1);
-    // for(int TILE = 0; TILE < NTILES;TILE ++){
-      //               coeff + TILEPosition + residue
-      // int i = threadIdx.x + TILE*TILEDIM + (tid/N)*N;
-      // int j = threadIdx.y + TILE*TILEDIM + (tid/N)*N;
-      // long a_value = a[i];
-      // long b_value = b[j];
-    // }
+  // blockDim.x == blockDim.y
+  // if(tidX < N && tidY < N){
+    for(int tileY = 0;tileY < N/TILEDIM; tileY++)
+      for(int tileX = 0;tileX < N/TILEDIM; tileX++){
+        //      (           coefficient    ) + residue
+        int i = (threadIdx.x + tileX*TILEDIM);
+        int j = (threadIdx.y + tileY*TILEDIM);
 
-    int i = (tidX % N) + (tidX/N)*N;
-    int j = (tidY % N) + (tidY/N)*N;
-    if(i+j < N){
+        if(i + j == coefficient)
+          atomicAdd((unsigned long long int*)(&value),(unsigned long long int)(a[i+residueOffset]*b[j+residueOffset]));
+      }
+    __syncthreads();
 
-      long a_value = a[i];
-      long b_value = b[j];
-      long c_value = a_value*b_value;//Debug
+    if(threadIdx.x == 0 && threadIdx.y == 0)
+      c[coefficient+residueOffset] = value;
+      // There are 2N threads in Y axis computing this coefficient
+      // atomicAdd((unsigned long long int*)(&(c[coefficient+residueOffset])),(unsigned long long int)(value));
 
-      atomicAdd((unsigned long long int*)(&(c[i+j])),(unsigned long long int)(c_value));
-    }
   // }
 }
 
@@ -155,10 +159,10 @@ __host__ long* CUDAFunctions::callPolynomialMul(cudaStream_t stream,long *a,long
     result = cudaMemset((void*)d_result,0,(2*N)*NPolis*sizeof(long));
     assert(result == cudaSuccess);
 
-
     dim3 blockDim(ADDBLOCKXDIM,ADDBLOCKXDIM);
-    int blocks = ((2*N*NPolis) % ADDBLOCKXDIM == 0? (2*N*NPolis)/ADDBLOCKXDIM : (2*N*NPolis)/ADDBLOCKXDIM+1);
-    dim3 gridDim(blocks,blocks);
+    // int blocks = ((2*N*NPolis) % ADDBLOCKXDIM == 0? (2*N*NPolis)/ADDBLOCKXDIM : (2*N*NPolis)/ADDBLOCKXDIM+1);
+    // dim3 gridDim(blocks,blocks);
+    dim3 gridDim(2*N*NPolis,1);
     polynomialPlainMul<<<gridDim,blockDim,1,stream>>>(a,b,d_result,N,NPolis);
     assert(cudaGetLastError() == cudaSuccess);
   #else

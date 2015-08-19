@@ -274,6 +274,7 @@ BOOST_AUTO_TEST_CASE(multiplyByPolynomial)
     std::cout << "count: " << count << std::endl;
     #endif
     std::cout << "c: " << c.to_string() << " degree: " << c.deg() << std::endl << std::endl;
+    std::cout << "c_ntl: " << c_ntl << " degree: " << NTL::deg(c_ntl) << std::endl << std::endl;
 
     BOOST_REQUIRE(NTL::deg(c_ntl) == c.deg());
     for(int i = 0;i <= c.deg();i++)

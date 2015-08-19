@@ -658,6 +658,7 @@ class Polynomial{
         std::vector<long> P;
 
         int primes_size = CRTPRIMESIZE;
+        std::cout << "Primes size: " << primes_size << std::endl;
         long n;
 
         while( (M < (2*degree)*q*q*q) ){

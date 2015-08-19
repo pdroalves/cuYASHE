@@ -10,6 +10,7 @@
 #include <unistd.h>
 #include <NTL/ZZ_pEX.h>
 #include <iomanip>
+ #include <stdint.h>
 
 #define BILLION  1000000000L
 #define MILLION  1000000L
@@ -38,7 +39,8 @@ int main(void){
   Polynomial phi;
   phi.set_mod(Polynomial::global_mod);
 
-  for(int d = 32;d <= 4096;d *= 2){
+  // for(int d = 32;d <= 4096;d *= 2){
+  for(int d = 256;d <= 256;d *= 2){
     std::cout << "d: " << d << std::endl;
 
     clock_gettime( CLOCK_REALTIME, &start);
@@ -58,6 +60,8 @@ int main(void){
 
     std::cout << "q: " << NTL::NumBytes(q)*8 << " bits" << std::endl;
 
+    ///////////////////////////////////////////////
+    // ADD
     // Time measured with memory copy
     Polynomial a;
     Polynomial b;
@@ -81,12 +85,43 @@ int main(void){
     a.update_device_data();
     b.crt();
     b.update_device_data();
-      
+
     clock_gettime( CLOCK_REALTIME, &start);
     for(int i = 0; i < N;i++){
       Polynomial c = (a+b);
     }
     clock_gettime( CLOCK_REALTIME, &stop);
     std::cout << "ADD) Time measured without memory copy: " << compute_time_ms(start,stop)/N << " ms" << std::endl;
+
+    ///////////////////////////////////////////////
+    // MUL
+    // Time measured with memory copy
+    Polynomial::random(&a,d-1);
+    Polynomial::random(&b,d-1);
+    clock_gettime( CLOCK_REALTIME, &start);
+    for(int i = 0; i < N;i++){
+
+      Polynomial c = (a*b);
+      a.set_device_updated(false);
+      b.set_device_updated(false);
+    }
+    clock_gettime( CLOCK_REALTIME, &stop);
+    std::cout << "MUL) Time measured with memory copy: " << compute_time_ms(start,stop)/N << " ms" << std::endl;
+
+    // Time measured without memory copy
+    Polynomial::random(&a,d-1);
+    Polynomial::random(&b,d-1);
+
+    a.crt();
+    a.update_device_data();
+    b.crt();
+    b.update_device_data();
+
+    clock_gettime( CLOCK_REALTIME, &start);
+    for(int i = 0; i < N;i++){
+      Polynomial c = (a*b);
+    }
+    clock_gettime( CLOCK_REALTIME, &stop);
+    std::cout << "MUL) Time measured without memory copy: " << compute_time_ms(start,stop)/N << " ms" << std::endl;
   }
 }

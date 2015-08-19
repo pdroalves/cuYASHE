@@ -13,7 +13,9 @@ int main(){
 
   degree = 32;
 
-  Polynomial::global_mod = conv<ZZ>("61"); // Defines default GF(q)
+  // Polynomial::global_mod = conv<ZZ>("1171313591017775093490277364417"); // Defines default GF(q)
+  // Polynomial::global_mod = conv<ZZ>("61"); // Defines default GF(q)
+  Polynomial::global_mod = conv<ZZ>("11"); // Defines default GF(q)
   Polynomial::BuildNthCyclotomic(&phi,degree);
   // std::cout << phi.to_string() << std::endl;
   phi.set_mod(Polynomial::global_mod);
@@ -51,5 +53,8 @@ int main(){
 
   ZZ_pEX c_ntl = a_ntl*b_ntl;
 
+  std::cout << "a: " << a.to_string() << " degree: " << a.deg() << std::endl << std::endl;
+  std::cout << "b: " << b.to_string() << " degree: " << b.deg() << std::endl << std::endl;
   std::cout << "c: " << c.to_string() << " degree: " << c.deg() << std::endl << std::endl;
+  std::cout << "c_ntl: " << c_ntl << " degree: " << NTL::deg(c_ntl) << std::endl << std::endl;
 }

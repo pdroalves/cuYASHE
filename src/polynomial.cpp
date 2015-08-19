@@ -58,20 +58,26 @@ void Polynomial::update_host_data(){
     if(this->polyCRT.size() != Polynomial::CRTPrimes.size())
       this->polyCRT.resize(Polynomial::CRTPrimes.size());
 
+    // Copy all data to host
+    long *tmp_polyCRT;
+    tmp_polyCRT = (long*) malloc (this->polyCRT.size()*this->CRTSPACING*sizeof(long));
+    result = cudaMemcpyAsync(tmp_polyCRT , this->d_polyCRT, this->polyCRT.size()*this->CRTSPACING*sizeof(long), cudaMemcpyDeviceToHost,this->stream);
+    #ifdef VERBOSE
+    std::cout << "cudaMemCpy" << i << ": " << cudaGetErrorString(result) <<" "<<this->CRTSPACING*sizeof(long) << " bytes to position "<< this->CRTSPACING*i*sizeof(long) <<std::endl;
+    #endif
+    assert(result == cudaSuccess);
+    result = cudaDeviceSynchronize();
+    //
     for(unsigned int i=0;i < this->polyCRT.size();i++){
       if(this->polyCRT[i].size() != this->CRTSPACING)
         this->polyCRT[i].resize(this->CRTSPACING);
-
-        result = cudaMemcpyAsync(&(this->polyCRT[i][0]) , this->d_polyCRT+this->CRTSPACING*i, this->CRTSPACING*sizeof(long), cudaMemcpyDeviceToHost,this->stream);
-        #ifdef VERBOSE
-        std::cout << "cudaMemCpy" << i << ": " << cudaGetErrorString(result) <<" "<<this->CRTSPACING*sizeof(long) << " bytes to position "<< this->CRTSPACING*i*sizeof(long) <<std::endl;
-        #endif
-        assert(result == cudaSuccess);
+        // *(this->polyCRT[i][0]) = *(tmp_polyCRT[i*this->CRTSPACING]);
+        // memcpy(&(this->polyCRT[i])[this->polyCRT[i][0].size() - this->CRTSPACING], &tmp_polyCRT[i*this->CRTSPACING],  this->CRTSPACING * sizeof(long));
+        // std::copy(&(tmp_polyCRT) + i*this->CRTSPACING,&(tmp_polyCRT) + (i+1)*this->CRTSPACING,this->polyCRT[i][0]);
+        for(unsigned int j=0; j < this->CRTSPACING;j++)
+          this->polyCRT[i][j] = tmp_polyCRT[j+i*this->CRTSPACING];
     }
-
-    result = cudaDeviceSynchronize();
-    assert(result == cudaSuccess);
-
+    free(tmp_polyCRT);
     this->set_host_updated(true);
 }
 
@@ -115,10 +121,11 @@ void Polynomial::icrt(){
   else
     this->update_host_data();
 
-
   std::vector<long> P = this->CRTPrimes;
   ZZ M = this->CRTProduct;
 
+  std::cout << "M: " << M << std::endl;
+  std::cout << "Mod: " << this->get_mod() << std::endl;
   Polynomial icrt(this->get_mod(),this->get_phi(),this->get_crt_spacing());
   for(unsigned int i = 0; i < this->polyCRT.size();i++){
     // Convert CRT representations to Polynomial
@@ -127,23 +134,40 @@ void Polynomial::icrt(){
     xi.set_coeffs(this->polyCRT[i]);
     // Asserts that each residue is in the correct field
     ZZ pi = ZZ(P[i]);
+    std::cout << "pi: " << pi << std::endl;
     xi %= pi;
-    
+
     ZZ Mpi= M/pi;
+    std::cout << "Mpi: " << Mpi << std::endl;
+
     ZZ InvMpi = NTL::InvMod(Mpi%pi,pi);
 
     // Polynomial step = ((xi*InvMpi % pi)*Mpi) % M;
     Polynomial step(xi);
 
+    // std::cout << "step: " << step.to_string() << std::endl;
+    // std::cout << "InvMpi: " << InvMpi << std::endl;
     step *= InvMpi;
+    // std::cout << "step*InvMpi: " << step.to_string() << std::endl;
     step %= pi;
+    // std::cout << "step*InvMpi mod pi: " << step.to_string() << std::endl;
     step *= Mpi;
+    // std::cout << "(step*InvMpi mod pi)*Mpi: " << step.to_string() << std::endl;
+    step %= M;
+    // std::cout << "(step*InvMpi mod pi)*Mpi mod M: " << step.to_string() << std::endl;
 
+    // std::cout << "step: " << step.to_string() << std::endl;
+    // std::cout << "icrt: " << icrt.to_string() << std::endl;
     icrt.CPUAddition(&step);
+    // std::cout << "icrt+step: " << icrt.to_string() << std::endl;
+    icrt %= M;
+
   }
-  icrt %= M;
+  // icrt %= M;
+  // std::cout << "icrt: "<< icrt.to_string() << std::endl << "get_mod: " << this->get_mod() << std::endl;
   icrt %= this->get_mod();
-  icrt %= Polynomial::global_phi;
+  // std::cout << "icrt: "<< icrt.to_string() << std::endl << "get_mod: " << this->get_mod() << std::endl;
+  // icrt %= Polynomial::global_phi;
   icrt.normalize();
   this->copy(icrt);
   this->set_host_updated(true);

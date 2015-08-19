@@ -1,5 +1,5 @@
 CUDA_CC = nvcc -O0 -G -g
-CC = g++ -std=c++11 -g -Wall
+CC = g++ -std=c++11 -g -Wall -m64
 
 OPENMP = -fopenmp
 
@@ -22,13 +22,13 @@ BENCHMARKYASHEBIN= $(INSTALL)/benchmark_yashe
 all: tests benchmarkpoly
 
 tests: polynomial.o cuda_functions.o test.o
-	$(CUDA_CC) $(LCUDA) $(ICUDA)  -G -g -o $(TESTBIN) test.o polynomial.o cuda_functions.o -Xcompiler $(OPENMP) $(NTL) -lboost_unit_test_framework
+	$(CUDA_CC) $(CUDA_ARCH) $(LCUDA) $(ICUDA)  -o $(TESTBIN) test.o polynomial.o cuda_functions.o -Xcompiler $(OPENMP) $(NTL) -lboost_unit_test_framework
 
 # main:main.o polynomial.o ciphertext.o cuda_functions.o kernels.o distribution.o yashe.o
-# 	$(CUDA_CC) $(LCUDA) $(ICUDA)  -G -g -o $(BIN) main.o polynomial.o ciphertext.o cuda_functions.o kernels.o distribution.o yashe.o -lcufft -Xcompiler $(OPENMP) $(NTL)
+# 	$(CUDA_CC) $(LCUDA) $(ICUDA)  -o $(BIN) main.o polynomial.o ciphertext.o cuda_functions.o kernels.o distribution.o yashe.o -lcufft -Xcompiler $(OPENMP) $(NTL)
 
 benchmarkpoly:benchmark_polynomial.o polynomial.o cuda_functions.o
-		$(CUDA_CC) $(LCUDA) $(ICUDA)  -G -g -o $(BENCHMARKPOLYBIN) benchmark_polynomial.o polynomial.o cuda_functions.o  -Xcompiler $(OPENMP) $(NTL) $(LTIME_MEASURE)
+		$(CUDA_CC) $(CUDA_ARCH) $(LCUDA) $(ICUDA)  -o $(BENCHMARKPOLYBIN) benchmark_polynomial.o polynomial.o cuda_functions.o  -Xcompiler $(OPENMP) $(NTL) $(LTIME_MEASURE)
 
 # main.o:main.cpp
 # 	$(CC) -c main.cpp -o main.o $(LCUDA) $(ICUDA)
@@ -46,10 +46,10 @@ polynomial.o:polynomial.cpp
 # 	$(CC) -c ciphertext.cpp -o ciphertext.o $(NTL) $(LCUDA) $(ICUDA)
 
 cuda_functions.o:cuda_functions.cu
-	$(CUDA_CC) $(CUDA_ARCH) -G -g -c cuda_functions.cu $(LCUDA) $(ICUDA)
+	$(CUDA_CC) $(CUDA_ARCH) -c cuda_functions.cu $(LCUDA) $(ICUDA) -Xcompiler -m64
 
 # kernels.o:kernels.cu
-# 	$(CUDA_CC) $(CUDA_ARCH) -G -g -c kernels.cu -lcufft
+# 	$(CUDA_CC) $(CUDA_ARCH) -c kernels.cu -lcufft
 #
 # distribution.o:distribution.cpp
 # 	$(CC) -c distribution.cpp -o distribution.o $(NTL) $(LCUDA) $(ICUDA)
@@ -58,11 +58,11 @@ cuda_functions.o:cuda_functions.cu
 # 	$(CC) -c yashe.cpp -o yashe.o $(NTL) $(LCUDA) $(ICUDA)
 
 test_ntt: cuda_functions.o
-	nvcc -G -g test_ntt.cu cuda_functions.cu -o ../bin/test_ntt -lntl -lgmp
+	$(CUDA_CC) $(CUDA_ARCH) test_ntt.cu cuda_functions.cu -o ../bin/test_ntt -lntl -lgmp -Xcompiler -m64
 
 
 test_mul: polynomial.o cuda_functions.o
-	nvcc -G -g test_mul.cu polynomial.cpp cuda_functions.cu -o ../bin/test_mul -lntl -lgmp
+	$(CUDA_CC) $(CUDA_ARCH) -G -g test_mul.cu polynomial.cpp cuda_functions.cu -o ../bin/test_mul -lntl -lgmp
 test.o:test.cu
 	$(CUDA_CC) -c test.cu -o test.o  -lboost_unit_test_framework $(NTL)
 
