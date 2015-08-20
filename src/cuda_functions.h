@@ -11,7 +11,7 @@ NTL_CLIENT
 
 class CUDAFunctions{
   public:
-
+  	static uint64_t wN;
 	static uint32_t *d_W;
 	static uint32_t *d_WInv;
 	const static uint64_t P = 4294955009;//31 bits
@@ -27,7 +27,7 @@ class CUDAFunctions{
 			// const uint64_t P = 4294955009;//31 bits
 			assert((P-1)%(N) == 0);
 			const uint64_t k = (P-1)/N;
-			const uint64_t wN = NTL::PowerMod(3,k,P);
+			wN = NTL::PowerMod(3,k,P);
 
 		    h_W = (uint32_t*)malloc(N*N*sizeof(uint32_t));
 			cudaError_t result = cudaMalloc((void**)&d_W,N*N*sizeof(uint32_t));
@@ -36,6 +36,11 @@ class CUDAFunctions{
 			result = cudaMalloc((void**)&d_WInv,N*N*sizeof(uint32_t));
 			assert(result == cudaSuccess);
 
+			  std::cout << "wN == " << wN << std::endl;
+			  std::cout << "k == " << k << std::endl;
+			  std::cout << "N == " << N << std::endl;
+			  std::cout << "P == " << P << std::endl;
+  
 			// Computes W
 			for(int j = 0; j < N; j++)
 				for(int i = 0; i < N; i++)

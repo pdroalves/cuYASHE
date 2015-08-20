@@ -8,6 +8,6 @@
 // #define PLAINMUL
 #define NTTMUL
 // #define FFTMUL
-#define FORWARD 1
-#define INVERSE 0
+
+enum ntt_mode_t {INVERSE,FORWARD};
 #endif

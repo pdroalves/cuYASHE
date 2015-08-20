@@ -9,6 +9,7 @@
 
 uint32_t *(CUDAFunctions::d_W) = NULL;
 uint32_t *(CUDAFunctions::d_WInv) = NULL;
+uint64_t CUDAFunctions::wN = 0;
 
 ///////////////////////////////////////
 /// Memory operations
@@ -140,7 +141,7 @@ __global__ void polynomialPlainMul(const uint32_t *a,const uint32_t *b,uint32_t 
   // }
 }
 
-__global__ void NTT32(uint32_t *W,uint32_t *WInv,uint32_t *a, uint32_t *a_hat, int N,int NPolis,uint64_t P,const int type){
+__global__ void NTT32(uint32_t *W,uint32_t *WInv,uint32_t *a, uint32_t *a_hat, const int N,const int NPolis,const uint64_t P,const int type){
   // This algorithm supposes that N is power of 2, divisible by 32
   // Input:
   // w: Matrix of wNs
@@ -149,6 +150,8 @@ __global__ void NTT32(uint32_t *W,uint32_t *WInv,uint32_t *a, uint32_t *a_hat, i
   // N: # of coefficients of each polynomial
   // NPolis: # of residues
   const int tid = threadIdx.x + blockIdx.x*blockDim.x;
+  const int residueid = tid / (N);
+  const int roffset = residueid*N;
   const int cid = tid & (N-1); // Coefficient id
   // const double invk = (double)(1<<30) / P;
   uint32_t *w;
@@ -163,14 +166,14 @@ __global__ void NTT32(uint32_t *W,uint32_t *WInv,uint32_t *a, uint32_t *a_hat, i
     // In each iteration, computes a_hat[i]
     for(int i = 0; i < N; i++){
       uint64_t W64 = w[i + cid*N];
-      uint64_t a64 = a[i];
+      uint64_t a64 = a[i + roffset];
       value = (value + W64*a64)%P;
       // value = value + mul_m(W64,a64,P,invk);
     }
     if(type == FORWARD)
-      a_hat[cid] = value % P;
+      a_hat[cid+roffset] = value % P;
     else
-      a_hat[cid] = (value % P)/N;
+      a_hat[cid+roffset] = (value % P)/N;
 
   }
 
@@ -178,7 +181,7 @@ __global__ void NTT32(uint32_t *W,uint32_t *WInv,uint32_t *a, uint32_t *a_hat, i
 
 
 
-__global__ void DOUBLENTT32(uint32_t *W,uint32_t *WInv,uint32_t *a, uint32_t *a_hat,uint32_t *b, uint32_t *b_hat, int N,int NPolis,uint64_t P,const int type){
+__global__ void DOUBLENTT32( uint32_t *W, uint32_t *WInv,uint32_t *a, uint32_t *a_hat,uint32_t *b, uint32_t *b_hat, const int N,const int NPolis,const uint64_t P,const int type){
   // This algorithm supposes that N is power of 2, divisible by 32
   // Input:
   // w: Matrix of wNs
@@ -188,6 +191,8 @@ __global__ void DOUBLENTT32(uint32_t *W,uint32_t *WInv,uint32_t *a, uint32_t *a_
   // NPolis: # of residues
 
   const int tid = threadIdx.x + blockIdx.x*blockDim.x;
+  const int residueid = tid / N;
+  const int roffset = residueid*N;
   const int cid = tid & (N-1); // Coefficient id
   uint32_t *w;
   if(type == FORWARD)
@@ -197,41 +202,41 @@ __global__ void DOUBLENTT32(uint32_t *W,uint32_t *WInv,uint32_t *a, uint32_t *a_
 
   // const uint32_t p = 0xffffffff00000001;
   if(tid < N*NPolis){
-    uint64_t Avalue;
-    uint64_t Bvalue;
+    uint64_t Avalue = 0;
+    uint64_t Bvalue = 0;
     // In each iteration, computes a_hat[i]
     for(int i = 0; i < N; i++){
 
       uint64_t W64 = w[i + cid*N];
-      uint64_t a64 = a[i];
-      uint64_t b64 = b[i];
+      uint64_t a64 = a[i + roffset];
+      uint64_t b64 = b[i + roffset];
       Avalue = (Avalue + W64*a64)%P;      
       Bvalue = (Bvalue + W64*b64)%P;
     }
     if(type == FORWARD){
-      a_hat[cid] = Avalue % P;
-      b_hat[cid] = Bvalue % P;
+      a_hat[cid+ roffset] = Avalue % P;
+      b_hat[cid+ roffset] = Bvalue % P;
     }else{
-      a_hat[cid] = (Avalue % P)/N;
-      b_hat[cid] = (Bvalue % P)/N;
+      a_hat[cid+ roffset] = (Avalue % P)/N;
+      b_hat[cid+ roffset] = (Bvalue % P)/N;
     }
   }
 
 }
 
-__global__ void polynomialNTTMul(const uint32_t *a,const uint32_t *b,uint32_t *c,const int size){
+__global__ void polynomialNTTMul(const uint32_t *a,const uint32_t *b,uint32_t *c,const int size,const uint64_t P){
   // We have one thread per polynomial coefficient on 32 threads-block.
   // For CRT polynomial adding, all representations should be concatenated aligned
   const int tid = threadIdx.x + blockDim.x*blockIdx.x;
-  uint32_t a_value;
-  uint32_t b_value;
+  uint64_t a_value;
+  uint64_t b_value;
 
   if(tid < size ){
       // Coalesced access to global memory. Doing this way we reduce required bandwich.
       a_value = a[tid];
       b_value = b[tid];
 
-      a_value *= b_value;
+      a_value = (a_value*b_value) % P;
 
       c[tid] = a_value;
   }
@@ -295,7 +300,7 @@ __host__ uint32_t* CUDAFunctions::callPolynomialMul(cudaStream_t stream,uint32_t
     assert(cudaGetLastError() == cudaSuccess);
 
     // Multiply
-    polynomialNTTMul<<<gridDim,blockDim,1,stream>>>(d_a,d_a,d_c,N);
+    polynomialNTTMul<<<gridDim,blockDim,1,stream>>>(d_a,d_b,d_c,N*NPolis,P);
 
     // Inverse    
     NTT32<<<gridDim,blockDim,1,stream>>>(CUDAFunctions::d_W,CUDAFunctions::d_WInv,d_c,d_result,N,NPolis,CUDAFunctions::P,INVERSE);

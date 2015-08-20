@@ -16,7 +16,7 @@ NTL_CLIENT
 
 #define BILLION  1000000000L
 #define MILLION  1000000L
-#define DEGREE 64
+#define DEGREE 128
 #define NPOLYS 1
 // #define P 0xffffffff00000001
 

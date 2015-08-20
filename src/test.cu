@@ -159,6 +159,32 @@ BOOST_AUTO_TEST_CASE(zeroAdd)
 
 }
 
+BOOST_AUTO_TEST_CASE(wNTest)
+{
+  uint32_t *W;
+  uint32_t *WInv;
+  int N = degree;
+
+  W = (uint32_t*)malloc(N*N*sizeof(uint32_t));
+  WInv = (uint32_t*)malloc(N*N*sizeof(uint32_t));
+
+  cudaError_t result = cudaMemcpy(W,CUDAFunctions::d_W , N*N*sizeof(uint32_t), cudaMemcpyDeviceToHost);
+  BOOST_REQUIRE(result == cudaSuccess);
+  result = cudaMemcpy(WInv,CUDAFunctions::d_WInv , N*N*sizeof(uint32_t), cudaMemcpyDeviceToHost);
+  BOOST_REQUIRE(result == cudaSuccess);
+
+  uint64_t P = CUDAFunctions::P;
+  uint64_t wN = CUDAFunctions::wN;
+
+  BOOST_REQUIRE(W[1+N] == wN);
+  BOOST_REQUIRE(W[2+N] == NTL::PowerMod(wN,2,P));
+  BOOST_REQUIRE(W[2+2*N] == NTL::PowerMod(wN,4,P));
+
+  BOOST_REQUIRE(NTL::MulMod(W[1+N],WInv[1+N],P) == 1);
+  BOOST_REQUIRE(NTL::MulMod(W[2+N],WInv[2+N],P) == 1);
+  BOOST_REQUIRE(NTL::MulMod(W[2+2*N],WInv[2+2*N],P) == 1);
+}
+
 BOOST_AUTO_TEST_CASE(simpleMultiplication)
 {
    // std:: cout <<  NTL::MulMod(6406262673276882058,4,9223372036854829057) << std::endl;
@@ -176,21 +202,8 @@ BOOST_AUTO_TEST_CASE(simpleMultiplication)
 //     cout << "Check: " << NTL::MulMod(inv, Z(6209464568650184525), P) << endl;    
 //   return 0;
   const int N = degree;
-  // const uint32_t P = 0xffffffff00000001;
-  // const uint32_t P = 9223372036854829057;//63 bits
-  const uint64_t P = 4294955009;//63 bits
-  assert((P-1)%(N) == 0);
-  const uint64_t k = (P-1)/N;
-  const uint64_t wN = NTL::PowerMod(3,k,P);
-  // const uint32_t wN = 549755813888;// Hard coded
-  // const uint32_t wN = 6209464568650184525;// Hard coded
-  std::cout << "wN == " << wN << std::endl;
-  std::cout << "k == " << k << std::endl;
-  std::cout << "N == " << N << std::endl;
-  std::cout << "P == " << P << std::endl;
-  // std::cout << "prime == " << prime << std::endl;
-  // const uint32_t q = 97;
-  const int NPOLYS = 1;
+
+  const int NPOLYS = Polynomial::CRTPrimes.size();
 
   dim3 blockDim(ADDBLOCKXDIM);
   dim3 gridDim((N*NPOLYS)/ADDBLOCKXDIM+1);
@@ -211,31 +224,54 @@ BOOST_AUTO_TEST_CASE(simpleMultiplication)
   assert(result == cudaSuccess);
 
   // Generates random values
+
+  ZZ_pEX a_ntl;
+  ZZ_pEX b_ntl;
   for(int j = 0; j < NPOLYS;j++)
-    for(int i = 0; i < N/2; i++)
-      h_a[i+j*NPOLYS] = i;
+    for(int i = 0; i < N; i++){
+      if(i < N/2){
+        h_a[i+j*N] = i;        
+        NTL::SetCoeff(a_ntl,i,i);
+        h_b[i+j*N] = 1;
+        NTL::SetCoeff(b_ntl,i,1);        
+      }else{        
+        h_a[i+j*N] = 0;
+        NTL::SetCoeff(a_ntl,i,0);
+        h_b[i+j*N] = 0;
+        NTL::SetCoeff(b_ntl,i,0);       
+      }
+    }
 
   // Copy to GPU
   result = cudaMemcpy(d_a,h_a , N*NPOLYS*sizeof(uint32_t), cudaMemcpyHostToDevice);
   assert(result == cudaSuccess);
 
-  result = cudaMemset((void*)d_b,1,N*NPOLYS*sizeof(uint32_t));
+  // result = cudaMemset((void*)d_b,1,N*NPOLYS*sizeof(uint32_t));
+  // assert(result == cudaSuccess);  
+  result = cudaMemcpy(d_b,h_b , N*NPOLYS*sizeof(uint32_t), cudaMemcpyHostToDevice);
   assert(result == cudaSuccess);
 
+  // Multiply
   cudaStream_t stream;
   cudaStreamCreate(&stream);
   uint32_t *d_c = CUDAFunctions::callPolynomialMul(stream,d_a,d_b,N, NPOLYS);
 
-  // Verify if the values were really shuffled
+  ZZ_pEX c_ntl = a_ntl*b_ntl;
+
   result = cudaMemcpy(h_c,d_c,  N*NPOLYS*sizeof(uint32_t), cudaMemcpyDeviceToHost);
   assert(result == cudaSuccess);
 
-  // std::cout << "Output: " << std::endl;
-  int count = 0;
-  for(int i = 0; i < N; i++)
-    if(h_c[i] != h_a[i])
-      count++;
-  std::cout << count << " errors." << std::endl;
+  for(int j = 0; j < NPOLYS;j++)
+    for(int i = 0; i < N; i++){
+      int ntl_value;
+      if( NTL::IsZero(c_ntl[i]) )
+      // Without this, NTL raises an exception when we call rep()
+        ntl_value = 0L;
+      else
+        ntl_value = conv<int>(NTL::rep(c_ntl[i])[0]);
+
+      BOOST_REQUIRE(h_c[i+j*N] == ntl_value);
+    }
   cudaFree(d_a);
   cudaFree(d_b);
   cudaFree(d_c);
