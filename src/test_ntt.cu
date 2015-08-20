@@ -65,59 +65,29 @@ __device__ __host__ uint32_t mulmod(uint32_t a, uint32_t b, uint32_t m) {
     return res;
 }
 
-__global__ void NTT(uint32_t *W,uint32_t *a, uint32_t *a_hat, int N,int NPolis,uint32_t P){
-  // This algorithm supposes that N is power of 2, divisible by 32
-  // Input:
-  // w: Matrix of wNs
-  // a: residues
-  // a_hat: output
-  // N: # of coefficients of each polynomial
-  // NPolis: # of residues
 
-  const int tid = threadIdx.x + blockIdx.x*blockDim.x;
-  const int cid = tid & (N-1); // Coefficient id
+// fast truncation of double-precision to integers
+#define CUMP_D2I_TRUNC (double)(3ll << 51)
+// computes r = a + b subop c unsigned using extended precision
+#define VADDx(r, a, b, c, subop) \
+    asm volatile("vadd.u32.u32.u32." subop " %0, %1, %2, %3;" :  \
+            "=r"(r) : "r"(a) , "r"(b), "r"(c));
 
-  // const uint32_t p = 0xffffffff00000001;
-  if(tid < N*NPolis){
-    uint32_t value = 0;
-    // In each iteration, computes a_hat[i]
-    for(int i = 0; i < N; i++){
-      value = (value + mulmod(W[i + cid*N],a[i],P)) %P;
-    }
-    a_hat[cid] = value % P;
-  }
+// computes a * b mod m; invk = (double)(1<<30) / m
+__device__ __forceinline__ 
+uint64_t mul_m(uint64_t a, uint64_t b, volatile uint64_t m,
+    volatile double invk) { 
 
-}
+   unsigned hi = __umul64hi(a*2, b*2); // 3 flops
+   // 2 double instructions
+   double rf = __uint2double_rn(hi) * invk + CUMP_D2I_TRUNC;
+   uint64_t r = (uint64_t)__double2loint(rf);
+   r = a * b - r * m; // 2 flops
 
-
-
-__global__ void DOUBLENTT2(uint32_t *W,uint32_t *a, uint32_t *a_hat,uint32_t *b, uint32_t *b_hat, int N,int NPolis,uint32_t P){
-  // This algorithm supposes that N is power of 2, divisible by 32
-  // Input:
-  // w: Matrix of wNs
-  // a: residues
-  // a_hat: output
-  // N: # of coefficients of each polynomial
-  // NPolis: # of residues
-
-  const int tid = threadIdx.x + blockIdx.x*blockDim.x;
-  const int cid = tid & (N-1); // Coefficient id
-
-  // const uint32_t p = 0xffffffff00000001;
-  if(tid < N*NPolis){
-    uint32_t Wvalue;
-    uint32_t Avalue;
-    uint32_t Bvalue;
-    // In each iteration, computes a_hat[i]
-    for(int i = 0; i < N; i++){
-      Wvalue = W[i + cid*N];
-      Avalue = (Avalue + Wvalue*a[i]) ;
-      Bvalue = (Bvalue + Wvalue*b[i]) ;
-    }
-    a_hat[cid] = Avalue;
-    b_hat[cid] = Bvalue;
-  }
-
+   // can also be replaced by: VADDx(r, r, m, r, "min") // == umin(r, r + m);
+   if((int)r < 0) 
+      r += m;
+   return r;
 }
 
 __global__ void NTT32(uint32_t *W,uint32_t *a, uint32_t *a_hat, int N,int NPolis,uint64_t P){
@@ -130,19 +100,17 @@ __global__ void NTT32(uint32_t *W,uint32_t *a, uint32_t *a_hat, int N,int NPolis
   // NPolis: # of residues
   const int tid = threadIdx.x + blockIdx.x*blockDim.x;
   const int cid = tid & (N-1); // Coefficient id
+  // const double invk = (double)(1<<30) / P;
 
   // const inteiro p = 0xffffffff00000001;
   if(tid < N*NPolis){
-    uint64_t value;
+    uint64_t value = 0;
     // In each iteration, computes a_hat[i]
     for(int i = 0; i < N; i++){
       uint64_t W64 = W[i + cid*N];
       uint64_t a64 = a[i];
       value = (value + W64*a64)%P;
-      // if((value << 32)&1 == 1){
-        // Need to apply mod
-        // value %= P;
-      // }
+      // value = value + mul_m(W64,a64,P,invk);
     }
     a_hat[cid] = value % P;
   }
@@ -173,8 +141,8 @@ __global__ void DOUBLENTT32(uint32_t *W,uint32_t *a, uint32_t *a_hat,uint32_t *b
       uint64_t W64 = W[i + cid*N];
       uint64_t a64 = a[i];
       uint64_t b64 = b[i];
-      Avalue = (Avalue + W64*a64);      
-      Bvalue = (Bvalue + W64*b64);
+      Avalue = (Avalue + W64*a64)%P;      
+      Bvalue = (Bvalue + W64*b64)%P;
     }
     a_hat[cid] = Avalue % P;
     b_hat[cid] = Bvalue % P;

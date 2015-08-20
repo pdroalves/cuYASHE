@@ -16,6 +16,7 @@ struct CUDASuite
 {
   // Test CUDA functions
     CUDASuite(){
+
     }
 
     ~CUDASuite()
@@ -34,6 +35,7 @@ struct PolySuite
         BOOST_TEST_MESSAGE("setup PolySuite");
 
         degree = 128;
+        CUDAFunctions::init(degree);
 
         Polynomial::global_mod = conv<ZZ>("1171313591017775093490277364417"); // Defines default GF(q)
         Polynomial::BuildNthCyclotomic(&phi,degree);
@@ -155,6 +157,91 @@ BOOST_AUTO_TEST_CASE(zeroAdd)
   #endif
   BOOST_REQUIRE(r == a);
 
+}
+
+BOOST_AUTO_TEST_CASE(simpleMultiplication)
+{
+   // std:: cout <<  NTL::MulMod(6406262673276882058,4,9223372036854829057) << std::endl;
+  // std:: cout <<  NTL::MulMod(6406262673276882058,4,9223372036854829057) << std::endl;
+
+// uint32_t integer = 9223372036854829057L;
+//     ZZ P = ZZ(integer);
+//     ZZ x = Z(6209464568650184525);
+//     ZZ inv = NTL::InvMod(x,P);
+    
+//     cout << integer << "\n" << P << endl;
+    
+//     cout << "PowerMod: " << inv << endl;
+    
+//     cout << "Check: " << NTL::MulMod(inv, Z(6209464568650184525), P) << endl;    
+//   return 0;
+  const int N = degree;
+  // const uint32_t P = 0xffffffff00000001;
+  // const uint32_t P = 9223372036854829057;//63 bits
+  const uint64_t P = 4294955009;//63 bits
+  assert((P-1)%(N) == 0);
+  const uint64_t k = (P-1)/N;
+  const uint64_t wN = NTL::PowerMod(3,k,P);
+  // const uint32_t wN = 549755813888;// Hard coded
+  // const uint32_t wN = 6209464568650184525;// Hard coded
+  std::cout << "wN == " << wN << std::endl;
+  std::cout << "k == " << k << std::endl;
+  std::cout << "N == " << N << std::endl;
+  std::cout << "P == " << P << std::endl;
+  // std::cout << "prime == " << prime << std::endl;
+  // const uint32_t q = 97;
+  const int NPOLYS = 1;
+
+  dim3 blockDim(ADDBLOCKXDIM);
+  dim3 gridDim((N*NPOLYS)/ADDBLOCKXDIM+1);
+
+  uint32_t *h_a;
+  uint32_t *d_a;
+  uint32_t *h_b;
+  uint32_t *d_b;
+  uint32_t *h_c;
+
+  // Alloc memory
+  h_a = (uint32_t*)malloc(N*NPOLYS*sizeof(uint32_t));
+  h_b = (uint32_t*)malloc(N*NPOLYS*sizeof(uint32_t));
+  h_c = (uint32_t*)malloc(N*NPOLYS*sizeof(uint32_t));
+  cudaError_t result = cudaMalloc((void**)&d_a,N*NPOLYS*sizeof(uint32_t));
+  assert(result == cudaSuccess);
+  result = cudaMalloc((void**)&d_b,N*NPOLYS*sizeof(uint32_t));
+  assert(result == cudaSuccess);
+
+  // Generates random values
+  for(int j = 0; j < NPOLYS;j++)
+    for(int i = 0; i < N/2; i++)
+      h_a[i+j*NPOLYS] = i;
+
+  // Copy to GPU
+  result = cudaMemcpy(d_a,h_a , N*NPOLYS*sizeof(uint32_t), cudaMemcpyHostToDevice);
+  assert(result == cudaSuccess);
+
+  result = cudaMemset((void*)d_b,1,N*NPOLYS*sizeof(uint32_t));
+  assert(result == cudaSuccess);
+
+  cudaStream_t stream;
+  cudaStreamCreate(&stream);
+  uint32_t *d_c = CUDAFunctions::callPolynomialMul(stream,d_a,d_b,N, NPOLYS);
+
+  // Verify if the values were really shuffled
+  result = cudaMemcpy(h_c,d_c,  N*NPOLYS*sizeof(uint32_t), cudaMemcpyDeviceToHost);
+  assert(result == cudaSuccess);
+
+  // std::cout << "Output: " << std::endl;
+  int count = 0;
+  for(int i = 0; i < N; i++)
+    if(h_c[i] != h_a[i])
+      count++;
+  std::cout << count << " errors." << std::endl;
+  cudaFree(d_a);
+  cudaFree(d_b);
+  cudaFree(d_c);
+  free(h_a);
+  free(h_b);
+  free(h_c);
 }
 
 BOOST_AUTO_TEST_CASE(multiplyByZZOnCPU)

@@ -14,8 +14,8 @@ NTL_CLIENT
 #define NITERATIONS 100
 // #define NITERATIONS 1
 // #define FIRSTITERATION 256
-#define FIRSTITERATION 4096
-#define LASTITERATION 4096
+#define FIRSTITERATION 1024
+#define LASTITERATION 1024
 #define ADDBLOCKXDIM 32
 
 double compute_time_ms(struct timespec start,struct timespec stop){
@@ -46,6 +46,99 @@ __global__ void polynomialAdd(const inteiro *a,const inteiro *b,inteiro *c,const
 
 ///////////////////////////////////////
 /// Mul
+
+
+__device__ __host__ uint64_t mulmod(uint64_t a, uint64_t b, uint64_t m) {
+    uint64_t res = 0;
+    uint64_t temp_b;
+
+    /* Only needed if b may be >= m */
+    if (b >= m) {
+        if (m > UINT64_MAX / 2u)
+            b -= m;
+        else
+            b %= m;
+    }
+
+    while (a != 0) {
+        if (a & 1) {
+            /* Add b to res, modulo m, without overflow */
+            if (b >= m - res) /* Equiv to if (res + b >= m), without overflow */
+                res -= m;
+            res += b;
+        }
+        a >>= 1;
+
+        /* Double b, modulo m */
+        temp_b = b;
+        if (b >= m - b)       /* Equiv to if (2 * b >= m), without overflow */
+            temp_b -= m;
+        b += temp_b;
+    }
+    return res;
+}
+
+uint64_t SQM_pow (uint64_t b, uint64_t e, uint64_t mod)
+{
+    uint64_t result = 1;
+    unsigned significant = 1;
+    {
+        uint64_t e_t = e;
+
+        while (e_t >>= 1)
+        {
+            ++significant;
+        }
+    }
+
+    for (int pos = significant-1; pos >= 0; --pos)
+    {
+        bool bit = e & (1 << pos);
+        result = mulmod(result, result, mod);
+
+        if (bit)
+            result = mulmod(result,b, mod);
+    }
+
+    return result;
+}
+
+uint64_t powerMod(uint64_t x,uint64_t h,uint64_t p){
+  // unsigned long t;
+  // if(h == 0)
+  //   return 1;
+  // else if(h == 1)
+  //   return x % p;
+  // else
+  //   t = log2((double)(h))+1;
+  // ZZ r = ZZ(x);
+  // ZZ X = ZZ(x);
+  // ZZ P = ZZ(p);
+
+  // for(int i = t-1; i >= 0; i--){
+  //   r = r*r;
+  //   r %= P;
+  //   if((h >> i) & 1 == 1)//i-th bit
+  //     r *= X % P;
+    
+  // }
+  // return conv<uint64_t>(r);
+
+  // return uint64FromZZ(NTL::PowerMod(ZZFromUint64(x),h,ZZFromUint64(p)));
+  return (SQM_pow(x,h,p));
+}
+
+uint64_t invMod(uint64_t x,uint64_t p){
+  // if(x == 0){
+    // std:: cout << "Achei o erro!" << std::endl;
+  // }
+  // std::cout << x << std::endl;
+  // return uint64FromZZ(NTL::InvMod(ZZFromUint64(x),ZZFromUint64(p)));
+  // return uint64FromZZ(NTL::PowerMod(ZZFromUint64(x),p-2,ZZFromUint64(p)));
+
+  return (SQM_pow(x,p-2,p));
+
+}
 
 __global__ void polynomialNTTMul(const inteiro *a,const inteiro *b,inteiro *c,const int size){
   // We have one thread per polynomial coefficient on 32 threads-block.
@@ -115,6 +208,54 @@ __global__ void NTT2(inteiro *W,inteiro *a, inteiro *a_hat, int N,int NPolis){
 
 }
 
+__global__ void NTT2B(inteiro *W,inteiro *a, inteiro *a_hat, int N,int NPolis,inteiro P){
+  // This algorithm supposes that N is power of 2, divisible by 32
+  // Input:
+  // w: Matrix of wNs
+  // a: residues
+  // a_hat: output
+  // N: # of coefficients of each polynomial
+  // NPolis: # of residues
+
+  const int tid = threadIdx.x + blockIdx.x*blockDim.x;
+  const int cid = tid & (N-1); // Coefficient id
+
+  // const uint64_t p = 0xffffffff00000001;
+  if(tid < N*NPolis){
+    uint64_t value = 0;
+    // In each iteration, computes a_hat[i]
+    for(int i = 0; i < N; i++){
+      value = (value + mulmod(W[i + cid*N],a[i],P)) %P;
+    }
+    a_hat[cid] = value % P;
+  }
+
+}
+
+__global__ void NTT2C(inteiro *W,inteiro *a, inteiro *a_hat, int N,int NPolis,inteiro P){
+  // This algorithm supposes that N is power of 2, divisible by 32
+  // Input:
+  // w: Matrix of wNs
+  // a: residues
+  // a_hat: output
+  // N: # of coefficients of each polynomial
+  // NPolis: # of residues
+
+  const int tid = threadIdx.x + blockIdx.x*blockDim.x;
+  const int cid = tid & (N-1); // Coefficient id
+
+  // const inteiro p = 0xffffffff00000001;
+  if(tid < N*NPolis){
+    inteiro value;
+    // In each iteration, computes a_hat[i]
+    for(int i = 0; i < N; i++){
+      value = (value + W[i + cid*N]*a[i]) % P;
+    }
+    a_hat[cid] = value % P;
+  }
+
+}
+
 
 
 __global__ void DOUBLENTT2(inteiro *W,inteiro *a, inteiro *a_hat,inteiro *b, inteiro *b_hat, int N,int NPolis){
@@ -142,6 +283,64 @@ __global__ void DOUBLENTT2(inteiro *W,inteiro *a, inteiro *a_hat,inteiro *b, int
     }
     a_hat[cid] = Avalue;
     b_hat[cid] = Bvalue;
+  }
+
+}
+
+__global__ void DOUBLENTT2B(inteiro *W,inteiro *a, inteiro *a_hat,inteiro *b, inteiro *b_hat, int N,int NPolis,inteiro P){
+  // This algorithm supposes that N is power of 2, divisible by 32
+  // Input:
+  // w: Matrix of wNs
+  // a: residues
+  // a_hat: output
+  // N: # of coefficients of each polynomial
+  // NPolis: # of residues
+
+  const int tid = threadIdx.x + blockIdx.x*blockDim.x;
+  const int cid = tid & (N-1); // Coefficient id
+
+  // const inteiro p = 0xffffffff00000001;
+  if(tid < N*NPolis){
+    inteiro Wvalue = 0;
+    inteiro Avalue = 0;
+    inteiro Bvalue = 0;
+    // In each iteration, computes a_hat[i]
+    for(int i = 0; i < N; i++){
+      Wvalue = W[i + cid*N];
+      Avalue = (Avalue + mulmod(Wvalue,a[i],P)) % P;
+      Bvalue = (Avalue + mulmod(Wvalue,b[i],P)) % P;
+    }
+    a_hat[cid] = Avalue % P;
+    b_hat[cid] = Bvalue % P;
+  }
+
+}
+
+__global__ void DOUBLENTT2C(inteiro *W,inteiro *a, inteiro *a_hat,inteiro *b, inteiro *b_hat, int N,int NPolis,inteiro P){
+  // This algorithm supposes that N is power of 2, divisible by 32
+  // Input:
+  // w: Matrix of wNs
+  // a: residues
+  // a_hat: output
+  // N: # of coefficients of each polynomial
+  // NPolis: # of residues
+
+  const int tid = threadIdx.x + blockIdx.x*blockDim.x;
+  const int cid = tid & (N-1); // Coefficient id
+
+  // const inteiro p = 0xffffffff00000001;
+  if(tid < N*NPolis){
+    inteiro Wvalue;
+    inteiro Avalue;
+    inteiro Bvalue;
+    // In each iteration, computes a_hat[i]
+    for(int i = 0; i < N; i++){
+      Wvalue = W[i + cid*N];
+      Avalue = (Avalue + Wvalue*a[i]) % P;
+      Bvalue = (Bvalue + Wvalue*b[i]) % P;
+    }
+    a_hat[cid] = Avalue % P;
+    b_hat[cid] = Bvalue % P;
   }
 
 }
@@ -289,32 +488,32 @@ __global__ void NTT5(inteiro *W,inteiro *a, inteiro *a_hat, int N,int NPolis){
 
 // }
 
-inteiro powerMod(inteiro x,long h,inteiro p){
-  unsigned long t;
-  if(h == 0)
-    return 1;
-  else if(h == 1)
-    return x % p;
-  else
-    t = log2((double)(h))+1;
-  ZZ r = ZZ(x);
-  ZZ X = ZZ(x);
-  ZZ P = ZZ(p);
+// inteiro powerMod(inteiro x,long h,inteiro p){
+//   unsigned long t;
+//   if(h == 0)
+//     return 1;
+//   else if(h == 1)
+//     return x % p;
+//   else
+//     t = log2((double)(h))+1;
+//   ZZ r = ZZ(x);
+//   ZZ X = ZZ(x);
+//   ZZ P = ZZ(p);
 
-  for(int i = t-1; i >= 0; i--){
-    r = r*r;
-    r %= P;
-    if((h >> i) & 1 == 1)//i-th bit
-      r *= X % P;
+//   for(int i = t-1; i >= 0; i--){
+//     r = r*r;
+//     r %= P;
+//     if((h >> i) & 1 == 1)//i-th bit
+//       r *= X % P;
     
-  }
-  return conv<inteiro>(r);
-}
+//   }
+//   return conv<inteiro>(r);
+// }
 
-inteiro invMod(inteiro x,inteiro p){
-	// We suppose that p is a prime
-	return powerMod(x,p-2,p);
-}
+// inteiro invMod(inteiro x,inteiro p){
+// 	// We suppose that p is a prime
+// 	return powerMod(x,p-2,p);
+// }
 int main(){
 	// std::cout << "Add: "<< std::endl << std::endl;
 	// for(int degree = 128; degree <= 2048; degree *= 2){
@@ -375,7 +574,7 @@ int main(){
 	for(int degree = FIRSTITERATION; degree <= LASTITERATION; degree *= 2){
 		// MUL
 		std::cout << "###################################" << std::endl;
-		std::cout << "############## "<< degree << "################" << std::endl;
+		std::cout << "############## "<< degree << " ################" << std::endl;
 
 		const inteiro P = 0xffffffff00000001;
 		assert((P-1)%(degree) == 0);
@@ -464,20 +663,20 @@ int main(){
 		dim3 blockDim(ADDBLOCKXDIM);
 		dim3 gridDim(N/ADDBLOCKXDIM);
 
-		std:: cout << "4 kernels" << std::endl;
-		clock_gettime( CLOCK_REALTIME, &start);
-		for(int i = 0; i < NITERATIONS;i++){
-  		NTT<<<gridDim,blockDim>>>(d_W,d_a,d_A,N,1); // Forward
-  		NTT<<<gridDim,blockDim>>>(d_W,d_b,d_B,N,1); // Forward
-			polynomialNTTMul<<<gridDim,blockDim>>>(d_A,d_B,d_C,N);
-  		NTT<<<gridDim,blockDim>>>(d_WInv,d_c,d_C,N,1);// Inverse
+		// std:: cout << "4 kernels" << std::endl;
+		// clock_gettime( CLOCK_REALTIME, &start);
+		// for(int i = 0; i < NITERATIONS;i++){
+  // 		NTT<<<gridDim,blockDim>>>(d_W,d_a,d_A,N,1); // Forward
+  // 		NTT<<<gridDim,blockDim>>>(d_W,d_b,d_B,N,1); // Forward
+		// 	polynomialNTTMul<<<gridDim,blockDim>>>(d_A,d_B,d_C,N);
+  // 		NTT<<<gridDim,blockDim>>>(d_WInv,d_c,d_C,N,1);// Inverse
 
 
-			result = cudaDeviceSynchronize();
-			assert(result == cudaSuccess);
-		}
-		clock_gettime( CLOCK_REALTIME, &stop);
-		std::cout << degree <<") NTT1 Mul kernel 64 bits: " << compute_time_ms(start,stop)/NITERATIONS << std::endl<< std::endl;
+		// 	result = cudaDeviceSynchronize();
+		// 	assert(result == cudaSuccess);
+		// }
+		// clock_gettime( CLOCK_REALTIME, &stop);
+		// std::cout << degree <<") NTT1 Mul kernel 64 bits: " << compute_time_ms(start,stop)/NITERATIONS << std::endl<< std::endl;
 
 	    std:: cout << "4 kernels" << std::endl;
 	    clock_gettime( CLOCK_REALTIME, &start);
@@ -508,62 +707,92 @@ int main(){
 	    clock_gettime( CLOCK_REALTIME, &stop);
 	    std::cout << degree <<") DOUBLENTT2 Mul kernel 64 bits: " << compute_time_ms(start,stop)/NITERATIONS << std::endl<< std::endl;
 
+
 		std:: cout << "4 kernels" << std::endl;
 	    clock_gettime( CLOCK_REALTIME, &start);
 	    for(int i = 0; i < NITERATIONS;i++){
-	      DOUBLENTT2ANDMUL<<<gridDim,blockDim>>>(d_W,d_a,d_A,d_b,d_B,d_C,N,1); // Forward
-	      NTT2<<<gridDim,blockDim>>>(d_WInv,d_c,d_C,N,1);// Inverse
+	      DOUBLENTT2B<<<gridDim,blockDim>>>(d_W,d_a,d_A,d_b,d_B,N,1,P); // Forward
+	      polynomialNTTMul<<<gridDim,blockDim>>>(d_A,d_B,d_C,N);
+	      NTT2B<<<gridDim,blockDim>>>(d_WInv,d_c,d_C,N,1,P);// Inverse
+
+
 	      result = cudaDeviceSynchronize();
 	      assert(result == cudaSuccess);
 	    }
 	    clock_gettime( CLOCK_REALTIME, &stop);
-	    std::cout << degree <<") DOUBLENTT2ANDMUL Mul kernel 64 bits: " << compute_time_ms(start,stop)/NITERATIONS << std::endl<< std::endl;
+	    std::cout << degree <<") DOUBLENTT2B Mul kernel 64 bits: " << compute_time_ms(start,stop)/NITERATIONS << std::endl<< std::endl;
 
-
-	    std:: cout << "4 kernels" << std::endl;
+		std:: cout << "4 kernels" << std::endl;
 	    clock_gettime( CLOCK_REALTIME, &start);
 	    for(int i = 0; i < NITERATIONS;i++){
-	      NTT3<<<gridDim,blockDim>>>(d_W,d_a,d_A,N,1); // Forward
-	      NTT3<<<gridDim,blockDim>>>(d_W,d_b,d_B,N,1); // Forward
+	      DOUBLENTT2C<<<gridDim,blockDim>>>(d_W,d_a,d_A,d_b,d_B,N,1,P); // Forward
 	      polynomialNTTMul<<<gridDim,blockDim>>>(d_A,d_B,d_C,N);
-	      NTT3<<<gridDim,blockDim>>>(d_WInv,d_c,d_C,N,1);// Inverse
+	      NTT2C<<<gridDim,blockDim>>>(d_WInv,d_c,d_C,N,1,P);// Inverse
 
 
 	      result = cudaDeviceSynchronize();
 	      assert(result == cudaSuccess);
 	    }
 	    clock_gettime( CLOCK_REALTIME, &stop);
-	    std::cout << degree <<") NTT3 Mul kernel 64 bits: " << compute_time_ms(start,stop)/NITERATIONS << std::endl<< std::endl;
-
-	    std:: cout << "4 kernels" << std::endl;
-	    clock_gettime( CLOCK_REALTIME, &start);
-	    for(int i = 0; i < NITERATIONS;i++){
-	      NTT4<<<gridDim,blockDim>>>(d_W,d_a,d_A,N,1); // Forward
-	      NTT4<<<gridDim,blockDim>>>(d_W,d_b,d_B,N,1); // Forward
-	      polynomialNTTMul<<<gridDim,blockDim>>>(d_A,d_B,d_C,N);
-	      NTT4<<<gridDim,blockDim>>>(d_WInv,d_c,d_C,N,1);// Inverse
+	    std::cout << degree <<") DOUBLENTT2C Mul kernel 64 bits: " << compute_time_ms(start,stop)/NITERATIONS << std::endl<< std::endl;
 
 
-	      result = cudaDeviceSynchronize();
-	      assert(result == cudaSuccess);
-	    }
-	    clock_gettime( CLOCK_REALTIME, &stop);
-	    std::cout << degree <<") NTT4 Mul kernel 64 bits: " << compute_time_ms(start,stop)/NITERATIONS << std::endl<< std::endl;
-
-	    std:: cout << "4 kernels" << std::endl;
-	    clock_gettime( CLOCK_REALTIME, &start);
-	    for(int i = 0; i < NITERATIONS;i++){
-	      NTT5<<<gridDim,blockDim>>>(d_W,d_a,d_A,N,1); // Forward
-	      NTT5<<<gridDim,blockDim>>>(d_W,d_b,d_B,N,1); // Forward
-	      polynomialNTTMul<<<gridDim,blockDim>>>(d_A,d_B,d_C,N);
-	      NTT5<<<gridDim,blockDim>>>(d_WInv,d_c,d_C,N,1);// Inverse
+		// std:: cout << "4 kernels" << std::endl;
+	 //    clock_gettime( CLOCK_REALTIME, &start);
+	 //    for(int i = 0; i < NITERATIONS;i++){
+	 //      DOUBLENTT2ANDMUL<<<gridDim,blockDim>>>(d_W,d_a,d_A,d_b,d_B,d_C,N,1); // Forward
+	 //      NTT2<<<gridDim,blockDim>>>(d_WInv,d_c,d_C,N,1);// Inverse
+	 //      result = cudaDeviceSynchronize();
+	 //      assert(result == cudaSuccess);
+	 //    }
+	 //    clock_gettime( CLOCK_REALTIME, &stop);
+	 //    std::cout << degree <<") DOUBLENTT2ANDMUL Mul kernel 64 bits: " << compute_time_ms(start,stop)/NITERATIONS << std::endl<< std::endl;
 
 
-	      result = cudaDeviceSynchronize();
-	      assert(result == cudaSuccess);
-	    }
-	    clock_gettime( CLOCK_REALTIME, &stop);
-	    std::cout << degree <<") NTT5 Mul kernel 64 bits: " << compute_time_ms(start,stop)/NITERATIONS << std::endl<< std::endl;
+	 //    std:: cout << "4 kernels" << std::endl;
+	 //    clock_gettime( CLOCK_REALTIME, &start);
+	 //    for(int i = 0; i < NITERATIONS;i++){
+	 //      NTT3<<<gridDim,blockDim>>>(d_W,d_a,d_A,N,1); // Forward
+	 //      NTT3<<<gridDim,blockDim>>>(d_W,d_b,d_B,N,1); // Forward
+	 //      polynomialNTTMul<<<gridDim,blockDim>>>(d_A,d_B,d_C,N);
+	 //      NTT3<<<gridDim,blockDim>>>(d_WInv,d_c,d_C,N,1);// Inverse
+
+
+	 //      result = cudaDeviceSynchronize();
+	 //      assert(result == cudaSuccess);
+	 //    }
+	 //    clock_gettime( CLOCK_REALTIME, &stop);
+	 //    std::cout << degree <<") NTT3 Mul kernel 64 bits: " << compute_time_ms(start,stop)/NITERATIONS << std::endl<< std::endl;
+
+	 //    std:: cout << "4 kernels" << std::endl;
+	 //    clock_gettime( CLOCK_REALTIME, &start);
+	 //    for(int i = 0; i < NITERATIONS;i++){
+	 //      NTT4<<<gridDim,blockDim>>>(d_W,d_a,d_A,N,1); // Forward
+	 //      NTT4<<<gridDim,blockDim>>>(d_W,d_b,d_B,N,1); // Forward
+	 //      polynomialNTTMul<<<gridDim,blockDim>>>(d_A,d_B,d_C,N);
+	 //      NTT4<<<gridDim,blockDim>>>(d_WInv,d_c,d_C,N,1);// Inverse
+
+
+	 //      result = cudaDeviceSynchronize();
+	 //      assert(result == cudaSuccess);
+	 //    }
+	 //    clock_gettime( CLOCK_REALTIME, &stop);
+	 //    std::cout << degree <<") NTT4 Mul kernel 64 bits: " << compute_time_ms(start,stop)/NITERATIONS << std::endl<< std::endl;
+
+	 //    std:: cout << "4 kernels" << std::endl;
+	 //    clock_gettime( CLOCK_REALTIME, &start);
+	 //    for(int i = 0; i < NITERATIONS;i++){
+	 //      NTT5<<<gridDim,blockDim>>>(d_W,d_a,d_A,N,1); // Forward
+	 //      NTT5<<<gridDim,blockDim>>>(d_W,d_b,d_B,N,1); // Forward
+	 //      polynomialNTTMul<<<gridDim,blockDim>>>(d_A,d_B,d_C,N);
+	 //      NTT5<<<gridDim,blockDim>>>(d_WInv,d_c,d_C,N,1);// Inverse
+
+
+	 //      result = cudaDeviceSynchronize();
+	 //      assert(result == cudaSuccess);
+	 //    }
+	 //    clock_gettime( CLOCK_REALTIME, &stop);
+	 //    std::cout << degree <<") NTT5 Mul kernel 64 bits: " << compute_time_ms(start,stop)/NITERATIONS << std::endl<< std::endl;
 
 	}
 }

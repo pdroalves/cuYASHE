@@ -5,7 +5,9 @@
 #define SUB 1
 #define CRTPRIMESIZE 32
 // #define VERBOSE
-#define PLAINMUL
-// #define NTTMUL
+// #define PLAINMUL
+#define NTTMUL
 // #define FFTMUL
+#define FORWARD 1
+#define INVERSE 0
 #endif

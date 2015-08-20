@@ -14,7 +14,7 @@ NTL_CLIENT
 #define NITERATIONS 300
 #define FIRSTITERATION 256
 #define LASTITERATION 4096
-#define ADDBLOCKXDIM 32
+#define ADDBLOCKXDIM 64
 
 double compute_time_ms(struct timespec start,struct timespec stop){
   return (( stop.tv_sec - start.tv_sec )*BILLION + ( stop.tv_nsec - start.tv_nsec ))/MILLION;
@@ -103,7 +103,7 @@ __global__ void NTT2(inteiro *W,inteiro *a, inteiro *a_hat, int N,int NPolis){
 
   // const inteiro p = 0xffffffff00000001;
   if(tid < N*NPolis){
-    inteiro value;
+    inteiro value = 0;
     // In each iteration, computes a_hat[i]
     for(int i = 0; i < N; i++){
       value += W[i + cid*N]*a[i];
@@ -112,6 +112,90 @@ __global__ void NTT2(inteiro *W,inteiro *a, inteiro *a_hat, int N,int NPolis){
   }
 
 }
+
+// fast truncation of double-precision to integers
+#define CUMP_D2I_TRUNC (double)(3ll << 51)
+// computes r = a + b subop c unsigned using extended precision
+#define VADDx(r, a, b, c, subop) \
+    asm volatile("vadd.u32.u32.u32." subop " %0, %1, %2, %3;" :  \
+            "=r"(r) : "r"(a) , "r"(b), "r"(c));
+
+// computes a * b mod m; invk = (double)(1<<30) / m
+__device__ __forceinline__ 
+unsigned mul_m(unsigned a, unsigned b, volatile unsigned m,
+    volatile double invk) { 
+
+   unsigned hi = __umulhi(a*2, b*2); // 3 flops
+   // 2 double instructions
+   double rf = __uint2double_rn(hi) * invk + CUMP_D2I_TRUNC;
+   unsigned r = (unsigned)__double2loint(rf);
+   r = a * b - r * m; // 2 flops
+
+   // can also be replaced by: VADDx(r, r, m, r, "min") // == umin(r, r + m);
+   if((int)r < 0) 
+      r += m;
+   return r;
+}
+
+__global__ void DOUBLENTT2C(inteiro *W,inteiro *a, inteiro *a_hat,inteiro *b, inteiro *b_hat, int N,int NPolis,inteiro P){
+  // This algorithm supposes that N is power of 2, divisible by 32
+  // Input:
+  // w: Matrix of wNs
+  // a: residues
+  // a_hat: output
+  // N: # of coefficients of each polynomial
+  // NPolis: # of residues
+
+  const int tid = threadIdx.x + blockIdx.x*blockDim.x;
+  const int cid = tid & (N-1); // Coefficient id
+
+  // const uint32_t p = 0xffffffff00000001;
+  if(tid < N*NPolis){
+    uint64_t Avalue = 0;
+    uint64_t Bvalue = 0;
+    // In each iteration, computes a_hat[i]
+    for(int i = 0; i < N; i++){
+
+      uint64_t W64 = W[i + cid*N];
+      uint64_t a64 = a[i];
+      uint64_t b64 = b[i];
+      Avalue = (Avalue + W64*a64)%P;      
+      Bvalue = (Bvalue + W64*b64)%P;
+    }
+    a_hat[cid] = Avalue % P;
+    b_hat[cid] = Bvalue % P;
+  }
+}
+
+__global__ void NTT2C(inteiro *W,inteiro *a, inteiro *a_hat, int N,int NPolis,inteiro P){
+  // This algorithm supposes that N is power of 2, divisible by 32
+  // Input:
+  // w: Matrix of wNs
+  // a: residues
+  // a_hat: output
+  // N: # of coefficients of each polynomial
+  // NPolis: # of residues
+
+  const int tid = threadIdx.x + blockIdx.x*blockDim.x;
+  const int cid = tid & (N-1); // Coefficient id
+  const double invk = (double)(1<<30) / P;
+
+  // const inteiro p = 0xffffffff00000001;
+  if(tid < N*NPolis){
+    uint64_t value = 0;
+    // In each iteration, computes a_hat[i]
+    for(int i = 0; i < N; i++){
+      // uint64_t W64 = W[i + cid*N];
+      // uint64_t a64 = a[i];
+      // value = (value + W64*a64);
+      value = value + mul_m(W[i + cid*N],a[i],P,invk);
+    }
+    a_hat[cid] = value % P;
+  }
+
+}
+
+
 
 __global__ void NTT3(inteiro *W,inteiro *a, inteiro *a_hat, int N,int NPolis){
   // This algorithm supposes that N is power of 2, divisible by 32
@@ -355,6 +439,37 @@ int main(){
 	    }
 	    clock_gettime( CLOCK_REALTIME, &stop);
 	    std::cout << degree <<") NTT2 Mul kernel 32 bits: " << compute_time_ms(start,stop)/NITERATIONS << std::endl<< std::endl;
+
+
+	    std:: cout << "4 kernels" << std::endl;
+	    clock_gettime( CLOCK_REALTIME, &start);
+	    for(int i = 0; i < NITERATIONS;i++){
+	      NTT2C<<<gridDim,blockDim>>>(d_W,d_a,d_A,N,1,P); // Forward
+	      NTT2C<<<gridDim,blockDim>>>(d_W,d_b,d_B,N,1,P); // Forward
+	      polynomialNTTMul<<<gridDim,blockDim>>>(d_A,d_B,d_C,N);
+	      NTT2C<<<gridDim,blockDim>>>(d_WInv,d_c,d_C,N,1,P);// Inverse
+
+
+	      result = cudaDeviceSynchronize();
+	      assert(result == cudaSuccess);
+	    }
+	    clock_gettime( CLOCK_REALTIME, &stop);
+	    std::cout << degree <<") NTT2C Mul kernel 32 bits: " << compute_time_ms(start,stop)/NITERATIONS << std::endl<< std::endl;
+
+
+		std:: cout << "4 kernels" << std::endl;
+	    clock_gettime( CLOCK_REALTIME, &start);
+	    for(int i = 0; i < NITERATIONS;i++){
+	      DOUBLENTT2C<<<gridDim,blockDim>>>(d_W,d_a,d_A,d_b,d_B,N,1,P); // Forward
+	      polynomialNTTMul<<<gridDim,blockDim>>>(d_A,d_B,d_C,N);
+	      NTT2C<<<gridDim,blockDim>>>(d_WInv,d_c,d_C,N,1,P);// Inverse
+
+
+	      result = cudaDeviceSynchronize();
+	      assert(result == cudaSuccess);
+	    }
+	    clock_gettime( CLOCK_REALTIME, &stop);
+	    std::cout << degree <<") DOUBLENTT2C Mul kernel 64 bits: " << compute_time_ms(start,stop)/NITERATIONS << std::endl<< std::endl;
 
 	    std:: cout << "4 kernels" << std::endl;
 	    clock_gettime( CLOCK_REALTIME, &start);

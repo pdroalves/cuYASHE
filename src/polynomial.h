@@ -16,7 +16,7 @@ class Polynomial{
     // Attributes
     int CRTSPACING =-1;// Stores the distance between the zero-coeff of two consecutive residues in d_polyCRT
     static ZZ CRTProduct;
-    static std::vector<long> CRTPrimes;
+    static std::vector<uint32_t> CRTPrimes;
     static Polynomial *global_phi;
     static ZZ global_mod;
 
@@ -215,7 +215,7 @@ class Polynomial{
       }
 
 
-      long *d_result = CUDAFunctions::callPolynomialAddSub(this->stream,this->get_device_crt_residues(),b.get_device_crt_residues(),(int)(this->CRTSPACING*this->polyCRT.size()),ADD);
+      uint32_t *d_result = CUDAFunctions::callPolynomialAddSub(this->stream,this->get_device_crt_residues(),b.get_device_crt_residues(),(int)(this->CRTSPACING*this->polyCRT.size()),ADD);
 
       Polynomial c(this->get_mod(),this->get_phi(),this->CRTSPACING);
       c.set_device_crt_residues(d_result);
@@ -263,7 +263,7 @@ class Polynomial{
           }
       }
 
-      long *d_result = CUDAFunctions::callPolynomialAddSub(this->stream,this->get_device_crt_residues(),b.get_device_crt_residues(),(int)(this->CRTSPACING*this->polyCRT.size()),SUB);
+      uint32_t *d_result = CUDAFunctions::callPolynomialAddSub(this->stream,this->get_device_crt_residues(),b.get_device_crt_residues(),(int)(this->CRTSPACING*this->polyCRT.size()),SUB);
 
       Polynomial c(this->get_mod(),this->get_phi(),this->CRTSPACING);
       c.set_device_crt_residues(d_result);
@@ -312,7 +312,7 @@ class Polynomial{
           }
       }
 
-      long *d_result = CUDAFunctions::callPolynomialMul(this->stream,this->get_device_crt_residues(),b.get_device_crt_residues(),this->CRTSPACING,this->CRTPrimes.size());
+      uint32_t *d_result = CUDAFunctions::callPolynomialMul(this->stream,this->get_device_crt_residues(),b.get_device_crt_residues(),this->CRTSPACING,this->CRTPrimes.size());
 
       Polynomial c(this->get_mod(),this->get_phi(),2*this->CRTSPACING);
       c.set_device_crt_residues(d_result);
@@ -610,7 +610,7 @@ class Polynomial{
       std::vector<ZZ> coefs_copy(this->coefs);
       return coefs_copy;
     }
-    void set_coeffs(std::vector<long> values){
+    void set_coeffs(std::vector<uint32_t> values){
 
       if(!this->get_host_updated()){
         this->icrt();
@@ -618,7 +618,7 @@ class Polynomial{
 
       // Replaces all coefficients
       this->coefs.resize(values.size());
-      for(std::vector<long>::iterator iter = values.begin();iter != values.end();iter++){
+      for(std::vector<uint32_t>::iterator iter = values.begin();iter != values.end();iter++){
         this->coefs[iter-values.begin()] = conv<ZZ>(*iter);
       }
       this->expected_degree = this->coefs.size()-1;
@@ -635,15 +635,15 @@ class Polynomial{
       this->expected_degree = this->coefs.size()-1;
 
     }
-    std::vector<std::vector<long> > get_crt_residues(){
-      std::vector<std::vector<long> > crt_residues_copy(this->polyCRT);
+    std::vector<std::vector<uint32_t> > get_crt_residues(){
+      std::vector<std::vector<uint32_t> > crt_residues_copy(this->polyCRT);
       return crt_residues_copy;
     }
-    long* get_device_crt_residues(){
+    uint32_t* get_device_crt_residues(){
       // Returns the address of crt residues at device memory
       return this->d_polyCRT;
     }
-    void set_device_crt_residues(long *residues){
+    void set_device_crt_residues(uint32_t *residues){
       this->d_polyCRT = residues;
     }
 
@@ -652,14 +652,14 @@ class Polynomial{
     int get_crt_spacing(){
       return this->CRTSPACING;
     }
-    static void gen_crt_primes(ZZ q,long degree){
-        // We will use 63bit primes to fit long data type (64 bits raises "GenPrime: length too large")
+    static void gen_crt_primes(ZZ q,uint32_t degree){
+        // We will use 63bit primes to fit uint32_t data type (64 bits raises "GenPrime: length too large")
         ZZ M = ZZ(1);
-        std::vector<long> P;
+        std::vector<uint32_t> P;
 
         int primes_size = CRTPRIMESIZE;
         std::cout << "Primes size: " << primes_size << std::endl;
-        long n;
+        uint32_t n;
 
         while( (M < (2*degree)*q*q*q) ){
             n = NTL::GenPrime_long(primes_size);
@@ -725,7 +725,7 @@ class Polynomial{
 
       // If updated data lies in gpu's global memory, realign it
       if(this->get_device_updated()){
-        long * d_pointer = CUDAFunctions::callRealignCRTResidues(this->stream, this->CRTSPACING,new_spacing,this->get_device_crt_residues(),this->deg()+1,Polynomial::CRTPrimes.size());
+        uint32_t * d_pointer = CUDAFunctions::callRealignCRTResidues(this->stream, this->CRTSPACING,new_spacing,this->get_device_crt_residues(),this->deg()+1,Polynomial::CRTPrimes.size());
         if(d_pointer != NULL){
           this->set_device_crt_residues(d_pointer);
         }else{
@@ -759,8 +759,8 @@ class Polynomial{
     cudaStream_t stream;
     int expected_degree; // This variable stores the expected degree for this polinomial
     std::vector<ZZ> coefs;
-    std::vector<std::vector<long> > polyCRT; // Must be initialized by crt()
-    long *d_polyCRT; // Must be initialized on CRTSPACING definition and updated by crt(), if needed
+    std::vector<std::vector<uint32_t> > polyCRT; // Must be initialized by crt()
+    uint32_t *d_polyCRT; // Must be initialized on CRTSPACING definition and updated by crt(), if needed
     ZZ mod;
     Polynomial *phi;
 
