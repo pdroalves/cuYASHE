@@ -141,6 +141,30 @@ __global__ void polynomialPlainMul(const uint32_t *a,const uint32_t *b,uint32_t 
   // }
 }
 
+__device__ uint64_t mulmod(uint64_t a, uint64_t b, uint64_t m) {
+    uint64_t res = 0;
+    uint64_t temp_b;
+
+    while (a != 0) {
+        if (a & 1) {
+            /* Add b to res, modulo m, without overflow */
+            if (b >= m - res) /* Equiv to if (res + b >= m), without overflow */
+                res -= m;
+            res += b;
+        }
+        a >>= 1;
+
+        /* Double b, modulo m */
+        temp_b = b;
+        if (b >= m - b)       /* Equiv to if (2 * b >= m), without overflow */
+            temp_b -= m;
+        b += temp_b;
+    __syncthreads();
+    }
+    return res;
+}
+
+
 __global__ void NTT32(uint32_t *W,uint32_t *WInv,uint32_t *a, uint32_t *a_hat, const int N,const int NPolis,const uint64_t P,const int type){
   // This algorithm supposes that N is power of 2, divisible by 32
   // Input:
@@ -149,26 +173,25 @@ __global__ void NTT32(uint32_t *W,uint32_t *WInv,uint32_t *a, uint32_t *a_hat, c
   // a_hat: output
   // N: # of coefficients of each polynomial
   // NPolis: # of residues
-  const int tid = threadIdx.x + blockIdx.x*blockDim.x;
+   const int tid = threadIdx.x + blockIdx.x*blockDim.x;
   const int residueid = tid / (N);
   const int roffset = residueid*N;
   const int cid = tid & (N-1); // Coefficient id
-  // const double invk = (double)(1<<30) / P;
+  // const uint64_t p = 0xffffffff00000001;
+
   uint32_t *w;
   if(type == FORWARD)
     w = W;
   else
     w = WInv;
 
-  // const inteiro p = 0xffffffff00000001;
   if(tid < N*NPolis){
     uint64_t value = 0;
     // In each iteration, computes a_hat[i]
     for(int i = 0; i < N; i++){
       uint64_t W64 = w[i + cid*N];
       uint64_t a64 = a[i + roffset];
-      value = (value + W64*a64)%P;
-      // value = value + mul_m(W64,a64,P,invk);
+      value = (value + mulmod(W64,a64,P));
     }
     if(type == FORWARD)
       a_hat[cid+roffset] = value % P;
@@ -200,7 +223,7 @@ __global__ void DOUBLENTT32( uint32_t *W, uint32_t *WInv,uint32_t *a, uint32_t *
   else
     w = WInv;
 
-  // const uint32_t p = 0xffffffff00000001;
+  // const uint64_t p = 0xffffffff00000001;
   if(tid < N*NPolis){
     uint64_t Avalue = 0;
     uint64_t Bvalue = 0;
@@ -210,15 +233,21 @@ __global__ void DOUBLENTT32( uint32_t *W, uint32_t *WInv,uint32_t *a, uint32_t *
       uint64_t W64 = w[i + cid*N];
       uint64_t a64 = a[i + roffset];
       uint64_t b64 = b[i + roffset];
-      Avalue = (Avalue + W64*a64)%P;      
-      Bvalue = (Bvalue + W64*b64)%P;
+      Avalue = (Avalue + mulmod(W64,a64,P));      
+      Bvalue = (Bvalue + mulmod(W64,b64,P));
+      // Avalue = (Avalue + W64*a64);      
+      // Bvalue = (Bvalue + W64*b64);
     }
     if(type == FORWARD){
       a_hat[cid+ roffset] = Avalue % P;
       b_hat[cid+ roffset] = Bvalue % P;
+      // a_hat[cid+ roffset] = Avalue ;
+      // b_hat[cid+ roffset] = Bvalue ;
     }else{
       a_hat[cid+ roffset] = (Avalue % P)/N;
       b_hat[cid+ roffset] = (Bvalue % P)/N;
+      // a_hat[cid+ roffset] = (Avalue );
+      // b_hat[cid+ roffset] = (Bvalue );
     }
   }
 
