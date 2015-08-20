@@ -40,7 +40,9 @@ int main(void){
   phi.set_mod(Polynomial::global_mod);
 
   // for(int d = 32;d <= 4096;d *= 2){
-  for(int d = 256;d <= 256;d *= 2){
+  for(int d = 256;d <= 4096;d *= 2){
+    CUDAFunctions::init(d);
+
     std::cout << "d: " << d << std::endl;
 
     clock_gettime( CLOCK_REALTIME, &start);

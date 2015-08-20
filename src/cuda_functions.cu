@@ -271,7 +271,7 @@ __host__ uint32_t* CUDAFunctions::callPolynomialMul(cudaStream_t stream,uint32_t
     polynomialPlainMul<<<gridDim,blockDim,1,stream>>>(a,b,d_result,N,NPolis);
     assert(cudaGetLastError() == cudaSuccess);
   #elif defined(NTTMUL)
-        std::cout << "NTT multiplication" << std::endl;
+        // std::cout << "NTT multiplication" << std::endl;
 
     // Allocates memory for temporary arrays on device
     // Each polynomial's degree gets doubled
@@ -281,12 +281,12 @@ __host__ uint32_t* CUDAFunctions::callPolynomialMul(cudaStream_t stream,uint32_t
     uint32_t *d_c;
     cudaError_t result = cudaMalloc((void**)&d_a,size*sizeof(uint32_t));
     assert(result == cudaSuccess);
-    result = cudaMemset((void*)d_a,0,size*sizeof(uint32_t));
-    assert(result == cudaSuccess);
+    // result = cudaMemset((void*)d_a,0,size*sizeof(uint32_t));
+    // assert(result == cudaSuccess);
     result = cudaMalloc((void**)&d_b,size*sizeof(uint32_t));
     assert(result == cudaSuccess);
-    result = cudaMemset((void*)d_b,0,size*sizeof(uint32_t));
-    assert(result == cudaSuccess);    
+    // result = cudaMemset((void*)d_b,0,size*sizeof(uint32_t));
+    // assert(result == cudaSuccess);    
     result = cudaMalloc((void**)&d_c,size*sizeof(uint32_t));
     assert(result == cudaSuccess);
     result = cudaMalloc((void**)&d_result,size*NPolis*sizeof(uint32_t));
