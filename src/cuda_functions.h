@@ -75,11 +75,11 @@ class CUDAFunctions{
   	static uint64_t wN;
 	static uint64_t *d_W;
 	static uint64_t *d_WInv;
-	const static uint64_t P = 18446744069414584321;//31 bits
+	// const static uint64_t P = 18446744069414584321;//31 bits
 
-    static uint32_t* callPolynomialAddSub(cudaStream_t stream,uint32_t *a,uint32_t *b,int size,int OP);
-    static uint32_t* callPolynomialMul(cudaStream_t stream,uint32_t *a,uint32_t *b, int N, int NPolis);
-    static uint32_t* callRealignCRTResidues(cudaStream_t stream,int oldSpacing,int newSpacing, uint32_t *array,int residuesSize,int residuesQty);
+    static uint64_t* callPolynomialAddSub(cudaStream_t stream,uint64_t *a,uint64_t *b,int size,int OP);
+    static uint64_t* callPolynomialMul(cudaStream_t stream,uint64_t *a,uint64_t *b, int N, int NPolis);
+    static uint64_t* callRealignCRTResidues(cudaStream_t stream,int oldSpacing,int newSpacing, uint64_t *array,int residuesSize,int residuesQty);
     static void init(int N){
 
 			uint64_t *h_W;
@@ -104,7 +104,7 @@ class CUDAFunctions{
 			  std::cout << "wN == " << wN << std::endl;
 			  std::cout << "k == " << k << std::endl;
 			  std::cout << "N == " << N << std::endl;
-			  std::cout << "P == " << P << std::endl;
+			  std::cout << "P == " << PZZ << std::endl;
   
 			// Computes W
 			for(int j = 0; j < N; j++)

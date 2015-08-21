@@ -161,19 +161,19 @@ BOOST_AUTO_TEST_CASE(zeroAdd)
 
 BOOST_AUTO_TEST_CASE(wNTest)
 {
-  uint32_t *W;
-  uint32_t *WInv;
+  uint64_t *W;
+  uint64_t *WInv;
   int N = degree;
 
-  W = (uint32_t*)malloc(N*N*sizeof(uint32_t));
-  WInv = (uint32_t*)malloc(N*N*sizeof(uint32_t));
+  W = (uint64_t*)malloc(N*N*sizeof(uint64_t));
+  WInv = (uint64_t*)malloc(N*N*sizeof(uint64_t));
 
-  cudaError_t result = cudaMemcpy(W,CUDAFunctions::d_W , N*N*sizeof(uint32_t), cudaMemcpyDeviceToHost);
+  cudaError_t result = cudaMemcpy(W,CUDAFunctions::d_W , N*N*sizeof(uint64_t), cudaMemcpyDeviceToHost);
   BOOST_REQUIRE(result == cudaSuccess);
-  result = cudaMemcpy(WInv,CUDAFunctions::d_WInv , N*N*sizeof(uint32_t), cudaMemcpyDeviceToHost);
+  result = cudaMemcpy(WInv,CUDAFunctions::d_WInv , N*N*sizeof(uint64_t), cudaMemcpyDeviceToHost);
   BOOST_REQUIRE(result == cudaSuccess);
 
-  uint64_t P = CUDAFunctions::P;
+  const uint64_t P = 0xffffffff00000001;
   uint64_t wN = CUDAFunctions::wN;
 
   BOOST_REQUIRE(W[1+N] == wN);
@@ -190,7 +190,7 @@ BOOST_AUTO_TEST_CASE(simpleMultiplication)
    // std:: cout <<  NTL::MulMod(6406262673276882058,4,9223372036854829057) << std::endl;
   // std:: cout <<  NTL::MulMod(6406262673276882058,4,9223372036854829057) << std::endl;
 
-// uint32_t integer = 9223372036854829057L;
+// uint64_t integer = 9223372036854829057L;
 //     ZZ P = ZZ(integer);
 //     ZZ x = Z(6209464568650184525);
 //     ZZ inv = NTL::InvMod(x,P);
@@ -209,19 +209,19 @@ BOOST_AUTO_TEST_CASE(simpleMultiplication)
     dim3 blockDim(ADDBLOCKXDIM);
     dim3 gridDim((N*NPOLYS)/ADDBLOCKXDIM+1);
 
-    uint32_t *h_a;
-    uint32_t *d_a;
-    uint32_t *h_b;
-    uint32_t *d_b;
-    uint32_t *h_c;
+    uint64_t *h_a;
+    uint64_t *d_a;
+    uint64_t *h_b;
+    uint64_t *d_b;
+    uint64_t *h_c;
 
     // Alloc memory
-    h_a = (uint32_t*)malloc(N*NPOLYS*sizeof(uint32_t));
-    h_b = (uint32_t*)malloc(N*NPOLYS*sizeof(uint32_t));
-    h_c = (uint32_t*)malloc(N*NPOLYS*sizeof(uint32_t));
-    cudaError_t result = cudaMalloc((void**)&d_a,N*NPOLYS*sizeof(uint32_t));
+    h_a = (uint64_t*)malloc(N*NPOLYS*sizeof(uint64_t));
+    h_b = (uint64_t*)malloc(N*NPOLYS*sizeof(uint64_t));
+    h_c = (uint64_t*)malloc(N*NPOLYS*sizeof(uint64_t));
+    cudaError_t result = cudaMalloc((void**)&d_a,N*NPOLYS*sizeof(uint64_t));
     assert(result == cudaSuccess);
-    result = cudaMalloc((void**)&d_b,N*NPOLYS*sizeof(uint32_t));
+    result = cudaMalloc((void**)&d_b,N*NPOLYS*sizeof(uint64_t));
     assert(result == cudaSuccess);
 
     // Generates random values
@@ -244,22 +244,22 @@ BOOST_AUTO_TEST_CASE(simpleMultiplication)
       }
 
     // Copy to GPU
-    result = cudaMemcpy(d_a,h_a , N*NPOLYS*sizeof(uint32_t), cudaMemcpyHostToDevice);
+    result = cudaMemcpy(d_a,h_a , N*NPOLYS*sizeof(uint64_t), cudaMemcpyHostToDevice);
     assert(result == cudaSuccess);
 
-    // result = cudaMemset((void*)d_b,1,N*NPOLYS*sizeof(uint32_t));
+    // result = cudaMemset((void*)d_b,1,N*NPOLYS*sizeof(uint64_t));
     // assert(result == cudaSuccess);  
-    result = cudaMemcpy(d_b,h_b , N*NPOLYS*sizeof(uint32_t), cudaMemcpyHostToDevice);
+    result = cudaMemcpy(d_b,h_b , N*NPOLYS*sizeof(uint64_t), cudaMemcpyHostToDevice);
     assert(result == cudaSuccess);
 
     // Multiply
     cudaStream_t stream;
     cudaStreamCreate(&stream);
-    uint32_t *d_c = CUDAFunctions::callPolynomialMul(stream,d_a,d_b,N, NPOLYS);
+    uint64_t *d_c = CUDAFunctions::callPolynomialMul(stream,d_a,d_b,N, NPOLYS);
 
     ZZ_pEX c_ntl = a_ntl*b_ntl;
 
-    result = cudaMemcpy(h_c,d_c,  N*NPOLYS*sizeof(uint32_t), cudaMemcpyDeviceToHost);
+    result = cudaMemcpy(h_c,d_c,  N*NPOLYS*sizeof(uint64_t), cudaMemcpyDeviceToHost);
     assert(result == cudaSuccess);
     // std::cout << c_ntl << std::endl;
     for(int j = 0; j < NPOLYS;j++)
