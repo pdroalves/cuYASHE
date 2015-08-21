@@ -57,8 +57,8 @@ cuda_functions.o:cuda_functions.cu
 # yashe.o:yashe.cpp
 # 	$(CC) -c yashe.cpp -o yashe.o $(NTL) $(LCUDA) $(ICUDA)
 
-test_ntt: cuda_functions.o
-	$(CUDA_CC) $(CUDA_ARCH) test_ntt.cu cuda_functions.cu -o ../bin/test_ntt -lntl -lgmp -m64
+test_ntt: test_ntt.cu
+	$(CUDA_CC) $(CUDA_ARCH) test_ntt.cu -o ../bin/test_ntt -lntl -lgmp -m64
 
 
 test_mul: polynomial.o cuda_functions.o

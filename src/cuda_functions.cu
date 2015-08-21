@@ -7,8 +7,8 @@
 #include <stdio.h>
 #include <assert.h>
 
-uint32_t *(CUDAFunctions::d_W) = NULL;
-uint32_t *(CUDAFunctions::d_WInv) = NULL;
+uint64_t *(CUDAFunctions::d_W) = NULL;
+uint64_t *(CUDAFunctions::d_WInv) = NULL;
 uint64_t CUDAFunctions::wN = 0;
 
 ///////////////////////////////////////
@@ -164,8 +164,77 @@ __device__ uint64_t mulmod(uint64_t a, uint64_t b, uint64_t m) {
     return res;
 }
 
+typedef struct {
+  unsigned long long int lo;
+  unsigned long long int hi;
+} my_uint128;
 
-__global__ void NTT32(uint32_t *W,uint32_t *WInv,uint32_t *a, uint32_t *a_hat, const int N,const int NPolis,const uint64_t P,const int type){
+__device__ my_uint128 add_uint128 (my_uint128 a, my_uint128 b)
+{
+  my_uint128 res;
+  res.lo = a.lo + b.lo;
+  res.hi = a.hi + b.hi + (res.lo < a.lo);
+  return res;
+} 
+
+__device__ my_uint128 add_uint64_128 (uint64_t a, my_uint128 b)
+{
+  my_uint128 res = {a+b.lo,b.hi};
+  return res;
+} 
+
+__device__ my_uint128 add_uint64_64 (uint64_t a, uint64_t b)
+{
+
+  my_uint128 res;
+  res.lo = a + b;
+  res.hi = (res.lo < a);
+
+  return res;
+} 
+
+
+__device__ uint64_t s_rem (uint64_t a)
+{
+  // Special reduction for prime 2^64-2^32+1
+  //
+  // x3 * 2^96 + x2 * 2^64 + x1 * 2^32 + x0 \equiv
+  // (x1+x2) * 2^32 + x0 - x3 - x2 mod p
+  //
+  // Here: x3 = 0, x2 = 0, x1 = (a >> 32), x0 = a-(x1 << 32)
+  const uint64_t p = 0xffffffff00000001;
+  // uint64_t x3 = 0;
+  // uint64_t x2 = 0;
+  uint64_t x1 = (a >> 32);
+  uint64_t x0 = (a & UINT32_MAX);
+
+  // uint64_t res = ((x1+x2)<<32 + x0-x3-x2);
+  uint64_t res = ((x1<<32) + x0);
+
+  return res;
+} 
+
+__device__ uint64_t s_rem (my_uint128 a)
+{
+  // Special reduction for prime 2^64-2^32+1
+  //
+  // x3 * 2^96 + x2 * 2^64 + x1 * 2^32 + x0 \equiv
+  // (x1+x2) * 2^32 + x0 - x3 - x2 mod p
+  //
+  // Here: x3 = 0, x2 = a.hi, x1 = (a.lo >> 32), x0 = a.lo-(x1 << 32)
+  // const uint64_t p = 0xffffffff00000001;
+  // uint64_t x3 = 0;
+  uint64_t x2 = a.hi;
+  uint64_t x1 = (a.lo >> 32);
+  uint64_t x0 = (a.lo & UINT32_MAX);
+
+  // uint64_t res = ((x1+x2)<<32 + x0-x3-x2);
+  uint64_t res = (((x1+x2)<<32) + x0-x2);
+
+  return res;
+} 
+
+__global__ void NTT32(uint64_t *W,uint64_t *WInv,uint32_t *a, uint32_t *a_hat, const int N,const int NPolis,const uint64_t P,const int type){
   // This algorithm supposes that N is power of 2, divisible by 32
   // Input:
   // w: Matrix of wNs
@@ -179,7 +248,7 @@ __global__ void NTT32(uint32_t *W,uint32_t *WInv,uint32_t *a, uint32_t *a_hat, c
   const int cid = tid & (N-1); // Coefficient id
   // const uint64_t p = 0xffffffff00000001;
 
-  uint32_t *w;
+  uint64_t *w;
   if(type == FORWARD)
     w = W;
   else
@@ -191,12 +260,13 @@ __global__ void NTT32(uint32_t *W,uint32_t *WInv,uint32_t *a, uint32_t *a_hat, c
     for(int i = 0; i < N; i++){
       uint64_t W64 = w[i + cid*N];
       uint64_t a64 = a[i + roffset];
-      value = (value + mulmod(W64,a64,P));
+      value = s_rem(add_uint64_64(value,mulmod(W64,a64,P)));
+
     }
     if(type == FORWARD)
-      a_hat[cid+roffset] = value % P;
+      a_hat[cid+roffset] = (value%P);
     else
-      a_hat[cid+roffset] = (value % P)/N;
+      a_hat[cid+roffset] = (value%P)/N;
 
   }
 
@@ -204,7 +274,7 @@ __global__ void NTT32(uint32_t *W,uint32_t *WInv,uint32_t *a, uint32_t *a_hat, c
 
 
 
-__global__ void DOUBLENTT32( uint32_t *W, uint32_t *WInv,uint32_t *a, uint32_t *a_hat,uint32_t *b, uint32_t *b_hat, const int N,const int NPolis,const uint64_t P,const int type){
+__global__ void DOUBLENTT32( uint64_t *W, uint64_t *WInv,uint32_t *a, uint32_t *a_hat,uint32_t *b, uint32_t *b_hat, const int N,const int NPolis,const uint64_t P,const int type){
   // This algorithm supposes that N is power of 2, divisible by 32
   // Input:
   // w: Matrix of wNs
@@ -212,12 +282,11 @@ __global__ void DOUBLENTT32( uint32_t *W, uint32_t *WInv,uint32_t *a, uint32_t *
   // a_hat: output
   // N: # of coefficients of each polynomial
   // NPolis: # of residues
-
   const int tid = threadIdx.x + blockIdx.x*blockDim.x;
   const int residueid = tid / N;
   const int roffset = residueid*N;
   const int cid = tid & (N-1); // Coefficient id
-  uint32_t *w;
+  uint64_t *w;
   if(type == FORWARD)
     w = W;
   else
@@ -233,24 +302,20 @@ __global__ void DOUBLENTT32( uint32_t *W, uint32_t *WInv,uint32_t *a, uint32_t *
       uint64_t W64 = w[i + cid*N];
       uint64_t a64 = a[i + roffset];
       uint64_t b64 = b[i + roffset];
-      Avalue = (Avalue + mulmod(W64,a64,P));      
-      Bvalue = (Bvalue + mulmod(W64,b64,P));
-      // Avalue = (Avalue + W64*a64);      
-      // Bvalue = (Bvalue + W64*b64);
+      Avalue = s_rem(add_uint64_64(Avalue,mulmod(W64,a64,P)));      
+      Bvalue = s_rem(add_uint64_64(Bvalue,mulmod(W64,b64,P)));
     }
     if(type == FORWARD){
-      a_hat[cid+ roffset] = Avalue % P;
-      b_hat[cid+ roffset] = Bvalue % P;
-      // a_hat[cid+ roffset] = Avalue ;
-      // b_hat[cid+ roffset] = Bvalue ;
+      a_hat[cid+ roffset] = Avalue %P;
+      b_hat[cid+ roffset] = Bvalue %P;
     }else{
-      a_hat[cid+ roffset] = (Avalue % P)/N;
-      b_hat[cid+ roffset] = (Bvalue % P)/N;
-      // a_hat[cid+ roffset] = (Avalue );
-      // b_hat[cid+ roffset] = (Bvalue );
+      a_hat[cid+ roffset] = (Avalue %P)/N;
+      b_hat[cid+ roffset] = (Bvalue %P)/N;
+
+      // a_hat[cid+ roffset] = (Avalue %P )/N;
+      // b_hat[cid+ roffset] = (Bvalue %P )/N;
     }
   }
-
 }
 
 __global__ void polynomialNTTMul(const uint32_t *a,const uint32_t *b,uint32_t *c,const int size,const uint64_t P){
