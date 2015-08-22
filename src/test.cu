@@ -34,10 +34,11 @@ struct PolySuite
     PolySuite(){
         BOOST_TEST_MESSAGE("setup PolySuite");
 
-        degree = 128;
+        degree = 32;
         CUDAFunctions::init(degree);
 
-        Polynomial::global_mod = conv<ZZ>("1171313591017775093490277364417"); // Defines default GF(q)
+        // Polynomial::global_mod = conv<ZZ>("1171313591017775093490277364417"); // Defines default GF(q)
+        Polynomial::global_mod = conv<ZZ>("2147483647"); // Defines default GF(q)
         Polynomial::BuildNthCyclotomic(&phi,degree);
         // std::cout << phi.to_string() << std::endl;
         phi.set_mod(Polynomial::global_mod);
@@ -90,14 +91,14 @@ BOOST_AUTO_TEST_CASE(simpleAdd)
 
   Polynomial b(a);//Copy
   Polynomial c = a+b;
-  // c.icrt();//
+  c.icrt();//
 
   #ifdef VERBOSE
   std::cout << "a: " << a.to_string() << std::endl;
   std::cout << "b: " << b.to_string() << std::endl;
   std::cout << "c: " << c.to_string() << std::endl;
   #endif
-  BOOST_REQUIRE(c == a*2);
+  BOOST_REQUIRE(c == (a*2)%(c.get_mod()));
 }
 
 BOOST_AUTO_TEST_CASE(multipleAdds)
@@ -114,7 +115,7 @@ BOOST_AUTO_TEST_CASE(multipleAdds)
   std::cout << "a: " << a.to_string() << std::endl;
   std::cout << "b: " << b.to_string() << std::endl;
   #endif
-  BOOST_REQUIRE(b == a*NTESTS);
+  BOOST_REQUIRE(b == (a*NTESTS)%(b.get_mod()));
 }
 
 BOOST_AUTO_TEST_CASE(multipleAddsWithDifferentDegrees)
@@ -173,7 +174,7 @@ BOOST_AUTO_TEST_CASE(wNTest)
   result = cudaMemcpy(WInv,CUDAFunctions::d_WInv , N*N*sizeof(uint64_t), cudaMemcpyDeviceToHost);
   BOOST_REQUIRE(result == cudaSuccess);
 
-  const uint64_t P = 0xffffffff00000001;
+  // const uint64_t P = 0xffffffff00000001;
   uint64_t wN = CUDAFunctions::wN;
 
   ZZ PZZ = conv<ZZ>("18446744069414584321");
@@ -320,52 +321,54 @@ BOOST_AUTO_TEST_CASE(multiplyByZZOnCPU)
   }
 }
 
-BOOST_AUTO_TEST_CASE(multiplyByZZOnGPU)
-{
-  Polynomial a;
-  ZZ b;
+// BOOST_AUTO_TEST_CASE(multiplyByZZOnGPU)
+// {
+//   Polynomial a;
+//   ZZ b;
 
-  for(int count = 0; count < NTESTS; count++){
+//   for(int count = 0; count < NTESTS; count++){
 
-    a.set_device_updated(false);
-    Polynomial::random(&a,degree-1);
-    a.set_host_updated(true);
+//     a.set_device_updated(false);
+//     Polynomial::random(&a,degree-1);
+//     a.set_host_updated(true);
 
-    ZZ_pEX a_ntl;
-    for(int i = 0;i <= a.deg();i++)
-      NTL::SetCoeff(a_ntl,i,conv<ZZ_p>(a.get_coeff(i)));
-    NTL::RandomBnd(b,ZZ(42));
-    // b = ZZ(0);
+//     ZZ_pEX a_ntl;
+//     for(int i = 0;i <= a.deg();i++)
+//       NTL::SetCoeff(a_ntl,i,conv<ZZ_p>(a.get_coeff(i)));
+//     NTL::RandomBnd(b,ZZ(42));
+//     // b = ZZ(0);
 
-    // This will force the execution on GPU
-    a.crt();
-    a.update_device_data();
-    a.set_host_updated(false);
+//     // This will force the execution on GPU
+//     a.crt();
+//     a.update_device_data();
+//     a.set_host_updated(false);
 
-    Polynomial c = a*b % Polynomial::global_mod;
-    c.icrt();
-    c.normalize();
+//     Polynomial c = a*b % Polynomial::global_mod;
+//     c.icrt();
+//     c.normalize();
 
-    ZZ_pEX c_ntl = a_ntl*conv<ZZ_p>(b);
+//     ZZ_pEX c_ntl = a_ntl*conv<ZZ_p>(b);
 
-    #ifdef VERBOSE
-    std::cout << "a: " << a.to_string() << " degree: " << a.deg() <<std::endl;
-    std::cout << "b: " << b <<std::endl;
-    std::cout << "c: " << c.to_string() << " degree: " << c.deg() <<std::endl;
-    std::cout << ": " << c_ntl << " degree: " << NTL::deg(c_ntl) << std::endl << std::endl;
-    std::cout << "c_ntl: " << c_ntl << " degree: " << NTL::deg(c_ntl) << std::endl << std::endl;
-    std::cout << "count: " << count << std::endl;
-    #endif
-    BOOST_REQUIRE(NTL::deg(c_ntl) == c.deg());
-    for(int i = 0;i <= c.deg();i++)
-      BOOST_REQUIRE(conv<ZZ>(NTL::rep(c_ntl[i])[0]) == c.get_coeff(i));
-  }
-}
+//     #ifdef VERBOSE
+//     std::cout << "a: " << a.to_string() << " degree: " << a.deg() <<std::endl;
+//     std::cout << "b: " << b <<std::endl;
+//     std::cout << "c: " << c.to_string() << " degree: " << c.deg() <<std::endl;
+//     std::cout << ": " << c_ntl << " degree: " << NTL::deg(c_ntl) << std::endl << std::endl;
+//     std::cout << "c_ntl: " << c_ntl << " degree: " << NTL::deg(c_ntl) << std::endl << std::endl;
+//     std::cout << "count: " << count << std::endl;
+//     #endif
+//     BOOST_REQUIRE(NTL::deg(c_ntl) == c.deg());
+//     for(int i = 0;i <= c.deg();i++)
+//       BOOST_REQUIRE(conv<ZZ>(NTL::rep(c_ntl[i])[0]) == c.get_coeff(i));
+//   }
+// }
 
 BOOST_AUTO_TEST_CASE(simpleMultiplyByPolynomial)
 {
   Polynomial a;
   Polynomial b;
+
+  CUDAFunctions::init(2*degree);
 
 
   a.set_device_updated(false);
@@ -398,21 +401,33 @@ BOOST_AUTO_TEST_CASE(simpleMultiplyByPolynomial)
   }
   std::cout << "count: " << count << std::endl;
   #endif
-    std::cout << "c: " << c.to_string() << " degree: " << c.deg() <<std::endl;
-    std::cout << "c_ntl: " << c_ntl << " degree: " << NTL::deg(c_ntl) << std::endl << std::endl;
+    // std::cout << "c: " << c.to_string() << " degree: " << c.deg() <<std::endl;
+    // std::cout << "c_ntl: " << c_ntl << " degree: " << NTL::deg(c_ntl) << std::endl << std::endl;
 
   BOOST_REQUIRE(NTL::deg(c_ntl) == c.deg());
-  for(int i = 0;i <= c.deg();i++)
-    BOOST_REQUIRE(conv<ZZ>(NTL::rep(c_ntl[i])[0]) == c.get_coeff(i));
+  for(int i = 0;i <= c.deg();i++){
+
+    int ntl_value;
+    if( NTL::IsZero(NTL::coeff(c_ntl,i)) )
+    // Without this, NTL raises an exception when we call rep()
+      ntl_value = 0L;
+    else
+      ntl_value = conv<int>(NTL::rep(NTL::coeff(c_ntl,i))[0]);
+
+    BOOST_REQUIRE(c.get_coeff(i) == ntl_value);
+  }
 
 }
 
 BOOST_AUTO_TEST_CASE(multiplyByPolynomial)
 {
-  Polynomial a;
-  Polynomial b;
+
+  CUDAFunctions::init(2*degree);
 
   for(int count = 0; count < NTESTS; count++){
+
+    Polynomial a;
+    Polynomial b;
 
     a.set_device_updated(false);
     b.set_device_updated(false);
@@ -442,16 +457,225 @@ BOOST_AUTO_TEST_CASE(multiplyByPolynomial)
     }
     std::cout << "count: " << count << std::endl;
     #endif
-      std::cout << "c: " << c.to_string() << " degree: " << c.deg() <<std::endl;
-      std::cout << "c_ntl: " << c_ntl << " degree: " << NTL::deg(c_ntl) << std::endl << std::endl;
+      // std::cout << "c: " << c.to_string() << " degree: " << c.deg() <<std::endl;
+      // std::cout << "c_ntl: " << c_ntl << " degree: " << NTL::deg(c_ntl) << std::endl << std::endl;
 
     BOOST_REQUIRE(NTL::deg(c_ntl) == c.deg());
-    for(int i = 0;i <= c.deg();i++)
-      BOOST_REQUIRE(conv<ZZ>(NTL::rep(c_ntl[i])[0]) == c.get_coeff(i));
+    for(int i = 0;i <= c.deg();i++){
+      int ntl_value;
+      if( NTL::IsZero(NTL::coeff(c_ntl,i)) )
+      // Without this, NTL raises an exception when we call rep()
+        ntl_value = 0L;
+      else
+        ntl_value = conv<int>(NTL::rep(NTL::coeff(c_ntl,i))[0]);
+
+      BOOST_REQUIRE(c.get_coeff(i) == ntl_value);
+    }
 
   }
 }
 
+
+BOOST_AUTO_TEST_CASE(multiplyAndAddByPolynomial)
+{
+
+  CUDAFunctions::init(2*degree);
+
+  for(int count = 0; count < NTESTS; count++){
+
+    Polynomial a;
+    Polynomial b;
+
+    a.set_device_updated(false);
+    b.set_device_updated(false);
+    Polynomial::random(&a,degree-1);
+    Polynomial::random(&b,degree-1);
+    a.set_host_updated(true);
+    b.set_host_updated(true);
+
+    ZZ_pEX b_ntl;
+    ZZ_pEX a_ntl;
+    for(int i = 0;i <= a.deg();i++)
+      NTL::SetCoeff(a_ntl,i,conv<ZZ_p>(a.get_coeff(i)));
+    for(int i = 0;i <= b.deg();i++)
+      NTL::SetCoeff(b_ntl,i,conv<ZZ_p>(b.get_coeff(i)));
+
+    Polynomial c = a*b+a;
+
+    ZZ_pEX c_ntl = a_ntl*b_ntl+a_ntl;
+
+    #ifdef DEBUG
+    if(c_ntl != c){
+      std::cout << "a: " << a << " degree: " << NTL::deg(a) <<std::endl;
+      std::cout << "b: " << b << " degree: " << NTL::deg(b) <<std::endl;
+      std::cout << "c: " << c << " degree: " << NTL::deg(c) <<std::endl;
+      std::cout << "c_ntl: " << c_ntl << " degree: " << NTL::deg(c_ntl) << std::endl << std::endl;
+    }
+    std::cout << "count: " << count << std::endl;
+    #endif
+      std::cout << "c: " << c.to_string() << " degree: " << c.deg() <<std::endl;
+      std::cout << "c_ntl: " << c_ntl << " degree: " << NTL::deg(c_ntl) << std::endl << std::endl;
+
+    BOOST_REQUIRE(NTL::deg(c_ntl) == c.deg());
+    for(int i = 0;i <= c.deg();i++){
+      int ntl_value;
+      if( NTL::IsZero(NTL::coeff(c_ntl,i)) )
+      // Without this, NTL raises an exception when we call rep()
+        ntl_value = 0L;
+      else
+        ntl_value = conv<int>(NTL::rep(NTL::coeff(c_ntl,i))[0]);
+
+      BOOST_REQUIRE(c.get_coeff(i) == ntl_value);
+    }
+
+  }
+}
+
+BOOST_AUTO_TEST_CASE(addAndMultiplyByPolynomial)
+{
+
+  CUDAFunctions::init(2*degree);
+
+  for(int count = 0; count < NTESTS; count++){
+
+    Polynomial a;
+    Polynomial b;
+
+    a.set_device_updated(false);
+    b.set_device_updated(false);
+    Polynomial::random(&a,degree-1);
+    Polynomial::random(&b,degree-1);
+    a.set_host_updated(true);
+    b.set_host_updated(true);
+
+    ZZ_pEX b_ntl;
+    ZZ_pEX a_ntl;
+    for(int i = 0;i <= a.deg();i++)
+      NTL::SetCoeff(a_ntl,i,conv<ZZ_p>(a.get_coeff(i)));
+    for(int i = 0;i <= b.deg();i++)
+      NTL::SetCoeff(b_ntl,i,conv<ZZ_p>(b.get_coeff(i)));
+
+    Polynomial c = a*b+a;
+
+    ZZ_pEX c_ntl = a_ntl*b_ntl+a_ntl;
+
+    #ifdef DEBUG
+    if(c_ntl != c){
+      std::cout << "a: " << a << " degree: " << NTL::deg(a) <<std::endl;
+      std::cout << "b: " << b << " degree: " << NTL::deg(b) <<std::endl;
+      std::cout << "c: " << c << " degree: " << NTL::deg(c) <<std::endl;
+      std::cout << "c_ntl: " << c_ntl << " degree: " << NTL::deg(c_ntl) << std::endl << std::endl;
+    }
+    std::cout << "count: " << count << std::endl;
+    #endif
+      std::cout << "c: " << c.to_string() << " degree: " << c.deg() <<std::endl;
+      std::cout << "c_ntl: " << c_ntl << " degree: " << NTL::deg(c_ntl) << std::endl << std::endl;
+
+    BOOST_REQUIRE(NTL::deg(c_ntl) == c.deg());
+    for(int i = 0;i <= c.deg();i++){
+      int ntl_value;
+      if( NTL::IsZero(NTL::coeff(c_ntl,i)) )
+      // Without this, NTL raises an exception when we call rep()
+        ntl_value = 0L;
+      else
+        ntl_value = conv<int>(NTL::rep(NTL::coeff(c_ntl,i))[0]);
+
+      BOOST_REQUIRE(c.get_coeff(i) == ntl_value);
+    }
+
+  }
+}
+
+BOOST_AUTO_TEST_CASE(randomPolynomialOperations)
+{
+
+  CUDAFunctions::init(2*degree);
+
+
+  Polynomial a;
+  Polynomial b;
+
+  a.set_device_updated(false);
+  b.set_device_updated(false);
+  Polynomial::random(&a,degree-1);
+  Polynomial::random(&b,degree-1);
+  a.set_host_updated(true);
+  b.set_host_updated(true);
+
+  ZZ_pEX b_ntl;
+  ZZ_pEX a_ntl;
+  for(int i = 0;i <= a.deg();i++)
+    NTL::SetCoeff(a_ntl,i,conv<ZZ_p>(a.get_coeff(i)));
+  for(int i = 0;i <= b.deg();i++)
+    NTL::SetCoeff(b_ntl,i,conv<ZZ_p>(b.get_coeff(i)));
+  Polynomial c;
+  ZZ_pEX c_ntl;
+
+  for(int count = 0; count < NTESTS; count++){
+    int random_op_bit = rand()%2;
+    int random_ab = rand()%3;
+    // 0: add
+    if(random_op_bit){
+      // 1: mul
+      if(random_ab == 1){
+        // 1: b
+        c *= b;
+        c_ntl *= b_ntl;
+      }else if(random_ab == 0){
+        // 0: a
+        c *= a;
+        c_ntl *= a_ntl;
+      }else if(random_ab == 2){
+        // 2: some integer
+        long value = conv<long>(ZZ(rand()) % c.get_mod());
+        c *= value;
+        c_ntl *= value;
+      }
+    }else{
+      // 0: add
+      if(random_ab == 1){
+        // 1: b
+        c += b;
+        c_ntl += b_ntl;
+      }else if(random_ab == 0){
+        // 0: a
+        c += a;
+        c_ntl += a_ntl;
+      }else if(random_ab == 2){
+        // 2: some integer
+        long value = conv<long>(ZZ(rand()) % c.get_mod());
+        c += value;
+        c_ntl += value;
+      }
+
+    }
+  }
+
+
+  #ifdef DEBUG
+  if(c_ntl != c){
+    std::cout << "a: " << a << " degree: " << NTL::deg(a) <<std::endl;
+    std::cout << "b: " << b << " degree: " << NTL::deg(b) <<std::endl;
+    std::cout << "c: " << c << " degree: " << NTL::deg(c) <<std::endl;
+    std::cout << "c_ntl: " << c_ntl << " degree: " << NTL::deg(c_ntl) << std::endl << std::endl;
+  }
+  std::cout << "count: " << count << std::endl;
+  #endif
+    // std::cout << "c: " << c.to_string() << " degree: " << c.deg() <<std::endl;
+    // std::cout << "c_ntl: " << c_ntl << " degree: " << NTL::deg(c_ntl) << std::endl << std::endl;
+
+  BOOST_REQUIRE(NTL::deg(c_ntl) == c.deg());
+  for(int i = 0;i <= c.deg();i++){
+    int ntl_value;
+    if( NTL::IsZero(NTL::coeff(c_ntl,i)) )
+    // Without this, NTL raises an exception when we call rep()
+      ntl_value = 0L;
+    else
+      ntl_value = conv<int>(NTL::rep(NTL::coeff(c_ntl,i))[0]);
+
+    BOOST_REQUIRE(c.get_coeff(i) == ntl_value);
+  }
+}
 
 BOOST_AUTO_TEST_CASE(modularInversion)
 {

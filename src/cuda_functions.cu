@@ -11,6 +11,7 @@
 uint64_t *(CUDAFunctions::d_W) = NULL;
 uint64_t *(CUDAFunctions::d_WInv) = NULL;
 uint64_t CUDAFunctions::wN = 0;
+int CUDAFunctions::N = 0;
 
 ///////////////////////////////////////
 /// Memory operations
@@ -284,7 +285,7 @@ __global__ void NTT64(uint64_t *W,uint64_t *WInv,uint64_t *a, uint64_t *a_hat, c
   const int residueid = tid / (N);
   const int roffset = residueid*N;
   const int cid = tid & (N-1); // Coefficient id
-  const uint64_t P = 0xffffffff00000001;
+  // const uint64_t P = 0xffffffff00000001;
 
 
   if(tid < N*NPolis){
@@ -304,9 +305,9 @@ __global__ void NTT64(uint64_t *W,uint64_t *WInv,uint64_t *a, uint64_t *a_hat, c
 
     }
     if(type == FORWARD)
-      a_hat[cid+roffset] = (value%P);
+      a_hat[cid+roffset] = (value);
     else
-      a_hat[cid+roffset] = (value%P)/N;
+      a_hat[cid+roffset] = (value)/N;
 
   }
 
@@ -326,7 +327,7 @@ __global__ void DOUBLENTT64( uint64_t *W, uint64_t *WInv,uint64_t *a, uint64_t *
   const int residueid = tid / N;
   const int roffset = residueid*N;
   const int cid = tid & (N-1); // Coefficient id
-  const uint64_t P = 0xffffffff00000001;
+  // const uint64_t P = 0xffffffff00000001;
 
 
   if(tid < N*NPolis){
@@ -350,14 +351,11 @@ __global__ void DOUBLENTT64( uint64_t *W, uint64_t *WInv,uint64_t *a, uint64_t *
       Bvalue = (mod_add(Bvalue, mod_mul(W64,b64)));
     }
     if(type == FORWARD){
-      a_hat[cid+ roffset] = (Avalue%P);
-      b_hat[cid+ roffset] = (Bvalue%P);
+      a_hat[cid+ roffset] = (Avalue);
+      b_hat[cid+ roffset] = (Bvalue);
     }else{
-      a_hat[cid+ roffset] = (Avalue%P)/N;
-      b_hat[cid+ roffset] = (Bvalue%P)/N;
-
-      // a_hat[cid+ roffset] = (Avalue %P )/N;
-      // b_hat[cid+ roffset] = (Bvalue %P )/N;
+      a_hat[cid+ roffset] = (Avalue)/N;
+      b_hat[cid+ roffset] = (Bvalue)/N;
     }
   }
 }
@@ -393,6 +391,7 @@ __host__ uint64_t* CUDAFunctions::callPolynomialMul(cudaStream_t stream,uint64_t
   // NPolis: number of residues
   // All representations should be concatenated aligned
   assert((N>0)&&((N & (N - 1)) == 0));//Check if N is power of 2
+  assert(N == CUDAFunctions::N);
   uint64_t *d_result;
 
   #ifdef PLAINMUL
@@ -429,7 +428,7 @@ __host__ uint64_t* CUDAFunctions::callPolynomialMul(cudaStream_t stream,uint64_t
     // assert(result == cudaSuccess);    
     result = cudaMalloc((void**)&d_c,size*sizeof(uint64_t));
     assert(result == cudaSuccess);
-    result = cudaMalloc((void**)&d_result,size*NPolis*sizeof(uint64_t));
+    result = cudaMalloc((void**)&d_result,size*sizeof(uint64_t));
     assert(result == cudaSuccess);
     
     dim3 blockDim(ADDBLOCKXDIM);

@@ -72,6 +72,7 @@ NTL_CLIENT
 
 class CUDAFunctions{
   public:
+  	static int N;
   	static uint64_t wN;
 	static uint64_t *d_W;
 	static uint64_t *d_WInv;
@@ -82,6 +83,7 @@ class CUDAFunctions{
     static uint64_t* callRealignCRTResidues(cudaStream_t stream,int oldSpacing,int newSpacing, uint64_t *array,int residuesSize,int residuesQty);
     static void init(int N){
 
+    		CUDAFunctions::N = N;
 			uint64_t *h_W;
 			uint64_t *h_WInv;
 

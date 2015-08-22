@@ -507,7 +507,7 @@ class Polynomial{
       if(this->deg() != b.deg())
         return false;
 
-      for(unsigned int i = 0; i <= this->deg();i++){
+      for( int i = 0; i <= this->deg();i++){
         if(this->get_coeff(i) != b.get_coeff(i))
           return false;
       }
@@ -520,14 +520,14 @@ class Polynomial{
     void CPUAddition(Polynomial *b){
       // Forces the addition to be executed by CPU
       // This method supposes that there is no need to apply CRT/ICRT on operands
-      for(unsigned int i = 0; i <= std::max(this->deg(),b->deg()); i++)
+      for( int i = 0; i <= std::max(this->deg(),b->deg()); i++)
         this->set_coeff(i,this->get_coeff(i) + b->get_coeff(i));
     }
 
     void CPUSubtraction(Polynomial *b){
       // Forces the subtraction to be executed by CPU
       // This method supposes that there is no need to apply CRT/ICRT on operands
-      for(unsigned int i = 0; i <= b->deg(); i++)
+      for( int i = 0; i <= b->deg(); i++)
         this->set_coeff(i,this->get_coeff(i) - b->get_coeff(i));
     }
 
@@ -743,7 +743,7 @@ class Polynomial{
       // To-do
       throw "Polynomial InvMod not implemented!";
     }
-    static void BuildNthCyclotomic(Polynomial *phi, int n);
+    static void BuildNthCyclotomic(Polynomial *phi, unsigned int n);
     static void random(Polynomial *a,int degree){
       if(a->get_mod() > 0)
         for(int i = 0;i <= degree;i++)

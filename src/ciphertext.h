@@ -8,32 +8,23 @@ class Ciphertext: public Polynomial{
     Ciphertext operator+(Ciphertext b);
     Ciphertext operator*(Ciphertext b);
     void convert();
-    Ciphertext operator=(const ZZ_pEX p){
-      level = 0;
-      for(int i = 0; i < NTL::deg(p); i++)
-        NTL::SetCoeff(*this,i,p[i]);
-      return *this;
-    }
     Ciphertext operator=(Polynomial p){
       level = 0;
-      // Ciphertext new_p;
-      for(int i = 0; i <= NTL::deg(p); i++)
-        NTL::SetCoeff(*this,i,p[i]);
+      this->copy(p);
 
-      this->set_cuda_device_pointer(p.getCudaDevicePointer());
-      this->set_host_updated(p.HOST_IS_UPDATED);
-      this->set_device_updated(p.DEVICE_IS_UPDATED);
+      this->set_device_crt_residues(p.get_device_crt_residues());
+      this->set_host_updated(p.get_host_updated());
+      this->set_device_updated(p.get_device_updated());
 
       return *this;
     }
     Ciphertext(Polynomial p){
       level = 0;
-      for(int i = 0; i <= NTL::deg(p); i++)
-        NTL::SetCoeff(*this,i,p[i]);
+      this->copy(p);
 
-      this->set_cuda_device_pointer(p.getCudaDevicePointer());
-      this->set_host_updated(p.HOST_IS_UPDATED);
-      this->set_device_updated(p.DEVICE_IS_UPDATED);
+      this->set_device_crt_residues(p.get_device_crt_residues());
+      this->set_host_updated(p.get_host_updated());
+      this->set_device_updated(p.get_device_updated());
 
     }
     Ciphertext(){
@@ -42,12 +33,11 @@ class Ciphertext: public Polynomial{
 
     void copy(Polynomial p){
         level = 0;
-        for(int i = 0; i <= NTL::deg(p); i++)
-          NTL::SetCoeff(*this,i,p[i]);
+        this->copy(p);
 
-        this->set_cuda_device_pointer(p.getCudaDevicePointer());
-        this->set_host_updated(p.HOST_IS_UPDATED);
-        this->set_device_updated(p.DEVICE_IS_UPDATED);
+        this->set_device_crt_residues(p.get_device_crt_residues());
+        this->set_host_updated(p.get_host_updated());
+        this->set_device_updated(p.get_device_updated());
     }
 
     int level;

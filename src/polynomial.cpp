@@ -2,6 +2,7 @@
 #include "common.h"
 #include <omp.h>
 #include <assert.h>
+#include <string.h>
 
 ZZ Polynomial::CRTProduct = ZZ(1);
 std::vector<uint64_t> Polynomial::CRTPrimes(0);
@@ -27,22 +28,28 @@ void Polynomial::update_device_data(){
     assert(result == cudaSuccess);
 
 
-    result = cudaMemset((void*)this->d_polyCRT,0,this->CRTSPACING*(this->polyCRT.size())*sizeof(uint64_t));
+    // result = cudaMemset((void*)this->d_polyCRT,0,this->CRTSPACING*(this->polyCRT.size())*sizeof(uint64_t));
+    // #ifdef VERBOSE
+    // std::cout << "cudaMemset:" << cudaGetErrorString(result) << std::endl;
+    // #endif
+    // assert(result == cudaSuccess);
+
+    uint64_t *aux;
+    // aux = (uint64_t*)malloc(this->CRTSPACING*(this->polyCRT.size())*sizeof(uint64_t));
+    aux = (uint64_t*)calloc(this->CRTSPACING*(this->polyCRT.size()),sizeof(uint64_t));
+    for(unsigned int i=0;i < this->polyCRT.size();i++){
+      memcpy(aux+this->CRTSPACING*i,&(this->polyCRT[i][0]),(this->polyCRT[i].size())*sizeof(uint64_t));
+    }
+
+    result = cudaMemcpyAsync(this->d_polyCRT, aux , this->CRTSPACING*(this->polyCRT.size())*sizeof(uint64_t), cudaMemcpyHostToDevice,this->stream);
+
     #ifdef VERBOSE
-    std::cout << "cudaMemset:" << cudaGetErrorString(result) << std::endl;
+    std::cout << "cudaMemcpyAsync" << i << ": " << cudaGetErrorString(result) << " "<<(this->polyCRT[i].size())*sizeof(uint64_t) << " bytes to position "<< this->CRTSPACING*i*sizeof(int) <<std::endl;
     #endif
     assert(result == cudaSuccess);
 
-    for(unsigned int i=0;i < this->polyCRT.size();i++){
-        result = cudaMemcpyAsync(this->d_polyCRT+this->CRTSPACING*i, &(this->polyCRT[i][0]) , (this->polyCRT[i].size())*sizeof(uint64_t), cudaMemcpyHostToDevice,this->stream);
-
-        #ifdef VERBOSE
-        std::cout << "cudaMemcpyAsync" << i << ": " << cudaGetErrorString(result) << " "<<(this->polyCRT[i].size())*sizeof(uint64_t) << " bytes to position "<< this->CRTSPACING*i*sizeof(int) <<std::endl;
-        #endif
-        assert(result == cudaSuccess);
-    }
-
-    result = cudaDeviceSynchronize();
+    // result = cudaDeviceSynchronize();
+    free(aux);
     assert(result == cudaSuccess);
     this->ON_COPY = false;
     this->set_device_updated(true);
@@ -59,9 +66,9 @@ void Polynomial::update_host_data(){
       this->polyCRT.resize(Polynomial::CRTPrimes.size());
 
     // Copy all data to host
-    uint64_t *tmp_polyCRT;
-    tmp_polyCRT = (uint64_t*) malloc (this->polyCRT.size()*this->CRTSPACING*sizeof(uint64_t));
-    result = cudaMemcpyAsync(tmp_polyCRT , this->d_polyCRT, this->polyCRT.size()*this->CRTSPACING*sizeof(uint64_t), cudaMemcpyDeviceToHost,this->stream);
+    uint64_t *aux;
+    aux = (uint64_t*) calloc (this->polyCRT.size()*this->CRTSPACING,sizeof(uint64_t));
+    result = cudaMemcpyAsync(aux , this->d_polyCRT, this->polyCRT.size()*this->CRTSPACING*sizeof(uint64_t), cudaMemcpyDeviceToHost,this->stream);
     #ifdef VERBOSE
     std::cout << "cudaMemCpy" << i << ": " << cudaGetErrorString(result) <<" "<<this->CRTSPACING*sizeof(uint64_t) << " bytes to position "<< this->CRTSPACING*i*sizeof(uint64_t) <<std::endl;
     #endif
@@ -69,15 +76,15 @@ void Polynomial::update_host_data(){
     result = cudaDeviceSynchronize();
     //
     for(unsigned int i=0;i < this->polyCRT.size();i++){
-      if(this->polyCRT[i].size() != this->CRTSPACING)
+      if(this->polyCRT[i].size() != (unsigned int)(this->CRTSPACING))
         this->polyCRT[i].resize(this->CRTSPACING);
-        // *(this->polyCRT[i][0]) = *(tmp_polyCRT[i*this->CRTSPACING]);
-        // memcpy(&(this->polyCRT[i])[this->polyCRT[i][0].size() - this->CRTSPACING], &tmp_polyCRT[i*this->CRTSPACING],  this->CRTSPACING * sizeof(uint64_t));
-        // std::copy(&(tmp_polyCRT) + i*this->CRTSPACING,&(tmp_polyCRT) + (i+1)*this->CRTSPACING,this->polyCRT[i][0]);
-        for(unsigned int j=0; j < this->CRTSPACING;j++)
-          this->polyCRT[i][j] = tmp_polyCRT[j+i*this->CRTSPACING];
+        // *(this->polyCRT[i][0]) = *(aux[i*this->CRTSPACING]);
+        // memcpy(&(this->polyCRT[i])[this->polyCRT[i][0].size() - this->CRTSPACING], &aux[i*this->CRTSPACING],  this->CRTSPACING * sizeof(uint64_t));
+        // std::copy(&(aux) + i*this->CRTSPACING,&(aux) + (i+1)*this->CRTSPACING,this->polyCRT[i][0]);
+        for(unsigned int j=0; j < (unsigned int)(this->CRTSPACING);j++)
+          this->polyCRT[i][j] = aux[j+i*this->CRTSPACING];
     }
-    free(tmp_polyCRT);
+    free(aux);
     this->set_host_updated(true);
 }
 
@@ -214,7 +221,7 @@ int isPowerOfTwo (unsigned int x){
   return ((x != 0) && !(x & (x - 1)));
 }
 
-void Polynomial::BuildNthCyclotomic(Polynomial *phi,int n){
+void Polynomial::BuildNthCyclotomic(Polynomial *phi,unsigned int n){
 
   for(int i =0; i <= phi->deg(); i++)
     phi->set_coeff(i,0);
