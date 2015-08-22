@@ -68,7 +68,7 @@ void Polynomial::update_host_data(){
     // Copy all data to host
     uint64_t *aux;
     aux = (uint64_t*) calloc (this->polyCRT.size()*this->CRTSPACING,sizeof(uint64_t));
-    result = cudaMemcpyAsync(aux , this->d_polyCRT, this->polyCRT.size()*this->CRTSPACING*sizeof(uint64_t), cudaMemcpyDeviceToHost,this->stream);
+    result = cudaMemcpy(aux , this->d_polyCRT, this->polyCRT.size()*this->CRTSPACING*sizeof(uint64_t), cudaMemcpyDeviceToHost);
     #ifdef VERBOSE
     std::cout << "cudaMemCpy" << i << ": " << cudaGetErrorString(result) <<" "<<this->CRTSPACING*sizeof(uint64_t) << " bytes to position "<< this->CRTSPACING*i*sizeof(uint64_t) <<std::endl;
     #endif

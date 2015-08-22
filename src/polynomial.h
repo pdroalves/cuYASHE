@@ -4,6 +4,8 @@
 #include <vector>
 #include <sstream>
 #include <NTL/ZZ.h>
+#include <NTL/ZZ_pEX.h>
+#include <NTL/ZZ_pXFactoring.h>
 #include <cuda_runtime.h>
 #include "cuda_functions.h"
 #include "common.h"
@@ -279,7 +281,7 @@ class Polynomial{
     Polynomial operator*(Polynomial b){
 
       // Check align
-      int new_spacing = 2*std::max(this->CRTSPACING,b.CRTSPACING);
+      int new_spacing = pow(2,ceil(log2(this->deg()+b.deg())));
       this->update_crt_spacing(new_spacing);
       b.update_crt_spacing(new_spacing);
 
@@ -695,6 +697,10 @@ class Polynomial{
 
 
     int deg(){
+      if(!this->get_host_updated()){
+        this->icrt();
+      }
+
       return this->coefs.size()-1;
     }
     ZZ lead_coeff(){
@@ -741,7 +747,33 @@ class Polynomial{
     static void DivRem(Polynomial a,Polynomial b,Polynomial &quot,Polynomial &rem);
     static Polynomial InvMod(Polynomial a,Polynomial b){
       // To-do
-      throw "Polynomial InvMod not implemented!";
+      // throw "Polynomial InvMod not implemented!";
+      #warning "Polynomial InvMod not implemented!"
+
+      // 
+      ZZ_pEX a_ntl;
+      for(int i = 0; i <= a.deg();i++)
+        NTL::SetCoeff(a_ntl,i,conv<ZZ_p>(a.get_coeff(i)));
+      ZZ_pEX b_ntl;
+      for(int i = 0; i <= b.deg();i++)
+        NTL::SetCoeff(b_ntl,i,conv<ZZ_p>(b.get_coeff(i)));
+      
+      ZZ_pEX inv_a_ntl =  NTL::InvMod(a_ntl, b_ntl);
+
+
+      Polynomial result;
+      for(int i = 0; i <= b.deg();i++){
+        ZZ ntl_value;
+        if( NTL::IsZero(NTL::coeff(inv_a_ntl,i)) )
+        // Without this, NTL raises an exception when we call rep()
+          ntl_value = 0L;
+        else
+          ntl_value = conv<ZZ>(NTL::rep(NTL::coeff(inv_a_ntl,i))[0]);
+
+        result.set_coeff(i,ntl_value);
+      }
+
+      return result;
     }
     static void BuildNthCyclotomic(Polynomial *phi, unsigned int n);
     static void random(Polynomial *a,int degree){

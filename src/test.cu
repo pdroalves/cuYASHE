@@ -67,7 +67,6 @@ struct PolySuite
 
 struct YasheSuite
 {
-    Polynomial R;
     ZZ t;
     long t_long;
     Yashe cipher;
@@ -82,17 +81,20 @@ struct YasheSuite
         // Params
         ZZ q;
         q = conv<ZZ>("1171313591017775093490277364417L");
+        Polynomial::global_mod = q;
         ZZ_p::init(q); // Defines GF(q)
 
         t_long = 35951;
         t = ZZ(t_long);
-        int d = 32;
+        degree = 32;
         int w = 72;
 
-        Polynomial::BuildNthCyclotomic(&phi, d); // generate an cyclotomic polynomial
+        Polynomial::BuildNthCyclotomic(&phi, degree); // generate an cyclotomic polynomial
         #ifdef VERBOSE
         std::cout << "Cyclotomic polynomial: " << R << std::endl;
-        #endif
+        #endif 
+        phi.set_mod(Polynomial::global_mod);
+        Polynomial::global_phi = &phi;
 
         // Set params to NTL (just for comparison reasons)
         ZZ_p::init(Polynomial::global_mod);
@@ -102,15 +104,15 @@ struct YasheSuite
         }
         ZZ_pE::init(NTL_Phi);
 
-        CUDAFunctions::init(degree);
+        CUDAFunctions::init(2*degree);
         
         Polynomial::gen_crt_primes(Polynomial::global_mod,degree);
 
         // Yashe
         cipher = Yashe();
 
-        Yashe::d = d;
-        Yashe::phi = R;
+        Yashe::d = degree;
+        Yashe::phi = phi;
         Yashe::q = q;
         // std::cout << ZZ_p::modulus() << std::endl;
         // std::cout << q << std::endl;
@@ -747,15 +749,21 @@ BOOST_AUTO_TEST_CASE(randomPolynomialOperations)
 
 BOOST_AUTO_TEST_CASE(modularInversion)
 {
+
+  CUDAFunctions::init(2*degree);
+
   Polynomial a;
-  Polynomial::random(&a,8);
+  Polynomial::random(&a,degree-1);
 
 
   Polynomial aInv = Polynomial::InvMod(a,a.get_phi());
+  aInv %= a.get_phi();
   Polynomial result = a*aInv % a.get_phi();
 
   Polynomial one = Polynomial();
   one.set_coeff(0,1);
+
+  result.normalize();
 
   BOOST_REQUIRE(result == one);
 
