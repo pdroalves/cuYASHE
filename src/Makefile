@@ -22,7 +22,7 @@ BENCHMARKYASHEBIN= $(INSTALL)/benchmark_yashe
 all: tests benchmarkpoly
 
 tests: polynomial.o cuda_functions.o test.o ciphertext.o distribution.o yashe.o
-	$(CUDA_CC) $(CUDA_ARCH) $(LCUDA) $(ICUDA)  -o $(TESTBIN) test.o polynomial.o cuda_functions.o -Xcompiler $(OPENMP) $(NTL) -lboost_unit_test_framework
+	$(CUDA_CC) $(CUDA_ARCH) $(LCUDA) $(ICUDA)  -o $(TESTBIN) test.o polynomial.o cuda_functions.o ciphertext.o distribution.o yashe.o -Xcompiler $(OPENMP) $(NTL) -lboost_unit_test_framework
 
 # main:main.o polynomial.o ciphertext.o cuda_functions.o kernels.o distribution.o yashe.o
 # 	$(CUDA_CC) $(LCUDA) $(ICUDA)  -o $(BIN) main.o polynomial.o ciphertext.o cuda_functions.o kernels.o distribution.o yashe.o -lcufft -Xcompiler $(OPENMP) $(NTL)

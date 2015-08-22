@@ -4,6 +4,8 @@
 #include <NTL/ZZ_pEX.h>
 
 #include "polynomial.h"
+#include "ciphertext.h"
+#include "yashe.h"
 #include "common.h"
 #include "cuda_functions.h"
 #include <cuda.h>
@@ -57,6 +59,72 @@ struct PolySuite
     }
 
     ~PolySuite()
+    {
+        BOOST_TEST_MESSAGE("teardown mass");
+    }
+};
+
+
+struct YasheSuite
+{
+    Polynomial R;
+    ZZ t;
+    long t_long;
+    Yashe cipher;
+    int degree;
+    Polynomial phi;
+
+    YasheSuite()
+    {
+        BOOST_TEST_MESSAGE("setup YasheNonBinarySuite");
+        srand (36251);
+        
+        // Params
+        ZZ q;
+        q = conv<ZZ>("1171313591017775093490277364417L");
+        ZZ_p::init(q); // Defines GF(q)
+
+        t_long = 35951;
+        t = ZZ(t_long);
+        int d = 32;
+        int w = 72;
+
+        Polynomial::BuildNthCyclotomic(&phi, d); // generate an cyclotomic polynomial
+        #ifdef VERBOSE
+        std::cout << "Cyclotomic polynomial: " << R << std::endl;
+        #endif
+
+        // Set params to NTL (just for comparison reasons)
+        ZZ_p::init(Polynomial::global_mod);
+        ZZ_pX NTL_Phi;
+        for(int i = 0; i <= phi.deg();i++){
+          NTL::SetCoeff(NTL_Phi,i,conv<ZZ_p>(phi.get_coeff(i)));
+        }
+        ZZ_pE::init(NTL_Phi);
+
+        CUDAFunctions::init(degree);
+        
+        Polynomial::gen_crt_primes(Polynomial::global_mod,degree);
+
+        // Yashe
+        cipher = Yashe();
+
+        Yashe::d = d;
+        Yashe::phi = R;
+        Yashe::q = q;
+        // std::cout << ZZ_p::modulus() << std::endl;
+        // std::cout << q << std::endl;
+
+        Yashe::t = t;
+        Yashe::w = w;
+        Yashe::lwq = floor(NTL::log(q)/(log(2)*w)+1);
+
+        cipher.generate_keys();
+
+        BOOST_TEST_MESSAGE("Set!");
+    }
+
+    ~YasheSuite()
     {
         BOOST_TEST_MESSAGE("teardown mass");
     }
@@ -709,5 +777,22 @@ BOOST_AUTO_TEST_CASE(expectedDegree)
 BOOST_AUTO_TEST_SUITE_END()
 
 BOOST_FIXTURE_TEST_SUITE(CUDAFixture, CUDASuite)
+
+BOOST_AUTO_TEST_SUITE_END()
+
+BOOST_FIXTURE_TEST_SUITE(YasheFixture, YasheSuite)
+
+BOOST_AUTO_TEST_CASE(encryptDecrypt)
+{
+  Polynomial a;
+
+  for(int i = 0; i < 100;i++){
+    a.set_coeff(0,conv<ZZ>(rand())%t);
+
+    Ciphertext c = cipher.encrypt(a);
+    Polynomial a_decrypted = cipher.decrypt(c);
+    BOOST_REQUIRE( a_decrypted == a);
+  }
+}
 
 BOOST_AUTO_TEST_SUITE_END()

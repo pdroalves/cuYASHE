@@ -124,8 +124,8 @@ Ciphertext Yashe::encrypt(Polynomial m){
   Polynomial p;
 
   p = (h*ps) + e + m*delta;
+  p %= phi;
   #ifdef DEBUG
-  p.icrt();
   std::cout << "ciphertext: "<< p <<std::endl;
   #endif
 
