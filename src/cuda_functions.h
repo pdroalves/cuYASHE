@@ -101,10 +101,10 @@ class CUDAFunctions{
 			result = cudaMalloc((void**)&d_WInv,N*N*sizeof(uint64_t));
 			assert(result == cudaSuccess);
 
-			  std::cout << "wN == " << wN << std::endl;
-			  std::cout << "k == " << k << std::endl;
-			  std::cout << "N == " << N << std::endl;
-			  std::cout << "P == " << PZZ << std::endl;
+			  // std::cout << "wN == " << wN << std::endl;
+			  // std::cout << "k == " << k << std::endl;
+			  // std::cout << "N == " << N << std::endl;
+			  // std::cout << "P == " << PZZ << std::endl;
   
 			// Computes W
 			for(int j = 0; j < N; j++)

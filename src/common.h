@@ -8,6 +8,7 @@
 // #define PLAINMUL
 #define NTTMUL
 // #define FFTMUL
-
+// #define UINT64_MAX 18446744073709551615
+// #define UINT16_MAX 65535
 enum ntt_mode_t {INVERSE,FORWARD};
 #endif

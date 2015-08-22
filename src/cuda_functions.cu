@@ -6,6 +6,7 @@
 #include <iostream>
 #include <stdio.h>
 #include <assert.h>
+#include "modop.h"
 
 uint64_t *(CUDAFunctions::d_W) = NULL;
 uint64_t *(CUDAFunctions::d_WInv) = NULL;
@@ -179,9 +180,31 @@ __device__ my_uint128 add_uint128 (my_uint128 a, my_uint128 b)
 
 __device__ my_uint128 add_uint64_128 (uint64_t a, my_uint128 b)
 {
-  my_uint128 res = {a+b.lo,b.hi};
+  my_uint128 res = {a+b.lo,b.hi}; // FALHA SE A+B.LO > 64 BITS
+
+  // my_uint128 res;
+  // res.lo = a + b.lo;
+  // res.hi = b.hi + (res.lo < a);
   return res;
 } 
+
+__device__ my_uint128 sub_uint128_64 (my_uint128 a, uint64_t b)
+{
+  // a - b
+
+  // my_uint128 res;
+  // res.lo = a + b.lo;
+  // res.hi = b.hi + (res.lo < a);
+  
+  my_uint128 res;
+  const u_int64_t borrow = b > a.lo;
+
+  res.lo = a.lo - b;
+  res.hi = a.hi - borrow;
+
+  return res;
+} 
+
 
 __device__ my_uint128 add_uint64_64 (uint64_t a, uint64_t b)
 {
@@ -192,6 +215,15 @@ __device__ my_uint128 add_uint64_64 (uint64_t a, uint64_t b)
 
   return res;
 } 
+
+__device__ my_uint128 mul_uint64_128 (uint64_t a, uint64_t b)
+{
+  my_uint128 res = {a*b,__umul64hi(a,b)};
+  return res;
+} 
+
+
+
 
 
 __device__ uint64_t s_rem (uint64_t a)
@@ -205,11 +237,11 @@ __device__ uint64_t s_rem (uint64_t a)
   // const uint64_t p = 0xffffffff00000001;
   // uint64_t x3 = 0;
   // uint64_t x2 = 0;
-  uint64_t x1 = (a >> 32);
-  uint64_t x0 = (a & UINT32_MAX);
+  uint64_t x1 = (a >> 32); // Max 32 bits
+  uint64_t x0 = (a & UINT32_MAX); // Max 32 bits
 
   // uint64_t res = ((x1+x2)<<32 + x0-x3-x2);
-  uint64_t res = ((x1<<32) + x0);
+  uint64_t res = ((x1<<32) + x0); // Max 64 bits
 
   return res;
 } 
@@ -223,14 +255,20 @@ __device__ uint64_t s_rem (my_uint128 a)
   //
   // Here: x3 = 0, x2 = a.hi, x1 = (a.lo >> 32), x0 = a.lo-(x1 << 32)
   // const uint64_t p = 0xffffffff00000001;
-  // uint64_t x3 = 0;
-  uint64_t x2 = a.hi;
-  uint64_t x1 = (a.lo >> 32);
-  uint64_t x0 = (a.lo & UINT32_MAX);
+  uint64_t x3 = (a.hi >> 32); // Max 32 bits
+  uint64_t x2 = (a.hi & UINT32_MAX); // Max 32 bits
+  uint64_t x1 = (a.lo >> 32); // Max 32 bits
+  uint64_t x0 = (a.lo & UINT32_MAX); // Max 32 bits
 
-  // uint64_t res = ((x1+x2)<<32 + x0-x3-x2);
-  uint64_t res = (((x1+x2)<<32) + x0-x2);
+  // my_uint128 x1Px232StL = {x0,(x1+x2)}; // x1 plus x2 32 Shift to Left
 
+  // uint64_t res = sub_uint128_64(sub_uint128_64(x1Px232StL,x3),x2).lo; // -x3
+
+  // uint64_t res = (x1 << 32);
+  // res -= (x3+x2);
+  // res += (x2 << 32)+x0;
+
+  uint64_t res = ((x1+x2)<<32)+x0-x2-x3;
   return res;
 } 
 
@@ -248,19 +286,21 @@ __global__ void NTT64(uint64_t *W,uint64_t *WInv,uint64_t *a, uint64_t *a_hat, c
   const int cid = tid & (N-1); // Coefficient id
   const uint64_t P = 0xffffffff00000001;
 
-  uint64_t *w;
-  if(type == FORWARD)
-    w = W;
-  else
-    w = WInv;
 
   if(tid < N*NPolis){
+    // my_uint128 value = {0,0};
     uint64_t value = 0;
     // In each iteration, computes a_hat[i]
     for(int i = 0; i < N; i++){
-      uint64_t W64 = w[i + cid*N];
+      uint64_t W64;
+      if(type == FORWARD)
+        W64 = W[i + cid*N];
+      else
+        W64 = WInv[i + cid*N];    
+
       uint64_t a64 = a[i + roffset];
-      value = s_rem(add_uint64_64(value,mulmod(W64,a64,P)));
+      // value = (add_uint128(value, mul_uint64_128(W64,a64)));
+      value = (mod_add(value, mod_mul(W64,a64)));
 
     }
     if(type == FORWARD)
@@ -287,31 +327,34 @@ __global__ void DOUBLENTT64( uint64_t *W, uint64_t *WInv,uint64_t *a, uint64_t *
   const int roffset = residueid*N;
   const int cid = tid & (N-1); // Coefficient id
   const uint64_t P = 0xffffffff00000001;
-  uint64_t *w;
-  if(type == FORWARD)
-    w = W;
-  else
-    w = WInv;
 
-  // const uint64_t p = 0xffffffff00000001;
+
   if(tid < N*NPolis){
     uint64_t Avalue = 0;
     uint64_t Bvalue = 0;
+    // my_uint128 Avalue = {0,0};
+    // my_uint128 Bvalue = {0,0};
     // In each iteration, computes a_hat[i]
     for(int i = 0; i < N; i++){
+      uint64_t W64;
+      if(type == FORWARD)
+        W64 = W[i + cid*N];
+      else
+        W64 = WInv[i + cid*N];
 
-      uint64_t W64 = w[i + cid*N];
       uint64_t a64 = a[i + roffset];
       uint64_t b64 = b[i + roffset];
-      Avalue = s_rem(add_uint64_64(Avalue,mulmod(W64,a64,P)));      
-      Bvalue = s_rem(add_uint64_64(Bvalue,mulmod(W64,b64,P)));
+      // Avalue = (add_uint128(Avalue, mul_uint64_128(W64,a64)));      
+      // Bvalue = (add_uint128(Bvalue, mul_uint64_128(W64,b64)));
+      Avalue = (mod_add(Avalue, mod_mul(W64,a64)));      
+      Bvalue = (mod_add(Bvalue, mod_mul(W64,b64)));
     }
     if(type == FORWARD){
-      a_hat[cid+ roffset] = Avalue %P;
-      b_hat[cid+ roffset] = Bvalue %P;
+      a_hat[cid+ roffset] = (Avalue%P);
+      b_hat[cid+ roffset] = (Bvalue%P);
     }else{
-      a_hat[cid+ roffset] = (Avalue %P)/N;
-      b_hat[cid+ roffset] = (Bvalue %P)/N;
+      a_hat[cid+ roffset] = (Avalue%P)/N;
+      b_hat[cid+ roffset] = (Bvalue%P)/N;
 
       // a_hat[cid+ roffset] = (Avalue %P )/N;
       // b_hat[cid+ roffset] = (Bvalue %P )/N;
@@ -323,7 +366,7 @@ __global__ void polynomialNTTMul(const uint64_t *a,const uint64_t *b,uint64_t *c
   // We have one thread per polynomial coefficient on 32 threads-block.
   // For CRT polynomial adding, all representations should be concatenated aligned
   const int tid = threadIdx.x + blockDim.x*blockIdx.x;
-  const uint64_t P = 0xffffffff00000001;
+  // const uint64_t P = 0xffffffff00000001;
   uint64_t a_value;
   uint64_t b_value;
 
@@ -332,7 +375,8 @@ __global__ void polynomialNTTMul(const uint64_t *a,const uint64_t *b,uint64_t *c
       a_value = a[tid];
       b_value = b[tid];
 
-      a_value = mulmod(a_value,b_value,P);
+      // a_value = s_rem(mul_uint64_128(a_value,b_value));
+      a_value = mod_mul(a_value,b_value);
 
       c[tid] = a_value;
   }
@@ -355,15 +399,15 @@ __host__ uint64_t* CUDAFunctions::callPolynomialMul(cudaStream_t stream,uint64_t
     #ifdef VERBOSE
         std::cout << "Plain multiplication" << std::endl;
     #endif
-    cudaError_t result = cudaMalloc((void**)&d_result,(2*N)*NPolis*sizeof(uint64_t));
+    cudaError_t result = cudaMalloc((void**)&d_result,(N)*NPolis*sizeof(uint64_t));
     assert(result == cudaSuccess);
-    result = cudaMemset((void*)d_result,0,(2*N)*NPolis*sizeof(uint64_t));
+    result = cudaMemset((void*)d_result,0,(N)*NPolis*sizeof(uint64_t));
     assert(result == cudaSuccess);
 
     dim3 blockDim(ADDBLOCKXDIM,ADDBLOCKXDIM);
     // int blocks = ((2*N*NPolis) % ADDBLOCKXDIM == 0? (2*N*NPolis)/ADDBLOCKXDIM : (2*N*NPolis)/ADDBLOCKXDIM+1);
     // dim3 gridDim(blocks,blocks);
-    dim3 gridDim(2*N*NPolis,1);
+    dim3 gridDim(N*NPolis,1);
     polynomialPlainMul<<<gridDim,blockDim,1,stream>>>(a,b,d_result,N,NPolis);
     assert(cudaGetLastError() == cudaSuccess);
   #elif defined(NTTMUL)

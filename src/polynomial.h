@@ -279,11 +279,9 @@ class Polynomial{
     Polynomial operator*(Polynomial b){
 
       // Check align
-      if(this->CRTSPACING != b.CRTSPACING){
-        int new_spacing = std::max(this->CRTSPACING,b.CRTSPACING);
-        this->update_crt_spacing(new_spacing);
-        b.update_crt_spacing(new_spacing);
-      }
+      int new_spacing = 2*std::max(this->CRTSPACING,b.CRTSPACING);
+      this->update_crt_spacing(new_spacing);
+      b.update_crt_spacing(new_spacing);
 
       #ifdef VERBOSE
       std::cout << "Mul:" << std::endl;
@@ -314,7 +312,7 @@ class Polynomial{
 
       uint64_t *d_result = CUDAFunctions::callPolynomialMul(this->stream,this->get_device_crt_residues(),b.get_device_crt_residues(),this->CRTSPACING,this->CRTPrimes.size());
 
-      Polynomial c(this->get_mod(),this->get_phi(),2*this->CRTSPACING);
+      Polynomial c(this->get_mod(),this->get_phi(),this->CRTSPACING);
       c.set_device_crt_residues(d_result);
       c.set_host_updated(false);
       c.set_device_updated(true);
