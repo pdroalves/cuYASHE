@@ -49,8 +49,8 @@ void Polynomial::update_device_data(){
     assert(result == cudaSuccess);
 
     // result = cudaDeviceSynchronize();
+    // assert(result == cudaSuccess);
     free(aux);
-    assert(result == cudaSuccess);
     this->ON_COPY = false;
     this->set_device_updated(true);
     assert(this->get_device_updated() == true);
@@ -67,13 +67,14 @@ void Polynomial::update_host_data(){
 
     // Copy all data to host
     uint64_t *aux;
-    aux = (uint64_t*) calloc (this->polyCRT.size()*this->CRTSPACING,sizeof(uint64_t));
+    // aux = (uint64_t*) calloc (this->polyCRT.size()*this->CRTSPACING,sizeof(uint64_t));
+    aux = (uint64_t*) malloc (this->polyCRT.size()*this->CRTSPACING*sizeof(uint64_t));
     result = cudaMemcpy(aux , this->d_polyCRT, this->polyCRT.size()*this->CRTSPACING*sizeof(uint64_t), cudaMemcpyDeviceToHost);
-    #ifdef VERBOSE
-    std::cout << "cudaMemCpy" << i << ": " << cudaGetErrorString(result) <<" "<<this->CRTSPACING*sizeof(uint64_t) << " bytes to position "<< this->CRTSPACING*i*sizeof(uint64_t) <<std::endl;
-    #endif
-    assert(result == cudaSuccess);
+    // #ifdef VERBOSE
+    std::cout << "cudaMemCpy: " << cudaGetErrorString(result) <<" "<< this->polyCRT.size()*this->CRTSPACING*sizeof(uint64_t) <<std::endl;
+    // #endif
     result = cudaDeviceSynchronize();
+    assert(result == cudaSuccess);
     //
     for(unsigned int i=0;i < this->polyCRT.size();i++){
       if(this->polyCRT[i].size() != (unsigned int)(this->CRTSPACING))
@@ -172,7 +173,8 @@ void Polynomial::icrt(){
   }
   // icrt %= M;
   // std::cout << "icrt: "<< icrt.to_string() << std::endl << "get_mod: " << this->get_mod() << std::endl;
-  icrt %= this->get_mod();
+  if(!NTL::IsZero(this->get_mod()))
+    icrt %= this->get_mod();
   // std::cout << "icrt: "<< icrt.to_string() << std::endl << "get_mod: " << this->get_mod() << std::endl;
   // icrt %= Polynomial::global_phi;
   icrt.normalize();

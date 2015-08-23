@@ -443,7 +443,12 @@ __host__ uint64_t* CUDAFunctions::callPolynomialMul(cudaStream_t stream,uint64_t
 
     // Inverse    
     NTT64<<<gridDim,blockDim,1,stream>>>(CUDAFunctions::d_W,CUDAFunctions::d_WInv,d_c,d_result,N,NPolis,INVERSE);
+    result = cudaDeviceSynchronize();
+    assert(result == cudaSuccess);
     assert(cudaGetLastError() == cudaSuccess);
+
+    checkCudaErrors(cudaPeekAtLastError());
+    checkCudaErrors(cudaDeviceSynchronize());
 
     cudaFree(d_a);
     cudaFree(d_b);

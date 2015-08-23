@@ -147,8 +147,9 @@ class Polynomial{
       this->CRTSPACING = b.CRTSPACING;
       this->set_host_updated(b.get_host_updated());
       this->set_device_updated(b.get_device_updated());
-      this->set_coeffs(b.get_coeffs());
       this->polyCRT = b.get_crt_residues();
+      if(b.get_host_updated())
+        this->set_coeffs(b.get_coeffs());
       this->d_polyCRT = b.get_device_crt_residues();
       this->set_mod(b.get_mod());
       this->expected_degree = b.deg();
@@ -318,7 +319,7 @@ class Polynomial{
       c.set_device_crt_residues(d_result);
       c.set_host_updated(false);
       c.set_device_updated(true);
-      cudaDeviceSynchronize();
+      // cudaDeviceSynchronize();
       return c;
     }
     Polynomial operator*=(Polynomial b){
@@ -758,7 +759,8 @@ class Polynomial{
       for(int i = 0; i <= b.deg();i++)
         NTL::SetCoeff(b_ntl,i,conv<ZZ_p>(b.get_coeff(i)));
       
-      ZZ_pEX inv_a_ntl =  NTL::InvMod(a_ntl, b_ntl);
+      // ZZ_pEX inv_a_ntl =  NTL::InvMod(a_ntl, b_ntl);
+      ZZ_pEX inv_a_ntl =  a_ntl;
 
 
       Polynomial result;
