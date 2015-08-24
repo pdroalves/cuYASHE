@@ -82,49 +82,53 @@ class CUDAFunctions{
     static uint64_t* callPolynomialMul(cudaStream_t stream,uint64_t *a,uint64_t *b, int N, int NPolis);
     static uint64_t* callRealignCRTResidues(cudaStream_t stream,int oldSpacing,int newSpacing, uint64_t *array,int residuesSize,int residuesQty);
     static void init(int N){
+    	
+		#ifdef VERBOSE
+		std::cout << "Will compute W."
+		#endif
 
-    		CUDAFunctions::N = N;
-			uint64_t *h_W;
-			uint64_t *h_WInv;
+		CUDAFunctions::N = N;
+		uint64_t *h_W;
+		uint64_t *h_WInv;
 
-			// const uint64_t P = 4294955009;//31 bits
-			ZZ PZZ = conv<ZZ>("18446744069414584321");
-			uint64_t k = conv<uint64_t>(PZZ-1)/N;
-			ZZ wNZZ = NTL::PowerMod(ZZ(7),k,PZZ);
-			// assert((P-1)%(N) == 0);
-			// const uint64_t k = (P-1)/N;
-			wN = conv<uint64_t>(wNZZ);
-			// wN = 17870292113338400769;
+		// const uint64_t P = 4294955009;//31 bits
+		ZZ PZZ = conv<ZZ>("18446744069414584321");
+		uint64_t k = conv<uint64_t>(PZZ-1)/N;
+		ZZ wNZZ = NTL::PowerMod(ZZ(7),k,PZZ);
+		// assert((P-1)%(N) == 0);
+		// const uint64_t k = (P-1)/N;
+		wN = conv<uint64_t>(wNZZ);
+		// wN = 17870292113338400769;
 
-		    h_W = (uint64_t*)malloc(N*N*sizeof(uint64_t));
-			cudaError_t result = cudaMalloc((void**)&d_W,N*N*sizeof(uint64_t));
-			assert(result == cudaSuccess);
-			h_WInv = (uint64_t*)malloc(N*N*sizeof(uint64_t));
-			result = cudaMalloc((void**)&d_WInv,N*N*sizeof(uint64_t));
-			assert(result == cudaSuccess);
+	    h_W = (uint64_t*)malloc(N*N*sizeof(uint64_t));
+		cudaError_t result = cudaMalloc((void**)&d_W,N*N*sizeof(uint64_t));
+		assert(result == cudaSuccess);
+		h_WInv = (uint64_t*)malloc(N*N*sizeof(uint64_t));
+		result = cudaMalloc((void**)&d_WInv,N*N*sizeof(uint64_t));
+		assert(result == cudaSuccess);
 
-			  // std::cout << "wN == " << wN << std::endl;
-			  // std::cout << "k == " << k << std::endl;
-			  // std::cout << "N == " << N << std::endl;
-			  // std::cout << "P == " << PZZ << std::endl;
-  
-			// Computes W
-			for(int j = 0; j < N; j++)
-				for(int i = 0; i < N; i++)
-				    // h_W[i+j*N] = (( j == 0)? 1:(h_W[i-1+j*N]*pow(wN,i)%q));
-				    h_W[i+j*N] = conv<uint64_t>(NTL::PowerMod(wNZZ,j*i,PZZ));
+		  // std::cout << "wN == " << wN << std::endl;
+		  // std::cout << "k == " << k << std::endl;
+		  // std::cout << "N == " << N << std::endl;
+		  // std::cout << "P == " << PZZ << std::endl;
 
-			for(int j = 0; j < N; j++)
-				for(int i = 0; i < N; i++)
-				    h_WInv[i+j*N] = conv<uint64_t>(NTL::InvMod(conv<ZZ>(h_W[i+j*N]),PZZ ));
+		// Computes W
+		for(int j = 0; j < N; j++)
+			for(int i = 0; i < N; i++)
+			    // h_W[i+j*N] = (( j == 0)? 1:(h_W[i-1+j*N]*pow(wN,i)%q));
+			    h_W[i+j*N] = conv<uint64_t>(NTL::PowerMod(wNZZ,j*i,PZZ));
 
-			result = cudaMemcpy(d_W,h_W , N*N*sizeof(uint64_t), cudaMemcpyHostToDevice);
-			assert(result == cudaSuccess);
-			result = cudaMemcpy(d_WInv,h_WInv , N*N*sizeof(uint64_t), cudaMemcpyHostToDevice);
-			assert(result == cudaSuccess);
+		for(int j = 0; j < N; j++)
+			for(int i = 0; i < N; i++)
+			    h_WInv[i+j*N] = conv<uint64_t>(NTL::InvMod(conv<ZZ>(h_W[i+j*N]),PZZ ));
 
-			free(h_W);
-			free(h_WInv);
+		result = cudaMemcpy(d_W,h_W , N*N*sizeof(uint64_t), cudaMemcpyHostToDevice);
+		assert(result == cudaSuccess);
+		result = cudaMemcpy(d_WInv,h_WInv , N*N*sizeof(uint64_t), cudaMemcpyHostToDevice);
+		assert(result == cudaSuccess);
+
+		free(h_W);
+		free(h_WInv);
     }
   private:
 };

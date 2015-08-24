@@ -33,6 +33,7 @@ struct PolySuite
     int degree;
     Polynomial phi;
 
+
     PolySuite(){
         BOOST_TEST_MESSAGE("setup PolySuite");
 
@@ -72,6 +73,8 @@ struct YasheSuite
     Yashe cipher;
     int degree;
     Polynomial phi;
+    ZZ_pX NTL_Phi;
+
 
     YasheSuite()
     {
@@ -80,13 +83,15 @@ struct YasheSuite
         
         // Params
         ZZ q;
-        q = conv<ZZ>("1171313591017775093490277364417L");
+        // q = conv<ZZ>("1171313591017775093490277364417L");
+        q = conv<ZZ>("655615111");
         Polynomial::global_mod = q;
         ZZ_p::init(q); // Defines GF(q)
 
-        t_long = 35951;
+        // t_long = 35951;
+        t_long = 2;
         t = ZZ(t_long);
-        degree = 32;
+        degree = 4;
         int w = 72;
 
         Polynomial::BuildNthCyclotomic(&phi, degree); // generate an cyclotomic polynomial
@@ -98,7 +103,6 @@ struct YasheSuite
 
         // Set params to NTL (just for comparison reasons)
         ZZ_p::init(Polynomial::global_mod);
-        ZZ_pX NTL_Phi;
         for(int i = 0; i <= phi.deg();i++){
           NTL::SetCoeff(NTL_Phi,i,conv<ZZ_p>(phi.get_coeff(i)));
         }
@@ -248,12 +252,14 @@ BOOST_AUTO_TEST_CASE(wNTest)
   uint64_t wN = CUDAFunctions::wN;
 
   ZZ PZZ = conv<ZZ>("18446744069414584321");
+  uint64_t P = 18446744069414584321;
   uint64_t k = conv<uint64_t>(PZZ-1)/N;
   ZZ wNZZ = NTL::PowerMod(ZZ(7),k,PZZ);
 
   BOOST_REQUIRE(W[1+N] == wN);
-  BOOST_REQUIRE(W[2+N] == NTL::PowerMod(wNZZ,2,PZZ));
-  BOOST_REQUIRE(W[2+2*N] == NTL::PowerMod(wNZZ,4,PZZ));
+  BOOST_REQUIRE(wNZZ == wN);
+  BOOST_REQUIRE(W[2+N] == conv<uint64_t>(NTL::PowerMod(wNZZ,2,PZZ)));
+  BOOST_REQUIRE(W[2+2*N] == conv<uint64_t>(NTL::PowerMod(wNZZ,4,PZZ)));
 
 }
 
@@ -583,8 +589,8 @@ BOOST_AUTO_TEST_CASE(multiplyAndAddByPolynomial)
     }
     std::cout << "count: " << count << std::endl;
     #endif
-      std::cout << "c: " << c.to_string() << " degree: " << c.deg() <<std::endl;
-      std::cout << "c_ntl: " << c_ntl << " degree: " << NTL::deg(c_ntl) << std::endl << std::endl;
+      // std::cout << "c: " << c.to_string() << " degree: " << c.deg() <<std::endl;
+      // std::cout << "c_ntl: " << c_ntl << " degree: " << NTL::deg(c_ntl) << std::endl << std::endl;
 
     BOOST_REQUIRE(NTL::deg(c_ntl) == c.deg());
     for(int i = 0;i <= c.deg();i++){
@@ -638,8 +644,8 @@ BOOST_AUTO_TEST_CASE(addAndMultiplyByPolynomial)
     }
     std::cout << "count: " << count << std::endl;
     #endif
-      std::cout << "c: " << c.to_string() << " degree: " << c.deg() <<std::endl;
-      std::cout << "c_ntl: " << c_ntl << " degree: " << NTL::deg(c_ntl) << std::endl << std::endl;
+      // std::cout << "c: " << c.to_string() << " degree: " << c.deg() <<std::endl;
+      // std::cout << "c_ntl: " << c_ntl << " degree: " << NTL::deg(c_ntl) << std::endl << std::endl;
 
     BOOST_REQUIRE(NTL::deg(c_ntl) == c.deg());
     for(int i = 0;i <= c.deg();i++){
@@ -681,7 +687,7 @@ BOOST_AUTO_TEST_CASE(randomPolynomialOperations)
   Polynomial c;
   ZZ_pEX c_ntl;
 
-  for(int count = 0; count < NTESTS; count++){
+  for(int count = 0; count < 10*NTESTS; count++){
     int random_op_bit = rand()%2;
     int random_ab = rand()%3;
     // 0: add
@@ -719,20 +725,18 @@ BOOST_AUTO_TEST_CASE(randomPolynomialOperations)
       }
 
     }
-  }
+
+    c %= phi;
+    c %= Polynomial::global_mod;
+    c.normalize();
+    c_ntl %= conv<ZZ_pEX>(ZZ_pE::modulus());
 
 
-  #ifdef DEBUG
-  if(c_ntl != c){
-    std::cout << "a: " << a << " degree: " << NTL::deg(a) <<std::endl;
-    std::cout << "b: " << b << " degree: " << NTL::deg(b) <<std::endl;
-    std::cout << "c: " << c << " degree: " << NTL::deg(c) <<std::endl;
-    std::cout << "c_ntl: " << c_ntl << " degree: " << NTL::deg(c_ntl) << std::endl << std::endl;
-  }
-  std::cout << "count: " << count << std::endl;
-  #endif
-    // std::cout << "c: " << c.to_string() << " degree: " << c.deg() <<std::endl;
-    // std::cout << "c_ntl: " << c_ntl << " degree: " << NTL::deg(c_ntl) << std::endl << std::endl;
+
+  // #ifdef DEBUG
+  // std::cout << "c: " << c.to_string() << " degree: " << c.deg() <<std::endl;
+  // std::cout << "c_ntl: " << c_ntl << " degree: " << NTL::deg(c_ntl) << std::endl << std::endl;
+  // #endif
 
   BOOST_REQUIRE(NTL::deg(c_ntl) == c.deg());
   for(int i = 0;i <= c.deg();i++){
@@ -745,6 +749,12 @@ BOOST_AUTO_TEST_CASE(randomPolynomialOperations)
 
     BOOST_REQUIRE(c.get_coeff(i) == ntl_value);
   }
+  }
+
+    // std::cout << "c: " << c.to_string() << " degree: " << c.deg() <<std::endl;
+    // std::cout << "c_ntl: " << c_ntl << " degree: " << NTL::deg(c_ntl) << std::endl << std::endl;
+
+  
 }
 
 BOOST_AUTO_TEST_CASE(modularInversion)
@@ -794,7 +804,7 @@ BOOST_AUTO_TEST_CASE(encryptDecrypt)
 {
   Polynomial a;
 
-  for(int i = 0; i < 100;i++){
+  for(int i = 0; i < NTESTS;i++){
     a.set_coeff(0,conv<ZZ>(rand())%t);
 
     Ciphertext c = cipher.encrypt(a);

@@ -283,6 +283,12 @@ class Polynomial{
 
       // Check align
       int new_spacing = pow(2,ceil(log2(this->deg()+b.deg())));
+      if(new_spacing < CUDAFunctions::N)
+        new_spacing = CUDAFunctions::N;
+      else if(new_spacing != CUDAFunctions::N){
+        // Re-compute W matrix
+        CUDAFunctions::init(new_spacing);
+      }
       this->update_crt_spacing(new_spacing);
       b.update_crt_spacing(new_spacing);
 
@@ -394,7 +400,7 @@ class Polynomial{
       return p;
     }
     Polynomial operator+=(ZZ b){
-      this->set_coeffs( ((*this)+b).get_coeffs());
+      this->copy(((*this)+b));
       return *this;
     }
     Polynomial operator-(ZZ b){
@@ -410,7 +416,7 @@ class Polynomial{
       return p;
     }
     Polynomial operator-=(ZZ b){
-      this->set_coeffs( ((*this)-b).get_coeffs());
+      this->copy(((*this)-b));
       return *this;
     }
     Polynomial operator*(ZZ b){
@@ -429,13 +435,15 @@ class Polynomial{
       return p;
     }
     Polynomial operator*=(ZZ b){
-      this->set_coeffs( ((*this)*b).get_coeffs());
+      this->copy(((*this)*b));
       return *this;
     }
     Polynomial operator%(ZZ b){
       Polynomial p(*this);
+
       if(!this->get_host_updated()){
-        throw "Polynomial mod on device not implemented!";
+        #warning "Polynomial mod on device not implemented!";
+        this->icrt();
       }
 
       #pragma omp parallel for
@@ -450,13 +458,14 @@ class Polynomial{
       return p;
     }
     Polynomial operator%=(ZZ b){
-      this->set_coeffs( ((*this)%b).get_coeffs());
+      this->copy(((*this)%b));
       return *this;
     }
     Polynomial operator/(ZZ b){
       Polynomial p(*this);
       if(!this->get_host_updated()){
-        throw "Polynomial division on device not implemented!";
+        #warning "Polynomial division on device not implemented!";
+        this->icrt();        
       }
 
       #pragma omp parallel for
@@ -467,35 +476,35 @@ class Polynomial{
       return p;
     }
     Polynomial operator/=(ZZ b){
-      this->set_coeffs( ((*this)/b).get_coeffs());
+      this->copy(((*this)/b));
       return *this;
     }
-    Polynomial operator+(int b){
+    Polynomial operator+(long b){
       return (*this)+ZZ(b);
     }
-    Polynomial operator+=(int b){
-      this->set_coeffs( ((*this)+b).get_coeffs());
+    Polynomial operator+=(long b){
+      this->copy( ((*this)+b));
       return *this;
     }
-    Polynomial operator-(int b){
+    Polynomial operator-(long b){
       return (*this)-ZZ(b);
     }
-    Polynomial operator-=(int b){
-      this->set_coeffs( ((*this)-b).get_coeffs());
+    Polynomial operator-=(long b){
+      this->copy( ((*this)-b));
       return *this;
     }
-    Polynomial operator*(int b){
+    Polynomial operator*(long b){
       return (*this)*ZZ(b);
     }
-    Polynomial operator*=(int b){
-      this->set_coeffs( ((*this)*conv<ZZ>(b)).get_coeffs());
+    Polynomial operator*=(long b){
+      this->copy( ((*this)*conv<ZZ>(b)));
       return *this;
     }
-    Polynomial operator/(int b){
+    Polynomial operator/(long b){
       return (*this)/ZZ(b);
     }
-    Polynomial operator/=(int b){
-      this->set_coeffs( ((*this)/conv<ZZ>(b)).get_coeffs());
+    Polynomial operator/=(long b){
+      this->copy( ((*this)/conv<ZZ>(b)));
       return *this;
     }
 
@@ -759,9 +768,7 @@ class Polynomial{
       for(int i = 0; i <= b.deg();i++)
         NTL::SetCoeff(b_ntl,i,conv<ZZ_p>(b.get_coeff(i)));
       
-      // ZZ_pEX inv_a_ntl =  NTL::InvMod(a_ntl, b_ntl);
-      ZZ_pEX inv_a_ntl =  a_ntl;
-
+      ZZ_pEX inv_a_ntl =  NTL::InvMod(a_ntl, b_ntl);
 
       Polynomial result;
       for(int i = 0; i <= b.deg();i++){

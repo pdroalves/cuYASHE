@@ -22,22 +22,33 @@ void Yashe::generate_keys(){
   std::cout << "R: " << Polynomial::global_mod << std::endl;
   #endif
 
-  Polynomial g = this->xkey.get_sample(phi.deg()-1);
-  g %= phi;
+  // Polynomial g = this->xkey.get_sample(phi.deg()-1);
+  // g %= phi;
+  // g %= q;
+  Polynomial g;
+  g.set_coeff(0,1);
+  g.set_coeff(1,1);
+  g.set_coeff(2,655615110);
+  g.set_coeff(3,1);
+
   #ifdef DEBUG
   std::cout << "g = " << g << std::endl;
   #endif
   // Computes a polynomial f with inverse
   Polynomial fInv;
   while(1==1){
-    Polynomial fl = xkey.get_sample(phi.deg()-1);
-    fl %= phi;
+    // Polynomial fl = xkey.get_sample(phi.deg()-1);
+    // fl %= phi;
+    // fl %= q;
+    Polynomial fl;
+    fl.set_coeff(0,1);
+    fl.set_coeff(3,1);
 
     f = fl*t + 1;
 
     // std::cout << "phi " << this->phi << std::endl;
-    f %= f.get_mod();
-    f %= f.get_phi();
+    f %= phi;
+    f %= q;
 
     #ifdef DEBUG
     std::cout << "fl: " << fl << std::endl;
@@ -61,24 +72,10 @@ void Yashe::generate_keys(){
     }
   }
 
-  #ifdef DEBUG
-  std::cout << "fInv: " << fInv << std::endl;
-  #endif
-  h = ((fInv*g)%phi)*t;
-
-  #ifdef DEBUG
-  std::cout << "fInv*g*t: " << h << std::endl;
-  #endif
-  h%= phi;
-
-  #ifdef DEBUG
-  std::cout << "h = " << h << std::endl;
-  #endif
-  #ifdef DEBUG
-  std::cout << "lwq = " << lwq << std::endl;
-  #endif
-
-
+  h = fInv*g;
+  h *= t;
+  h %= phi;
+  h %= q;
   gamma.resize(lwq);
   for(int k = 0 ; k < lwq; k ++){
     gamma[k] = Polynomial(f);//Copy
@@ -90,8 +87,10 @@ void Yashe::generate_keys(){
 
     Polynomial e = xerr.get_sample(phi.deg()-1);
     e %= phi;
+    e %= q;
     Polynomial s = xerr.get_sample(phi.deg()-1);
     s %= phi;
+    e %= q;
 
     gamma[k] += e + h*s;
     gamma[k] %= phi;
@@ -139,6 +138,8 @@ Ciphertext Yashe::encrypt(Polynomial m){
   p += e;
   p += m*delta;
   p %= phi;
+  p %= q;
+
   #ifdef DEBUG
   std::cout << "ciphertext: "<< p <<std::endl;
   #endif
