@@ -432,8 +432,9 @@ __host__ uint64_t* CUDAFunctions::callPolynomialMul(cudaStream_t stream,uint64_t
     assert(result == cudaSuccess);
     
     dim3 blockDim(ADDBLOCKXDIM);
-    dim3 gridDim((size)/ADDBLOCKXDIM); // We expect that ADDBLOCKXDIM always divice size
+    dim3 gridDim((size)/ADDBLOCKXDIM+1); // We expect that ADDBLOCKXDIM always divice size
 
+    assert(blockDim.x*gridDim.x >= N);
     // Forward 
     DOUBLENTT64<<<gridDim,blockDim,1,stream>>>(CUDAFunctions::d_W,CUDAFunctions::d_WInv,a,d_a,b,d_b,N,NPolis,FORWARD);
     assert(cudaGetLastError() == cudaSuccess);

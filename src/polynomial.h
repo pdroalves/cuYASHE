@@ -152,7 +152,7 @@ class Polynomial{
         this->set_coeffs(b.get_coeffs());
       this->d_polyCRT = b.get_device_crt_residues();
       this->set_mod(b.get_mod());
-      this->expected_degree = b.deg();
+      // this->expected_degree = b.deg();
       if(this != Polynomial::global_phi)
         this->set_phi(b.get_phi());
     }

@@ -73,6 +73,7 @@ void Yashe::generate_keys(){
   }
 
   h = fInv*g;
+  std::cout << h.to_string() << std::endl;
   h *= t;
   h %= phi;
   h %= q;
