@@ -40,8 +40,8 @@ struct PolySuite
         degree = 32;
         CUDAFunctions::init(degree);
 
-        // Polynomial::global_mod = conv<ZZ>("1171313591017775093490277364417"); // Defines default GF(q)
-        Polynomial::global_mod = conv<ZZ>("2147483647"); // Defines default GF(q)
+        Polynomial::global_mod = conv<ZZ>("1171313591017775093490277364417L"); // Defines default GF(q)
+        // Polynomial::global_mod = conv<ZZ>("2147483647"); // Defines default GF(q)
         Polynomial::BuildNthCyclotomic(&phi,degree);
         // std::cout << phi.to_string() << std::endl;
         phi.set_mod(Polynomial::global_mod);
@@ -83,13 +83,13 @@ struct YasheSuite
         
         // Params
         ZZ q;
-        // q = conv<ZZ>("1171313591017775093490277364417L");
-        q = conv<ZZ>("655615111");
+        q = conv<ZZ>("1171313591017775093490277364417L");
+        // q = conv<ZZ>("655615111");
         Polynomial::global_mod = q;
         ZZ_p::init(q); // Defines GF(q)
 
-        // t_long = 35951;
-        t_long = 2;
+        t_long = 35951;
+        // t_long = 2;
         t = ZZ(t_long);
         degree = 4;
         int w = 72;
@@ -483,12 +483,12 @@ BOOST_AUTO_TEST_CASE(simpleMultiplyByPolynomial)
   BOOST_REQUIRE(NTL::deg(c_ntl) == c.deg());
   for(int i = 0;i <= c.deg();i++){
 
-    int ntl_value;
+    ZZ ntl_value;
     if( NTL::IsZero(NTL::coeff(c_ntl,i)) )
     // Without this, NTL raises an exception when we call rep()
       ntl_value = 0L;
     else
-      ntl_value = conv<int>(NTL::rep(NTL::coeff(c_ntl,i))[0]);
+      ntl_value = conv<ZZ>(NTL::rep(NTL::coeff(c_ntl,i))[0]);
 
     BOOST_REQUIRE(c.get_coeff(i) == ntl_value);
   }
@@ -520,7 +520,7 @@ BOOST_AUTO_TEST_CASE(multiplyByPolynomial)
       NTL::SetCoeff(b_ntl,i,conv<ZZ_p>(b.get_coeff(i)));
 
     Polynomial c = a*b;
-    c.icrt();
+    c %= Polynomial::global_mod;
 
     ZZ_pEX c_ntl = a_ntl*b_ntl;
 
@@ -538,12 +538,12 @@ BOOST_AUTO_TEST_CASE(multiplyByPolynomial)
 
     BOOST_REQUIRE(NTL::deg(c_ntl) == c.deg());
     for(int i = 0;i <= c.deg();i++){
-      int ntl_value;
+      ZZ ntl_value;
       if( NTL::IsZero(NTL::coeff(c_ntl,i)) )
       // Without this, NTL raises an exception when we call rep()
         ntl_value = 0L;
       else
-        ntl_value = conv<int>(NTL::rep(NTL::coeff(c_ntl,i))[0]);
+        ntl_value = conv<ZZ>(NTL::rep(NTL::coeff(c_ntl,i))[0]);
 
       BOOST_REQUIRE(c.get_coeff(i) == ntl_value);
     }
@@ -594,12 +594,12 @@ BOOST_AUTO_TEST_CASE(multiplyAndAddByPolynomial)
 
     BOOST_REQUIRE(NTL::deg(c_ntl) == c.deg());
     for(int i = 0;i <= c.deg();i++){
-      int ntl_value;
+      ZZ ntl_value;
       if( NTL::IsZero(NTL::coeff(c_ntl,i)) )
       // Without this, NTL raises an exception when we call rep()
         ntl_value = 0L;
       else
-        ntl_value = conv<int>(NTL::rep(NTL::coeff(c_ntl,i))[0]);
+        ntl_value = conv<ZZ>(NTL::rep(NTL::coeff(c_ntl,i))[0]);
 
       BOOST_REQUIRE(c.get_coeff(i) == ntl_value);
     }
@@ -649,12 +649,12 @@ BOOST_AUTO_TEST_CASE(addAndMultiplyByPolynomial)
 
     BOOST_REQUIRE(NTL::deg(c_ntl) == c.deg());
     for(int i = 0;i <= c.deg();i++){
-      int ntl_value;
+      ZZ ntl_value;
       if( NTL::IsZero(NTL::coeff(c_ntl,i)) )
       // Without this, NTL raises an exception when we call rep()
         ntl_value = 0L;
       else
-        ntl_value = conv<int>(NTL::rep(NTL::coeff(c_ntl,i))[0]);
+        ntl_value = conv<ZZ>(NTL::rep(NTL::coeff(c_ntl,i))[0]);
 
       BOOST_REQUIRE(c.get_coeff(i) == ntl_value);
     }
@@ -740,12 +740,12 @@ BOOST_AUTO_TEST_CASE(randomPolynomialOperations)
 
   BOOST_REQUIRE(NTL::deg(c_ntl) == c.deg());
   for(int i = 0;i <= c.deg();i++){
-    int ntl_value;
+    ZZ ntl_value;
     if( NTL::IsZero(NTL::coeff(c_ntl,i)) )
     // Without this, NTL raises an exception when we call rep()
       ntl_value = 0L;
     else
-      ntl_value = conv<int>(NTL::rep(NTL::coeff(c_ntl,i))[0]);
+      ntl_value = conv<ZZ>(NTL::rep(NTL::coeff(c_ntl,i))[0]);
 
     BOOST_REQUIRE(c.get_coeff(i) == ntl_value);
   }
@@ -767,8 +767,8 @@ BOOST_AUTO_TEST_CASE(modularInversion)
 
 
   Polynomial aInv = Polynomial::InvMod(a,a.get_phi());
-  aInv %= a.get_phi();
   Polynomial result = a*aInv % a.get_phi();
+  result %= a.get_mod();
 
   Polynomial one = Polynomial();
   one.set_coeff(0,1);
@@ -804,11 +804,12 @@ BOOST_AUTO_TEST_CASE(encryptDecrypt)
 {
   Polynomial a;
 
-  for(int i = 0; i < NTESTS;i++){
+  for(int i = 0; i < 10*NTESTS;i++){
     a.set_coeff(0,conv<ZZ>(rand())%t);
 
     Ciphertext c = cipher.encrypt(a);
     Polynomial a_decrypted = cipher.decrypt(c);
+
     BOOST_REQUIRE( a_decrypted == a);
   }
 }

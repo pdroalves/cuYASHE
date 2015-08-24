@@ -39,14 +39,9 @@ void Polynomial::update_device_data(){
     aux = (uint64_t*)calloc(this->CRTSPACING*(this->polyCRT.size()),sizeof(uint64_t));
     for(unsigned int i=0;i < this->polyCRT.size();i++){
       memcpy(aux+this->CRTSPACING*i,&(this->polyCRT[i][0]),(this->polyCRT[i].size())*sizeof(uint64_t));
-      std::cout << i << " HtD) ";
-      for(unsigned int j=0;j < this->polyCRT[i].size();j++)
-        std::cout << this->polyCRT[i][j] << " ";
-      std::cout << std::endl;
     }
-    std::cout << std::endl;
 
-    result = cudaMemcpyAsync(this->d_polyCRT, aux , this->CRTSPACING*(this->polyCRT.size())*sizeof(uint64_t), cudaMemcpyHostToDevice,this->stream);
+    result = cudaMemcpy(this->d_polyCRT, aux , this->CRTSPACING*(this->polyCRT.size())*sizeof(uint64_t), cudaMemcpyHostToDevice);
 
     #ifdef VERBOSE
     std::cout << "cudaMemcpyAsync" << i << ": " << cudaGetErrorString(result) << " "<<(this->polyCRT[i].size())*sizeof(uint64_t) << " bytes to position "<< this->CRTSPACING*i*sizeof(int) <<std::endl;
@@ -87,12 +82,9 @@ void Polynomial::update_host_data(){
         // *(this->polyCRT[i][0]) = *(aux[i*this->CRTSPACING]);
         // memcpy(&(this->polyCRT[i])[this->polyCRT[i][0].size() - this->CRTSPACING], &aux[i*this->CRTSPACING],  this->CRTSPACING * sizeof(uint64_t));
         // std::copy(&(aux) + i*this->CRTSPACING,&(aux) + (i+1)*this->CRTSPACING,this->polyCRT[i][0]);
-        std::cout << i << " DtH) ";
         for(unsigned int j=0; j < (unsigned int)(this->CRTSPACING);j++){
           this->polyCRT[i][j] = aux[j+i*this->CRTSPACING];
-          std::cout << this->polyCRT[i][j] << " ";
         }
-        std::cout << std::endl;
     }
     free(aux);
     this->set_host_updated(true);
