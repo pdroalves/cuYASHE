@@ -19,13 +19,8 @@ class Ciphertext: public Polynomial{
       return *this;
     }
     Ciphertext(Polynomial p){
-      level = 0;
-      this->copy(p);
-
-      this->set_device_crt_residues(p.get_device_crt_residues());
-      this->set_host_updated(p.get_host_updated());
-      this->set_device_updated(p.get_device_updated());
-
+        level = 0;
+        this->copy(p);
     }
     Ciphertext(){
       level = 0;
@@ -33,11 +28,7 @@ class Ciphertext: public Polynomial{
 
     void copy(Polynomial p){
         level = 0;
-        this->copy(p);
-
-        this->set_device_crt_residues(p.get_device_crt_residues());
-        this->set_host_updated(p.get_host_updated());
-        this->set_device_updated(p.get_device_updated());
+        Polynomial::copy(p);
     }
 
     int level;

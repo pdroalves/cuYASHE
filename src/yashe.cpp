@@ -121,8 +121,10 @@ Ciphertext Yashe::encrypt(Polynomial m){
 
   Polynomial ps = xerr.get_sample(phi.deg()-1);
   ps %= phi;
+  ps %= q;
   Polynomial e = xerr.get_sample(phi.deg()-1);
   e %= phi;
+  e %= q;
   
   #ifdef DEBUG
   std::cout << "ps: "<< ps <<std::endl;

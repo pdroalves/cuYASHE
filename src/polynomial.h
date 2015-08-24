@@ -218,7 +218,7 @@ class Polynomial{
       }
 
 
-      uint64_t *d_result = CUDAFunctions::callPolynomialAddSub(this->stream,this->get_device_crt_residues(),b.get_device_crt_residues(),(int)(this->CRTSPACING*this->polyCRT.size()),ADD);
+      uint64_t *d_result = CUDAFunctions::callPolynomialAddSub(this->stream,this->get_device_crt_residues(),b.get_device_crt_residues(),(int)(this->CRTSPACING*Polynomial::CRTPrimes.size()),ADD);
 
       Polynomial c(this->get_mod(),this->get_phi(),this->CRTSPACING);
       c.set_device_crt_residues(d_result);
