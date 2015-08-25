@@ -143,28 +143,7 @@ __global__ void polynomialPlainMul(const uint64_t *a,const uint64_t *b,uint64_t 
   // }
 }
 
-__device__ uint64_t mulmod(uint64_t a, uint64_t b, uint64_t m) {
-    uint64_t res = 0;
-    uint64_t temp_b;
 
-    while (a != 0) {
-        if (a & 1) {
-            /* Add b to res, modulo m, without overflow */
-            if (b >= m - res) /* Equiv to if (res + b >= m), without overflow */
-                res -= m;
-            res += b;
-        }
-        a >>= 1;
-
-        /* Double b, modulo m */
-        temp_b = b;
-        if (b >= m - b)       /* Equiv to if (2 * b >= m), without overflow */
-            temp_b -= m;
-        b += temp_b;
-    __syncthreads();
-    }
-    return res;
-}
 
 typedef struct {
   unsigned long long int lo;
@@ -181,11 +160,12 @@ __device__ my_uint128 add_uint128 (my_uint128 a, my_uint128 b)
 
 __device__ my_uint128 add_uint64_128 (uint64_t a, my_uint128 b)
 {
-  my_uint128 res = {a+b.lo,b.hi}; // FALHA SE A+B.LO > 64 BITS
+  // my_uint128 res = {a+b.lo,b.hi}; // FALHA SE A+B.LO > 64 BITS
 
-  // my_uint128 res;
-  // res.lo = a + b.lo;
-  // res.hi = b.hi + (res.lo < a);
+
+  my_uint128 res;
+  res.lo = a + b.lo;
+  res.hi = b.hi + (res.lo < a);
   return res;
 } 
 
@@ -222,10 +202,6 @@ __device__ my_uint128 mul_uint64_128 (uint64_t a, uint64_t b)
   my_uint128 res = {a*b,__umul64hi(a,b)};
   return res;
 } 
-
-
-
-
 
 __device__ uint64_t s_rem (uint64_t a)
 {
@@ -300,8 +276,8 @@ __global__ void NTT64(uint64_t *W,uint64_t *WInv,uint64_t *a, uint64_t *a_hat, c
         W64 = WInv[i + cid*N];    
 
       uint64_t a64 = a[i + roffset];
-      // value = (add_uint128(value, mul_uint64_128(W64,a64)));
-      value = (mod_add(value, mod_mul(W64,a64)));
+      value = s_rem(add_uint64_128(value, mul_uint64_128(W64,a64)));
+      // value = (mod_add(value, mod_mul(W64,a64)));
 
     }
     if(type == FORWARD)
@@ -345,10 +321,10 @@ __global__ void DOUBLENTT64( uint64_t *W, uint64_t *WInv,uint64_t *a, uint64_t *
 
       uint64_t a64 = a[i + roffset];
       uint64_t b64 = b[i + roffset];
-      // Avalue = (add_uint128(Avalue, mul_uint64_128(W64,a64)));      
-      // Bvalue = (add_uint128(Bvalue, mul_uint64_128(W64,b64)));
-      Avalue = (mod_add(Avalue, mod_mul(W64,a64)));      
-      Bvalue = (mod_add(Bvalue, mod_mul(W64,b64)));
+      Avalue = s_rem(add_uint64_128(Avalue, mul_uint64_128(W64,a64)));      
+      Bvalue = s_rem(add_uint64_128(Bvalue, mul_uint64_128(W64,b64)));
+      // Avalue = (mod_add(Avalue, mod_mul(W64,a64)));      
+      // Bvalue = (mod_add(Bvalue, mod_mul(W64,b64)));
     }
     if(type == FORWARD){
       a_hat[cid+ roffset] = (Avalue);
