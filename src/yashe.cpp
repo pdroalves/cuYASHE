@@ -22,14 +22,14 @@ void Yashe::generate_keys(){
   std::cout << "R: " << Polynomial::global_mod << std::endl;
   #endif
 
-  // Polynomial g = this->xkey.get_sample(phi.deg()-1);
-  // g %= phi;
-  // g %= q;
-  Polynomial g;
-  g.set_coeff(0,1);
-  g.set_coeff(1,1);
-  g.set_coeff(2,655615110);
-  g.set_coeff(3,1);
+  Polynomial g = this->xkey.get_sample(phi.deg()-1);
+  g %= phi;
+  g %= q;
+  // Polynomial g;
+  // g.set_coeff(0,1);
+  // g.set_coeff(1,1);
+  // g.set_coeff(2,655615110);
+  // g.set_coeff(3,1);
 
   #ifdef DEBUG
   std::cout << "g = " << g << std::endl;
@@ -37,12 +37,12 @@ void Yashe::generate_keys(){
   // Computes a polynomial f with inverse
   Polynomial fInv;
   while(1==1){
-    // Polynomial fl = xkey.get_sample(phi.deg()-1);
-    // fl %= phi;
-    // fl %= q;
-    Polynomial fl;
-    fl.set_coeff(0,1);
-    fl.set_coeff(3,1);
+    Polynomial fl = xkey.get_sample(phi.deg()-1);
+    fl %= phi;
+    fl %= q;
+    // Polynomial fl;
+    // fl.set_coeff(0,1);
+    // fl.set_coeff(3,1);
 
     f = fl*t + 1;
 
@@ -73,7 +73,6 @@ void Yashe::generate_keys(){
   }
 
   h = fInv*g;
-  std::cout << h.to_string() << std::endl;
   h *= t;
   h %= phi;
   h %= q;
