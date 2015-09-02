@@ -37,7 +37,7 @@ struct PolySuite
     PolySuite(){
         BOOST_TEST_MESSAGE("setup PolySuite");
 
-        degree = 32;
+        degree = 512;
         CUDAFunctions::init(degree);
 
         Polynomial::global_mod = conv<ZZ>("1171313591017775093490277364417L"); // Defines default GF(q)
@@ -80,7 +80,7 @@ struct YasheSuite
     {
         BOOST_TEST_MESSAGE("setup YasheNonBinarySuite");
         srand (36251);
-        
+
         // Params
         ZZ q;
         q = conv<ZZ>("1171313591017775093490277364417L");
@@ -97,7 +97,7 @@ struct YasheSuite
         Polynomial::BuildNthCyclotomic(&phi, degree); // generate an cyclotomic polynomial
         #ifdef VERBOSE
         std::cout << "Cyclotomic polynomial: " << R << std::endl;
-        #endif 
+        #endif
         phi.set_mod(Polynomial::global_mod);
         Polynomial::global_phi = &phi;
 
@@ -109,7 +109,7 @@ struct YasheSuite
         ZZ_pE::init(NTL_Phi);
 
         CUDAFunctions::init(2*degree);
-        
+
         Polynomial::gen_crt_primes(Polynomial::global_mod,degree);
 
         // Yashe
@@ -182,8 +182,10 @@ BOOST_AUTO_TEST_CASE(multipleAdds)
   Polynomial::random(&a,degree-1);
 
   Polynomial b;
-  for(int count = 0; count < NTESTS;count ++)
+  for(int count = 0; count < NTESTS;count ++){
     b += a;
+    //std::cout << b.to_string() << std::endl;
+  }
 
   #ifdef VERBOSE
   std::cout << "a: " << a.to_string() << std::endl;
@@ -240,26 +242,24 @@ BOOST_AUTO_TEST_CASE(wNTest)
   cuyasheint_t *WInv;
   int N = degree;
 
-  W = (cuyasheint_t*)malloc(N*N*sizeof(cuyasheint_t));
-  WInv = (cuyasheint_t*)malloc(N*N*sizeof(cuyasheint_t));
+  W = (cuyasheint_t*)malloc(N*sizeof(cuyasheint_t));
+  WInv = (cuyasheint_t*)malloc(N*sizeof(cuyasheint_t));
 
-  cudaError_t result = cudaMemcpy(W,CUDAFunctions::d_W , N*N*sizeof(cuyasheint_t), cudaMemcpyDeviceToHost);
+  cudaError_t result = cudaMemcpy(W,CUDAFunctions::d_W , N*sizeof(cuyasheint_t), cudaMemcpyDeviceToHost);
   BOOST_REQUIRE(result == cudaSuccess);
-  result = cudaMemcpy(WInv,CUDAFunctions::d_WInv , N*N*sizeof(cuyasheint_t), cudaMemcpyDeviceToHost);
+  result = cudaMemcpy(WInv,CUDAFunctions::d_WInv , N*sizeof(cuyasheint_t), cudaMemcpyDeviceToHost);
   BOOST_REQUIRE(result == cudaSuccess);
 
-  // const cuyasheint_t P = 0xffffffff00000001;
   cuyasheint_t wN = CUDAFunctions::wN;
-
   ZZ PZZ = conv<ZZ>("2147483647");
   cuyasheint_t P = 2147483647;
   cuyasheint_t k = conv<cuyasheint_t>(PZZ-1)/N;
   ZZ wNZZ = NTL::PowerMod(ZZ(7),k,PZZ);
 
-  BOOST_REQUIRE(W[1+N] == wN);
   BOOST_REQUIRE(wNZZ == wN);
-  BOOST_REQUIRE(W[2+N] == conv<cuyasheint_t>(NTL::PowerMod(wNZZ,2,PZZ)));
-  BOOST_REQUIRE(W[2+2*N] == conv<cuyasheint_t>(NTL::PowerMod(wNZZ,4,PZZ)));
+  BOOST_REQUIRE(W[1] == wN);
+  BOOST_REQUIRE(W[2] == conv<cuyasheint_t>(NTL::PowerMod(wNZZ,2,PZZ)));
+  BOOST_REQUIRE(W[4] == conv<cuyasheint_t>(NTL::PowerMod(wNZZ,4,PZZ)));
 
 }
 
@@ -282,12 +282,12 @@ BOOST_AUTO_TEST_CASE(simpleMultiplication)
 //     ZZ P = ZZ(integer);
 //     ZZ x = Z(6209464568650184525);
 //     ZZ inv = NTL::InvMod(x,P);
-    
+
 //     cout << integer << "\n" << P << endl;
-    
+
 //     cout << "PowerMod: " << inv << endl;
-    
-//     cout << "Check: " << NTL::MulMod(inv, Z(6209464568650184525), P) << endl;    
+
+//     cout << "Check: " << NTL::MulMod(inv, Z(6209464568650184525), P) << endl;
 //   return 0;
   for(int N = degree;N <= 2048;N *= 2){
     CUDAFunctions::init(N);
@@ -319,15 +319,15 @@ BOOST_AUTO_TEST_CASE(simpleMultiplication)
     for(int j = 0; j < NPOLYS;j++)
       for(int i = 0; i < N; i++){
         if(i < N/2){
-          h_a[i+j*N] = i;        
+          h_a[i+j*N] = i;
           NTL::SetCoeff(a_ntl,i,i);
           h_b[i+j*N] = 1;
-          NTL::SetCoeff(b_ntl,i,1);        
-        }else{        
+          NTL::SetCoeff(b_ntl,i,1);
+        }else{
           h_a[i+j*N] = 0;
           NTL::SetCoeff(a_ntl,i,0);
           h_b[i+j*N] = 0;
-          NTL::SetCoeff(b_ntl,i,0);       
+          NTL::SetCoeff(b_ntl,i,0);
         }
       }
 
@@ -336,7 +336,7 @@ BOOST_AUTO_TEST_CASE(simpleMultiplication)
     assert(result == cudaSuccess);
 
     // result = cudaMemset((void*)d_b,1,N*NPOLYS*sizeof(cuyasheint_t));
-    // assert(result == cudaSuccess);  
+    // assert(result == cudaSuccess);
     result = cudaMemcpy(d_b,h_b , N*NPOLYS*sizeof(cuyasheint_t), cudaMemcpyHostToDevice);
     assert(result == cudaSuccess);
 
@@ -349,7 +349,10 @@ BOOST_AUTO_TEST_CASE(simpleMultiplication)
 
     result = cudaMemcpy(h_c,d_c,  N*NPOLYS*sizeof(cuyasheint_t), cudaMemcpyDeviceToHost);
     assert(result == cudaSuccess);
-    // std::cout << c_ntl << std::endl;
+    for(int i = 0; i < N; i++)
+      std::cout << h_c[i] << " ";
+    std::cout << std::endl;
+
     for(int j = 0; j < NPOLYS;j++)
       for(int i = 0; i < N; i++){
         ZZ ntl_value;
@@ -358,7 +361,8 @@ BOOST_AUTO_TEST_CASE(simpleMultiplication)
           ntl_value = 0L;
         else
           ntl_value = conv<ZZ>(NTL::rep(NTL::coeff(c_ntl,i))[0]);
-
+        std::cout << "h_c " << h_c[i+j*N] << std::endl;
+        std::cout << "ntl_value: " <<ntl_value << std::endl;
         BOOST_REQUIRE(h_c[i+j*N] == ntl_value);
       }
     cudaFree(d_a);
@@ -764,20 +768,21 @@ BOOST_AUTO_TEST_CASE(randomPolynomialOperations)
     // std::cout << "c: " << c.to_string() << " degree: " << c.deg() <<std::endl;
     // std::cout << "c_ntl: " << c_ntl << " degree: " << NTL::deg(c_ntl) << std::endl << std::endl;
 
-  
+
 }
 
 BOOST_AUTO_TEST_CASE(modularInversion)
 {
 
-  CUDAFunctions::init(2*degree);
-
   Polynomial a;
-  Polynomial::random(&a,degree-1);
+  Polynomial::random(&a,Polynomial::global_phi->deg()-1);
 
-
-  Polynomial aInv = Polynomial::InvMod(a,a.get_phi());
+  std::cout << Polynomial::global_phi->to_string() << std::endl;
+  Polynomial aInv = Polynomial::InvMod(a,Polynomial::global_phi);
+  std::cout << a.to_string() << std::endl;
+  std::cout << aInv.to_string() << std::endl;
   Polynomial result = a*aInv % a.get_phi();
+  std::cout << result.to_string() << std::endl;
   result %= a.get_mod();
 
   Polynomial one = Polynomial();

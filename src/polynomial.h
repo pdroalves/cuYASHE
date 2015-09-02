@@ -465,7 +465,7 @@ class Polynomial{
       Polynomial p(*this);
       if(!this->get_host_updated()){
         #warning "Polynomial division on device not implemented!";
-        this->icrt();        
+        this->icrt();
       }
 
       #pragma omp parallel for
@@ -515,6 +515,8 @@ class Polynomial{
       if(!b.get_host_updated()){
         b.icrt();
       }
+      this->normalize();
+      b.normalize();
 
       if(this->deg() != b.deg())
         return false;
@@ -760,14 +762,14 @@ class Polynomial{
       // throw "Polynomial InvMod not implemented!";
       #warning "Polynomial InvMod not implemented!"
 
-      // 
+      //
       ZZ_pEX a_ntl;
       for(int i = 0; i <= a.deg();i++)
         NTL::SetCoeff(a_ntl,i,conv<ZZ_p>(a.get_coeff(i)));
       ZZ_pEX b_ntl;
       for(int i = 0; i <= b.deg();i++)
         NTL::SetCoeff(b_ntl,i,conv<ZZ_p>(b.get_coeff(i)));
-      
+
       ZZ_pEX inv_a_ntl =  NTL::InvMod(a_ntl, b_ntl);
 
       Polynomial result;
