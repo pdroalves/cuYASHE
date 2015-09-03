@@ -184,15 +184,21 @@ __device__ __host__ void NTTIteration(cuyasheint_t *W,cuyasheint_t *WInv,const i
 	butterfly(v);
 	int idxD = expand(j,Ns,R);
 	for(int r=0; r<R;r++)
-		data1[idxD+r*Ns] = s_rem(v[r]);
+    if(type == FORWARD)
+  		data1[idxD+r*Ns] = s_rem(v[r]);
+    else
+      data1[idxD+r*Ns] = s_rem(v[r])/2;
+
 }
 
 __global__ void NTT(cuyasheint_t *d_W,cuyasheint_t *d_WInv,const int N, const int R, const int Ns, cuyasheint_t* dataI, cuyasheint_t* dataO,const int type){
 
-	int j = blockIdx.y*N + blockIdx.x*(blockDim.x*blockDim.y*gridDim.x) + threadIdx.x;
-	NTTIteration(d_W,d_WInv,j, N, R, Ns, dataI, dataO,type);
-  // if(type == INVERSE)
-    // dataI[j] /= N;
+	  for(int i = 0; i < N/R; i += 1024){
+    // " Threads virtuais "
+    const int j = blockIdx.y*N + blockIdx.x*blockDim.x + threadIdx.x;
+    if( j < N)
+      NTTIteration(d_W,d_WInv,j, N, R, Ns, dataI, dataO,type);
+  }
 }
 
 __global__ void polynomialNTTMul(cuyasheint_t *a,const cuyasheint_t *b,const int size){
