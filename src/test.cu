@@ -37,7 +37,7 @@ struct PolySuite
     PolySuite(){
         BOOST_TEST_MESSAGE("setup PolySuite");
 
-        degree = 512;
+        degree = 128;
         CUDAFunctions::init(degree);
 
         Polynomial::global_mod = conv<ZZ>("1171313591017775093490277364417L"); // Defines default GF(q)
@@ -263,16 +263,16 @@ BOOST_AUTO_TEST_CASE(wNTest)
 
 }
 
-BOOST_AUTO_TEST_CASE(sremTest)
-{
-  for(int i = 0; i < 100*NTESTS;i++){
-    uint64_t a = rand()*pow(2,31);
-    cuyasheint_t result = s_rem(a);
-    // std::cout << "a: " << a << std::endl << "result: " << result << " == " << (a%2147483647)<<std::endl;
-    BOOST_REQUIRE(result == (a%2147483647));
-  }
+// BOOST_AUTO_TEST_CASE(sremTest)
+// {
+//   for(int i = 0; i < 100*NTESTS;i++){
+//     uint64_t a = rand()*pow(2,31);
+//     cuyasheint_t result = s_rem(a);
+//     // std::cout << "a: " << a << std::endl << "result: " << result << " == " << (a%2147483647)<<std::endl;
+//     BOOST_REQUIRE(result == (a%2147483647));
+//   }
 
-}
+// }
 BOOST_AUTO_TEST_CASE(simpleMultiplication)
 {
    // std:: cout <<  NTL::MulMod(6406262673276882058,4,9223372036854829057) << std::endl;
@@ -292,10 +292,9 @@ BOOST_AUTO_TEST_CASE(simpleMultiplication)
   for(int N = degree;N <= 2048;N *= 2){
     CUDAFunctions::init(N);
 
-    const int NPOLYS = Polynomial::CRTPrimes.size();
+    // const int NPOLYS = Polynomial::CRTPrimes.size();
+    const int NPOLYS = 1;
 
-    dim3 blockDim(ADDBLOCKXDIM);
-    dim3 gridDim((N*NPOLYS)/ADDBLOCKXDIM+1);
 
     cuyasheint_t *h_a;
     cuyasheint_t *d_a;
