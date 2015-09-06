@@ -143,31 +143,35 @@ __global__ void polynomialPlainMul(const cuyasheint_t *a,const cuyasheint_t *b,c
 }
 
 
-__host__ __device__ inline cuyasheint_t s_rem (uint64_t a)
+__device__ __host__ uint64_t s_rem (uint64_t a)
 {
-  uint64_t res = (a>>31) + (a&0x7FFFFFFF);
-  // This implies in an annoying divergence
-  if(res > 0x7FFFFFFF)
-    res = (cuyasheint_t)((res>>31) + (res&0x7FFFFFFF));
-  #ifdef __CUDA_ARCH__
-  // Only for device code
-  __syncthreads();
-  #endif
-  return (cuyasheint_t)res;
-}
+  // Special reduction for prime 2^64-2^32+1
+  //
+  // x3 * 2^96 + x2 * 2^64 + x1 * 2^32 + x0 \equiv
+  // (x1+x2) * 2^32 + x0 - x3 - x2 mod p
+  //
+  // Here: x3 = 0, x2 = 0, x1 = (a >> 32), x0 = a-(x1 << 32)
+  // const uint64_t p = 0xffffffff00000001;
+  // uint64_t x3 = 0;
+  // uint64_t x2 = 0;
+  uint64_t x1 = (a >> 32);
+  uint64_t x0 = (a & UINT32_MAX);
 
-__device__ __host__ inline uint64_t s_mul(uint64_t a,uint64_t b){
+  // uint64_t res = ((x1+x2)<<32 + x0-x3-x2);
+  uint64_t res = ((x1<<32) + x0);
+
+  return res;
+} 
+
+__device__ __host__  uint64_t s_mul(volatile uint64_t a,volatile uint64_t b){
   // Multiply and reduce a and b by prime 2^64-2^32+1
+  const uint64_t P = 18446744069414584321;
 
   // Multiply
   #ifdef __CUDA_ARCH__
   uint64_t cHi = __umul64hi(a,b);
   uint64_t cLo = a*b;
-  #else
-  __uint128_t c = ((__uint128_t)a) * ((__uint128_t)b); 
-  uint64_t cHi = (c>>64);
-  uint64_t cLo = (c & UINT64_MAX);
-  #endif
+ 
 
   // Reduce
   uint64_t x3 = (cHi >> 32);
@@ -175,15 +179,51 @@ __device__ __host__ inline uint64_t s_mul(uint64_t a,uint64_t b){
   uint64_t x1 = (cLo >> 32);
   uint64_t x0 = (cLo & UINT32_MAX);
 
-  uint64_t res = ((x1+x2)<<32)+x0-x2-x3;
-  return res - (0xffffffff00000001)*(res >= 0xffffffff00000001);
+  uint64_t X1 = (x1<<32);
+  uint64_t X2 = (x2<<32);
+
+  
+  uint64_t res = (X1+X2+x0-x2-x3);
+  bool testA = (((x2+x3) > X1+X2+x0) && !((X1+X2 < X1) ||  ((X1+X2)+x0 < x0)));
+  bool testB = ((res >= P) );
+  bool testC = ((X1+X2 < X1) ||  ((X1+X2)+x0 < x0));
+
+  // This avoids conditional branchs
+  res = (P-res)*(testA) + (res-P)*(!testA && testB) + (res+4294967295L)*(!testA && !testB && testC) + (res)*(!testA && !testB && !testC);
+
+
+  // if(((x2+x3) > X1+X2+x0) && !((X1+X2 < X1) ||  ((X1+X2)+x0 < x0))) {
+  //   // printf("Negative Overflow!\n");
+  //   res = P - res;
+  //  }else if ((res >= P) ){
+  //   // printf(" Overflow!\n");
+  //   res -= P;
+  //  }else if((X1+X2 < X1) ||  ((X1+X2)+x0 < x0)){
+  //   // printf(" Double Overflow\n");
+  //   res += 4294967295L;
+  // }
+   #else
+  uint64_t res = (((__uint128_t)a) * ((__uint128_t)b) )%P; 
+  // __uint128_t c = ((__uint128_t)a) * ((__uint128_t)b); 
+  // uint64_t cHi = (c>>64);
+  // uint64_t cLo = (c & UINT64_MAX);
+  #endif
+  return res;
+}
+
+__device__ __host__  uint64_t s_add(volatile uint64_t a,volatile uint64_t b){
+  // Multiply and reduce a and b by prime 2^64-2^32+1
+  uint64_t res = a+b;
+  res += (res < a)*4294967295L;
+  res = s_rem(res);
+  return res;
 }
 
 __host__ __device__ void butterfly(uint64_t *v){
 	// Butterfly
-	uint64_t v0 = v[0];
-	v[0] = v0 + v[1];
-	v[1] = v0 - v[1];
+  uint64_t v0 = v[0];
+  v[0] = s_add(v0,v[1]);
+  v[1] = v0 - v[1];
 }
 
 __host__ __device__ int expand(int idxL, int N1, int N2){
@@ -203,24 +243,24 @@ __device__ __host__ void NTTIteration(cuyasheint_t *W,
 	int idxS = j;
 	// int wIndex;
 	cuyasheint_t *w;
-	if(type == FORWARD){
+	if(type == FORWARD)
 		w = W;
-	}else{
+	else
 		w = WInv;
-	}
 
-	for(int r=0; r<R; r++)
+	for(int r=0; r<R; r++){
     v[r] = s_mul(data0[idxS+r*N/R],w[j]);
-		// v[r] = ((uint64_t)data0[idxS+r*N/R])*w[j];
-	
+  }
+		
 	butterfly(v);
 	int idxD = expand(j,Ns,R);
-	for(int r=0; r<R;r++)
+	for(int r=0; r<R;r++){
+
     if(type == FORWARD)
   		data1[idxD+r*Ns] = v[r];
     else
       data1[idxD+r*Ns] = v[r]/2;
-
+  }
 }
 
 __global__ void NTT(cuyasheint_t *d_W,cuyasheint_t *d_WInv,const int N, const int R, const int Ns, cuyasheint_t* dataI, cuyasheint_t* dataO,const int type){
@@ -228,7 +268,7 @@ __global__ void NTT(cuyasheint_t *d_W,cuyasheint_t *d_WInv,const int N, const in
   for(int i = 0; i < N/R; i += 1024){
     // " Threads virtuais "
     const int j = (blockIdx.x)*N + (threadIdx.x+i);
-    if( j < N)
+    if( j < N*gridDim.x)
       NTTIteration(d_W,d_WInv,j, N, R, Ns, dataI, dataO,type);
   }
 }
@@ -237,138 +277,18 @@ __global__ void polynomialNTTMul(cuyasheint_t *a,const cuyasheint_t *b,const int
   // We have one thread per polynomial coefficient on 32 threads-block.
   // For CRT polynomial adding, all representations should be concatenated aligned
   const int tid = threadIdx.x + blockDim.x*blockIdx.x;
-  // const cuyasheint_t P = 0xffffffff00000001;
-  uint64_t a_value;
-  uint64_t b_value;
 
   if(tid < size ){
       // Coalesced access to global memory. Doing this way we reduce required bandwich.
-      a_value = a[tid];
-      b_value = b[tid];
+      uint64_t a_value = a[tid];
+      uint64_t b_value = b[tid];
 
       // In-place
-      a[tid] = s_mul(a_value,b_value);
+      // a[tid] = s_mul(a_value,b_value);
+      a[tid] = a_value*b_value % 18446744069414584321;
   }
 }
 
-typedef float2 Complex;
-
-#define PI_F 3.141592654f
-
-static __device__ inline Complex ComplexMul(Complex a, Complex b)
-{
-    Complex c;
-    c.x = a.x * b.x - a.y * b.y;
-    c.y = a.x * b.y + a.y * b.x;
-    return c;
-}
-
-static __device__ inline Complex ComplexAdd(Complex a, Complex b)
-{
-    Complex c;
-    c.x = a.x + b.x;
-    c.y = a.y + b.y;
-    return c;
-}
-
-__global__ void FFT32(Complex *a, cuyasheint_t *a_hat, const int N,const int NPolis,const int type){
-  // This algorithm supposes that N is power of 2, divisible by 32
-  // Input:
-  // w: Matrix of wNs
-  // a: residues
-  // a_hat: output
-  // N: # of coefficients of each polynomial
-  // NPolis: # of residues
-  const int tid = threadIdx.x + blockIdx.x*blockDim.x;
-  const int residueid = tid / (N);
-  const int roffset = residueid*N;
-  const int cid = tid & (N-1); // Coefficient id
-  Complex wN;
-  if(type == FORWARD){
-    wN.x = __cosf(2*PI_F/N);
-    wN.y = __sinf(2*PI_F/N);
-  }
-  else{
-    wN.x = __cosf(-2*PI_F/N);
-    wN.y = __sinf(-2*PI_F/N);
-  }
-  Complex W64 = {1,0};
-
-  if(tid < N*NPolis){
-    // my_uint128 value = {0,0};
-    Complex value = {0,0};
-    // In each iteration, computes a_hat[i]
-    for(int i = 0; i < N; i++){
-      Complex a64 = a[i + roffset];
-      value = ComplexAdd(value,ComplexMul(W64,a64));
-      W64 = ComplexMul(W64,wN);
-    }
-    if(type == FORWARD)
-      a_hat[cid+roffset] = (value.x);
-    else
-      a_hat[cid+roffset] = (value.x)/N;
-
-  }
-
-}
-
-__global__ void DOUBLEFFT32( cuyasheint_t *a, Complex *a_hat,cuyasheint_t *b, Complex *b_hat, const int N,const int NPolis,const int type){
-  // This algorithm supposes that N is power of 2, divisible by 32
-  // Input:
-  // w: Matrix of wNs
-  // a: residues
-  // a_hat: output
-  // N: # of coefficients of each polynomial
-  // NPolis: # of residues
-  const int tid = threadIdx.x + blockIdx.x*blockDim.x;
-  const int residueid = tid / N;
-  const int roffset = residueid*N;
-  const int cid = tid & (N-1); // Coefficient id
-  Complex wN;
-  if(type == FORWARD){
-    wN.x = __cosf(2*PI_F/N);
-    wN.y = __sinf(2*PI_F/N);
-  }
-  else{
-    wN.x = __cosf(-2*PI_F/N);
-    wN.y = __sinf(-2*PI_F/N);
-  }
-  Complex W64 = {1,0};
-
-  if(tid < N*NPolis){
-    Complex Avalue = {0,0};
-    Complex Bvalue = {0,0};
-
-    for(int i = 0; i < N; i++){
-      // uint64_t a64 = a[((i + roffset+cid)&(N-1))];
-      // uint64_t b64 = b[((i + roffset+cid)&(N-1))];
-      Complex a64 = {(float)a[i + roffset],0};
-      Complex b64 = {(float)b[i + roffset],0};
-      Avalue = ComplexAdd(Avalue, ComplexMul(W64,a64));
-      Bvalue = ComplexAdd(Bvalue, ComplexMul(W64,b64));
-      W64 = ComplexMul(W64,wN);
-    }
-    if(type == FORWARD){
-      a_hat[cid+ roffset] = (Avalue);
-      b_hat[cid+ roffset] = (Bvalue);
-    }else{
-      a_hat[cid+ roffset] = {(Avalue.x)/N,0};
-      b_hat[cid+ roffset] = {(Bvalue.x)/N,0};
-    }
-  }
-}
-
-__global__ void polynomialFFTMul(Complex *a,const Complex *b,const int size){
-  // We have one thread per polynomial coefficient on 32 threads-block.
-  // For CRT polynomial adding, all representations should be concatenated aligned
-  const int tid = threadIdx.x + blockDim.x*blockIdx.x;
-
-  if(tid < size ){
-      // Coalesced access to global memory. Doing this way we reduce required bandwich.
-      // In-place
-      a[tid] = ComplexMul(a[tid],b[tid]);
-  }
-}
 
 __host__ cuyasheint_t* CUDAFunctions::callPolynomialMul(cudaStream_t stream,cuyasheint_t *a,cuyasheint_t *b,int N,int NPolis){
   // This method expects that both arrays are aligned
@@ -413,34 +333,43 @@ __host__ cuyasheint_t* CUDAFunctions::callPolynomialMul(cudaStream_t stream,cuya
     assert(result == cudaSuccess);
     result = cudaMalloc((void**)&d_a,size*sizeof(cuyasheint_t));
     assert(result == cudaSuccess);
+    result = cudaMemset(d_a,0,size*sizeof(cuyasheint_t));
+    assert(result == cudaSuccess);
     result = cudaMalloc((void**)&d_b,size*sizeof(cuyasheint_t));
+    assert(result == cudaSuccess);
+    result = cudaMemset(d_b,0,size*sizeof(cuyasheint_t));
     assert(result == cudaSuccess);
 
     const int RADIX = 2;
   	dim3 blockDim(std::min(N/RADIX,1024));
-    // dim3 gridDim((N/RADIX)/blockDim.x);
-  	dim3 gridDim((N/RADIX)/blockDim.x);
+  	dim3 gridDim(NPolis);
 
     // Forward
     for(int Ns=1; Ns<N; Ns*=RADIX){
       NTT<<<gridDim,blockDim,1,stream >>>(CUDAFunctions::d_W,CUDAFunctions::d_WInv,N,RADIX,Ns,a,d_a,FORWARD);
       assert(cudaGetLastError() == cudaSuccess);
+      std::swap(a,d_a);
     }
-    for(int Ns=1; Ns<N; Ns*=RADIX){
-      NTT<<<gridDim,blockDim,1,stream >>>(CUDAFunctions::d_W,CUDAFunctions::d_WInv,N,RADIX,Ns,b,d_b,FORWARD);
-      assert(cudaGetLastError() == cudaSuccess);
-    }
-    // Multiply
-    dim3 blockDimMul(ADDBLOCKXDIM);
-    dim3 gridDimMul((size)/ADDBLOCKXDIM+1); // We expect that ADDBLOCKXDIM always divide size
-    polynomialNTTMul<<<gridDimMul,blockDimMul,1,stream>>>(d_a,d_b,N*NPolis);
-    assert(cudaGetLastError() == cudaSuccess);
+    std::swap(a,d_a);      
 
-    // Inverse
+    // for(int Ns=1; Ns<N; Ns*=RADIX){
+    //   NTT<<<gridDim,blockDim,1,stream >>>(CUDAFunctions::d_W,CUDAFunctions::d_WInv,N,RADIX,Ns,b,d_b,FORWARD);
+    //   std::swap(b,d_b);
+    //   assert(cudaGetLastError() == cudaSuccess);
+    // }
+    // // Multiply
+    // dim3 blockDimMul(ADDBLOCKXDIM);
+    // dim3 gridDimMul((size)/ADDBLOCKXDIM+1); // We expect that ADDBLOCKXDIM always divide size
+    // polynomialNTTMul<<<gridDimMul,blockDimMul,1,stream>>>(d_a,d_b,size);
+    // assert(cudaGetLastError() == cudaSuccess);
+
+    // // Inverse
     for(int Ns=1; Ns<N; Ns*=RADIX){
       NTT<<<gridDim,blockDim,1,stream >>>(CUDAFunctions::d_W,CUDAFunctions::d_WInv,N,RADIX,Ns,d_a,d_result,INVERSE);
       assert(cudaGetLastError() == cudaSuccess);
+      std::swap(d_a,d_result);      
     }
+    std::swap(d_a,d_result);      
     cudaFree(d_a);
     cudaFree(d_b);
   #elif defined(FFTMUL)
@@ -462,15 +391,15 @@ __host__ cuyasheint_t* CUDAFunctions::callPolynomialMul(cudaStream_t stream,cuya
 
     assert(blockDim.x*gridDim.x >= N);
     // Forward
-    DOUBLEFFT32<<<gridDim,blockDim,1,stream>>>(a,d_A,b,d_B,N,NPolis,FORWARD);
+    fft_radix16<<<gridDim,blockDim,1,stream>>>(a,d_result,N);
     assert(cudaGetLastError() == cudaSuccess);
 
     // Multiply
-    polynomialFFTMul<<<gridDim,blockDim,1,stream>>>(d_A,d_B,N*NPolis);
+    // polynomialFFTMul<<<gridDim,blockDim,1,stream>>>(d_A,d_B,N*NPolis);
 
     // Inverse
-    FFT32<<<gridDim,blockDim,1,stream>>>(d_A,d_result,N,NPolis,INVERSE);
-    assert(cudaGetLastError() == cudaSuccess);
+    // fft_radix16<<<gridDim,blockDim,1,stream>>>(d_A,d_result,N,NPolis,INVERSE);
+    // assert(cudaGetLastError() == cudaSuccess);
 
     cudaFree(d_A);
     cudaFree(d_B);

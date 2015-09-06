@@ -75,7 +75,7 @@ int main(){
 		data = (integer*)malloc(N*sizeof(integer));
 		data0 = (integer*)malloc(N*sizeof(integer));
 		data1 = (integer*)malloc(N*sizeof(integer));
-		cpu_result = (integer*)malloc(N*sizeof(integer));
+		cpu_result = (integer*)calloc(N,sizeof(integer));
 
 
 		// Raw data
@@ -90,90 +90,90 @@ int main(){
 			data0[i] = data[i];
 
 		// CPU-NTT Forward
-	  	clock_gettime( CLOCK_REALTIME, &start);
-		for(int count = 0; count < NITERATIONS; count++)
-			CPU_NTT(h_W,h_WInv,N,RADIX,data0,data1,FORWARD);
-		clock_gettime( CLOCK_REALTIME, &stop);
-		std::cout << N <<") CPU NTT " << compute_time_ms(start,stop)/NITERATIONS << " ms" << std::endl<< std::endl;
-		cpu_ntt << N << " " << compute_time_ms(start,stop)/NITERATIONS << std::endl;
+	 //  	clock_gettime( CLOCK_REALTIME, &start);
+		// for(int count = 0; count < NITERATIONS; count++)
+		// 	CPU_NTT(h_W,h_WInv,N,RADIX,data0,data1,FORWARD);
+		// clock_gettime( CLOCK_REALTIME, &stop);
+		// std::cout << N <<") CPU NTT " << compute_time_ms(start,stop)/NITERATIONS << " ms" << std::endl<< std::endl;
+		// cpu_ntt << N << " " << compute_time_ms(start,stop)/NITERATIONS << std::endl;
 
-		// CPU-NTT Inverse
-		for(int count = 0; count < NITERATIONS; count++)
-			CPU_NTT(h_W,h_WInv,N,RADIX,data1,data0,INVERSE);
-		clock_gettime( CLOCK_REALTIME, &stop);
-		std::cout << N <<") CPU INTT) " << compute_time_ms(start,stop)/NITERATIONS << " ms" << std::endl<< std::endl;
-		cpu_intt << N << " " << compute_time_ms(start,stop)/NITERATIONS << std::endl;
+		// // CPU-NTT Inverse
+		// for(int count = 0; count < NITERATIONS; count++)
+		// 	CPU_NTT(h_W,h_WInv,N,RADIX,data1,data0,INVERSE);
+		// clock_gettime( CLOCK_REALTIME, &stop);
+		// std::cout << N <<") CPU INTT) " << compute_time_ms(start,stop)/NITERATIONS << " ms" << std::endl<< std::endl;
+		// cpu_intt << N << " " << compute_time_ms(start,stop)/NITERATIONS << std::endl;
 
-		// Verify correctness
-		for(int i = 0; i < N; i++)
-			data0[i] = data[i];
+		// // Verify correctness
+		// for(int i = 0; i < N; i++)
+		// 	data0[i] = data[i];
 
 		CPU_NTT(h_W,h_WInv,N,RADIX,data0,data1,FORWARD);
-		CPU_NTT(h_W,h_WInv,N,RADIX,data1,cpu_result,INVERSE);
+		// CPU_NTT(h_W,h_WInv,N,RADIX,data1,cpu_result,INVERSE);
 		for(int i=0;i < N;i++){
-			std::cout << N << ") " << i << " - " << (cpu_result[i]) << " == " << data[i] << std::endl;
+			std::cout << N << ") " << i << " - " << (data1[i]) << std::endl;
 			// assert(cu_result[i]/2 == data[i]);
 	    }
 
 		// GPU
-		cudaMalloc((void**)&d_data0,N*sizeof(integer));
-		cudaMalloc((void**)&d_data1,N*sizeof(integer));
+		// cudaMalloc((void**)&d_data0,N*sizeof(integer));
+		// cudaMalloc((void**)&d_data1,N*sizeof(integer));
 
-		h_data0 = (integer*)malloc(N*sizeof(integer));
-		h_data1 = (integer*)malloc(N*sizeof(integer));
+		// h_data0 = (integer*)malloc(N*sizeof(integer));
+		// h_data1 = (integer*)malloc(N*sizeof(integer));
 
-		// GPU-NTT data
-		for(int i = 0; i < N; i++)
-			h_data0[i] = data[i];
-		cudaMemcpy(d_data0,h_data0,N*sizeof(integer),cudaMemcpyHostToDevice);
-		cudaMemcpy(d_data1,h_data1,N*sizeof(integer),cudaMemcpyHostToDevice);
+		// // GPU-NTT data
+		// for(int i = 0; i < N; i++)
+		// 	h_data0[i] = data[i];
+		// cudaMemcpy(d_data0,h_data0,N*sizeof(integer),cudaMemcpyHostToDevice);
+		// cudaMemcpy(d_data1,h_data1,N*sizeof(integer),cudaMemcpyHostToDevice);
 
-		// GPU-NTT Forward
-	  	clock_gettime( CLOCK_REALTIME, &start);
-		for(int count = 0; count < NITERATIONS; count++){
-			CALL_GPU_NTT(d_W,d_WInv,N,RADIX,d_data0,d_data1,FORWARD);
-			result = cudaDeviceSynchronize();
-			assert(result == cudaSuccess);
-		}
-		clock_gettime( CLOCK_REALTIME, &stop);
-		std::cout << N <<") GPU NTT " << compute_time_ms(start,stop)/NITERATIONS << " ms" << std::endl<< std::endl;
-		gpu_ntt << N << " " << compute_time_ms(start,stop)/NITERATIONS << std::endl;
+		// // GPU-NTT Forward
+	 //  	clock_gettime( CLOCK_REALTIME, &start);
+		// for(int count = 0; count < NITERATIONS; count++){
+		// 	CALL_GPU_NTT(d_W,d_WInv,N,RADIX,d_data0,d_data1,FORWARD);
+		// 	result = cudaDeviceSynchronize();
+		// 	assert(result == cudaSuccess);
+		// }
+		// clock_gettime( CLOCK_REALTIME, &stop);
+		// std::cout << N <<") GPU NTT " << compute_time_ms(start,stop)/NITERATIONS << " ms" << std::endl<< std::endl;
+		// gpu_ntt << N << " " << compute_time_ms(start,stop)/NITERATIONS << std::endl;
 
-		// GPU-NTT Inverse
-		for(int count = 0; count < NITERATIONS; count++){
-			CALL_GPU_NTT(d_W,d_WInv,N,RADIX,d_data1,d_data0,INVERSE);
-			result = cudaDeviceSynchronize();
-			assert(result == cudaSuccess);
-		}
-		clock_gettime( CLOCK_REALTIME, &stop);
-		std::cout << N <<") GPU INTT) " << compute_time_ms(start,stop)/NITERATIONS << " ms" << std::endl<< std::endl;
-		gpu_intt << N << " " << compute_time_ms(start,stop)/NITERATIONS << std::endl;
+		// // GPU-NTT Inverse
+		// for(int count = 0; count < NITERATIONS; count++){
+		// 	CALL_GPU_NTT(d_W,d_WInv,N,RADIX,d_data1,d_data0,INVERSE);
+		// 	result = cudaDeviceSynchronize();
+		// 	assert(result == cudaSuccess);
+		// }
+		// clock_gettime( CLOCK_REALTIME, &stop);
+		// std::cout << N <<") GPU INTT) " << compute_time_ms(start,stop)/NITERATIONS << " ms" << std::endl<< std::endl;
+		// gpu_intt << N << " " << compute_time_ms(start,stop)/NITERATIONS << std::endl;
 
-		cu_result = (integer*)malloc(N*sizeof(integer));
-		cudaMalloc((void**)&d_cu_result,N*sizeof(integer));
+		// cu_result = (integer*)malloc(N*sizeof(integer));
+		// cudaMalloc((void**)&d_cu_result,N*sizeof(integer));
 
-		cudaMemcpy(d_data0,h_data0,N*sizeof(integer),cudaMemcpyHostToDevice);
-		cudaMemcpy(d_data1,h_data1,N*sizeof(integer),cudaMemcpyHostToDevice);
-		CALL_GPU_NTT(d_W,d_WInv,N,RADIX,d_data0,d_data1,FORWARD);
-		cudaMemcpy(cu_result,d_data1,N*sizeof(integer),cudaMemcpyDeviceToHost);
-		CALL_GPU_NTT(d_W,d_WInv,N,RADIX,d_data1,d_cu_result,INVERSE);
-		cudaMemcpy(cu_result,d_cu_result,N*sizeof(integer),cudaMemcpyDeviceToHost);
+		// cudaMemcpy(d_data0,h_data0,N*sizeof(integer),cudaMemcpyHostToDevice);
+		// cudaMemcpy(d_data1,h_data1,N*sizeof(integer),cudaMemcpyHostToDevice);
+		// CALL_GPU_NTT(d_W,d_WInv,N,RADIX,d_data0,d_data1,FORWARD);
+		// cudaMemcpy(cu_result,d_data1,N*sizeof(integer),cudaMemcpyDeviceToHost);
+		// CALL_GPU_NTT(d_W,d_WInv,N,RADIX,d_data1,d_cu_result,INVERSE);
+		// cudaMemcpy(cu_result,d_cu_result,N*sizeof(integer),cudaMemcpyDeviceToHost);
 
-		// Correctness test
-		for(int i=0;i < N;i++){
-			std::cout << N << ") " << i << " - " << (cu_result[i]) << " == " << data[i] << std::endl;
-			assert(cu_result[i]/2 == data[i]);
-	    }
-		free(data0);
-		free(data1);
-		free(h_data0);
-		free(h_data1);
-		free(h_W);
-		free(h_WInv);
-		cudaFree(d_W);
-		cudaFree(d_WInv);
-		cudaFree(d_data0);
-		cudaFree(d_data1);
+		// // Correctness test
+		// for(int i=0;i < N;i++){
+		// 	std::cout << N << ") " << i << " - " << (cu_result[i]) << " == " << data[i] << std::endl;
+		// 	assert(cu_result[i]/2 == data[i]);
+	 //    }
+		// free(data0);
+		// free(data1);
+		// free(h_data0);
+		// free(h_data1);
+		// free(h_W);
+		// free(h_WInv);
+		// cudaFree(d_W);
+		// cudaFree(d_WInv);
+		// cudaFree(d_data0);
+		// cudaFree(d_data1);
 	}
 	return 0;
 }

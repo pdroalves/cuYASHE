@@ -49,8 +49,14 @@ __device__ __host__ void FFTIteration(const int j,const int N,const int R,const 
 	}
 	FFT(v);
 	int idxD = expand(j,Ns,R);
-	for(int r=0; r<R;r++)
+	for(int r=0; r<R;r++){
+		#ifdef __CUDA_ARCH__
+		#else
+		if(idxD+r*Ns == 0)
+			std::cout << idxS+r*N/R << " => " << idxD+r*Ns << ") "<< v[r].real << ", " << v[r].imag << std::endl;
+		#endif
 		data1[idxD+r*Ns] = v[r];
+	}
 }
 
 __host__ Complex* CPU_FFT(int N,int R, Complex* data0, Complex* data1,const int type){

@@ -8,11 +8,11 @@
 #define BILLION  1000000000L
 #define MILLION  1000000L
 #define NITERATIONS 100
-#define FIRSTITERATION 1024
-#define LASTITERATION 8192
+// #define FIRSTITERATION 1024
+// #define LASTITERATION 8192
 
-// #define FIRSTITERATION 256
-// #define LASTITERATION 256
+#define FIRSTITERATION 32
+#define LASTITERATION 32
 
 typedef struct complex{
 	float real;
@@ -38,6 +38,10 @@ typedef struct complex{
 		aux.imag = this->imag / b;
 		return aux;
 
+	}
+
+	__host__ __device__ bool operator==(const complex b){
+		return (this->real == b.real) && (this->imag == b.imag);
 	}
 	// complex operator*=(const complex b){
 	// 	//this has better precision

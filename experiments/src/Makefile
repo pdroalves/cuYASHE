@@ -1,4 +1,4 @@
-all: addmul32 addmul64
+all: stockham stockham_ntt
 
 addmul64:
 	nvcc -O2 -g -G addmul64.cu -o ../bin/addmul64 -lntl -lgmp -Xcompiler -O2 -m64
@@ -17,7 +17,7 @@ cooley_tukey_kernels.o:cooley_tukey_kernels.cu
 
 stockham:
 	nvcc -O0 -arch=sm_35 -G -g ./stockham.cpp ./stockham_reference.cu -o stockham_reference -lm -std=c++11
-	nvcc -O0 -arch=sm_35 -G -g ./stockham.cpp ./stockham_global.cu -o stockham_global -lm -std=c++11
+	# nvcc -O0 -arch=sm_35 -G -g ./stockham.cpp ./stockham_global.cu -o stockham_global -lm -std=c++11
 
 stockham_ntt:
 	nvcc -O0 -arch=sm_35 -G -g ./stockham_ntt.cpp ./stockham_ntt_reference.cu -o stockham_ntt_reference -lm -std=c++11 -lntl -lgmp

@@ -251,15 +251,14 @@ BOOST_AUTO_TEST_CASE(wNTest)
   BOOST_REQUIRE(result == cudaSuccess);
 
   cuyasheint_t wN = CUDAFunctions::wN;
-  ZZ PZZ = conv<ZZ>("2147483647");
-  cuyasheint_t P = 2147483647;
+  ZZ PZZ = conv<ZZ>("18446744069414584321");
   cuyasheint_t k = conv<cuyasheint_t>(PZZ-1)/N;
   ZZ wNZZ = NTL::PowerMod(ZZ(7),k,PZZ);
+  std::cout << wNZZ << std::endl;
 
-  BOOST_REQUIRE(wNZZ == wN);
-  BOOST_REQUIRE(W[1] == wN);
-  BOOST_REQUIRE(W[2] == conv<cuyasheint_t>(NTL::PowerMod(wNZZ,2,PZZ)));
-  BOOST_REQUIRE(W[4] == conv<cuyasheint_t>(NTL::PowerMod(wNZZ,4,PZZ)));
+  BOOST_REQUIRE(wNZZ == NTL::to_ZZ(wN));
+  for(int i = 0; i < N;i++)
+    BOOST_REQUIRE(NTL::MulMod(NTL::to_ZZ(W[i]),NTL::to_ZZ(WInv[i]),PZZ) == 1);
 
 }
 
@@ -273,6 +272,24 @@ BOOST_AUTO_TEST_CASE(wNTest)
 //   }
 
 // }
+
+BOOST_AUTO_TEST_CASE(smulTest)
+{
+  const uint64_t P = 18446744069414584321L;
+  for(int i = 0; i < 100*NTESTS;i++){
+    uint64_t a = (((long long)rand() << 32) | rand());
+    uint64_t b = (((long long)rand() << 32) | rand());
+    uint64_t result = s_mul(a,b);
+    BOOST_REQUIRE(result == ((__uint128_t)(a)*(__uint128_t)(b) % P));
+  }
+  for(int i = 0; i < 100*NTESTS;i++){
+    uint64_t a = rand();
+    uint64_t b = rand();
+    uint64_t result = s_mul(a,b);
+    BOOST_REQUIRE(result == ((__uint128_t)(a)*(__uint128_t)(b) % P));
+  }
+
+}
 BOOST_AUTO_TEST_CASE(simpleMultiplication)
 {
    // std:: cout <<  NTL::MulMod(6406262673276882058,4,9223372036854829057) << std::endl;
