@@ -14,7 +14,7 @@
 
 #define BILLION  1000000000L
 #define MILLION  1000000L
-#define N 5
+#define N 100
 
 double compute_time_ms(struct timespec start,struct timespec stop){
   return (( stop.tv_sec - start.tv_sec )*BILLION + ( stop.tv_nsec - start.tv_nsec ))/MILLION;
@@ -27,7 +27,6 @@ int main(void){
   ZZ q;
   NTL::power2(q,127);
   q -= conv<ZZ>("1");
-  // q = conv<ZZ>("29316470390781739727162023002705124274941375580893935465368909063714281477945179333011630414722254764073645230223932743216392688823460680758889304794331637974301464859326760246600358579450181637660062440977187871461442682309328769934057946518619501220414767495984855605032841798854796753064339241622940652513869950152690350855152773707881050741110143113552223312850640591152683257812256815921533692895839411505063155441368275626096592855230505652718473783525106554227979995834393499");
 
   struct timespec start, stop;
   clock_gettime( CLOCK_REALTIME, &start);
@@ -40,16 +39,13 @@ int main(void){
   Polynomial phi;
   phi.set_mod(Polynomial::global_mod);
 
-  // for(int d = 32;d <= 4096;d *= 2){
-  for(int d = 256;d <= 4096;d *= 2){
-    CUDAFunctions::init(d);
+  for(int d = 512;d <= 4096;d *= 2){
+    CUDAFunctions::init(2*d);
 
     std::cout << "d: " << d << std::endl;
 
     clock_gettime( CLOCK_REALTIME, &start);
-
     Polynomial::BuildNthCyclotomic(&phi, d); // generate an cyclotomic polynomial
-
     clock_gettime( CLOCK_REALTIME, &stop);
     std::cout << "Irreducible polynomial generated in " << compute_time_ms(start,stop) << " ms." << std::endl;
     std::cout << "Generating " << phi.deg() << " degree polynomials." << std::endl;
@@ -63,11 +59,57 @@ int main(void){
 
     std::cout << "q: " << NTL::NumBytes(q)*8 << " bits" << std::endl;
 
+    Polynomial a;
+    Polynomial b;
+    ///////////////////////////////////////////////
+    // Copy
+    //
+    Polynomial::random(&a,d-1);
+    a.set_device_updated(false);
+    a.crt();
+    clock_gettime( CLOCK_REALTIME, &start);
+    for(int i = 0; i < N;i++){
+      a.update_device_data();
+      a.set_device_updated(false);
+      cudaDeviceSynchronize();
+    }
+    clock_gettime( CLOCK_REALTIME, &stop);
+    std::cout << "Copy) Host to Device: " << compute_time_ms(start,stop)/N << " ms" << std::endl;
+
+    Polynomial::random(&a,d-1);
+    a.crt();
+    a.update_device_data();
+    a.set_host_updated(false);
+    clock_gettime( CLOCK_REALTIME, &start);
+    for(int i = 0; i < N;i++){
+      a.update_host_data();
+      a.set_host_updated(false);
+      cudaDeviceSynchronize();
+    }
+    clock_gettime( CLOCK_REALTIME, &stop);
+    std::cout << "Copy) Device to host: " << compute_time_ms(start,stop)/N << " ms" << std::endl;
+
+    ///////////////////////////////////////////////
+    // CRT/ICRT
+    //
+    Polynomial::random(&a,d-1);
+    clock_gettime( CLOCK_REALTIME, &start);
+    for(int i = 0; i < N;i++){
+      a.crt();
+    }
+    clock_gettime( CLOCK_REALTIME, &stop);
+    std::cout << "CRT) Foward: " << compute_time_ms(start,stop)/N << " ms" << std::endl;
+
+    clock_gettime( CLOCK_REALTIME, &start);
+    for(int i = 0; i < N;i++){
+      a.icrt();
+    }
+    clock_gettime( CLOCK_REALTIME, &stop);
+    std::cout << "CRT) Inverse: " << compute_time_ms(start,stop)/N << " ms" << std::endl;
+
     ///////////////////////////////////////////////
     // ADD
     // Time measured with memory copy
-    Polynomial a;
-    Polynomial b;
     Polynomial::random(&a,d-1);
     Polynomial::random(&b,d-1);
     clock_gettime( CLOCK_REALTIME, &start);
@@ -76,6 +118,8 @@ int main(void){
       Polynomial c = (a+b);
       a.set_device_updated(false);
       b.set_device_updated(false);
+      cudaDeviceSynchronize();
+
     }
     clock_gettime( CLOCK_REALTIME, &stop);
     std::cout << "ADD) Time measured with memory copy: " << compute_time_ms(start,stop)/N << " ms" << std::endl;
@@ -92,6 +136,8 @@ int main(void){
     clock_gettime( CLOCK_REALTIME, &start);
     for(int i = 0; i < N;i++){
       Polynomial c = (a+b);
+      cudaDeviceSynchronize();
+
     }
     clock_gettime( CLOCK_REALTIME, &stop);
     std::cout << "ADD) Time measured without memory copy: " << compute_time_ms(start,stop)/N << " ms" << std::endl;
@@ -101,12 +147,16 @@ int main(void){
     // Time measured with memory copy
     Polynomial::random(&a,d-1);
     Polynomial::random(&b,d-1);
+    a.update_crt_spacing(2*d);
+    b.update_crt_spacing(2*d);
     clock_gettime( CLOCK_REALTIME, &start);
     for(int i = 0; i < N;i++){
 
       Polynomial c = (a*b);
       a.set_device_updated(false);
       b.set_device_updated(false);
+      cudaDeviceSynchronize();
+
     }
     clock_gettime( CLOCK_REALTIME, &stop);
     std::cout << "MUL) Time measured with memory copy: " << compute_time_ms(start,stop)/N << " ms" << std::endl;
@@ -114,7 +164,8 @@ int main(void){
     // Time measured without memory copy
     Polynomial::random(&a,d-1);
     Polynomial::random(&b,d-1);
-
+    a.update_crt_spacing(2*d);
+    b.update_crt_spacing(2*d);
     a.crt();
     a.update_device_data();
     b.crt();
@@ -123,6 +174,8 @@ int main(void){
     clock_gettime( CLOCK_REALTIME, &start);
     for(int i = 0; i < N;i++){
       Polynomial c = (a*b);
+      cudaDeviceSynchronize();
+
     }
     clock_gettime( CLOCK_REALTIME, &stop);
     std::cout << "MUL) Time measured without memory copy: " << compute_time_ms(start,stop)/N << " ms" << std::endl;
