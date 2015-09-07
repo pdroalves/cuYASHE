@@ -22,13 +22,13 @@ BENCHMARKYASHEBIN= $(INSTALL)/benchmark_yashe
 all: tests benchmarkpoly
 
 tests: polynomial.o cuda_functions.o test.o ciphertext.o distribution.o yashe.o
-	$(CUDA_CC) $(CUDA_ARCH) $(LCUDA) $(ICUDA)  -o $(TESTBIN) test.o polynomial.o cuda_functions.o ciphertext.o distribution.o yashe.o -Xcompiler $(OPENMP) $(NTL) -lboost_unit_test_framework
+	$(CUDA_CC) $(CUDA_ARCH) $(LCUDA) $(ICUDA)  -o $(TESTBIN) test.o polynomial.o cuda_functions.o ciphertext.o distribution.o yashe.o -lcufft -Xcompiler $(OPENMP) $(NTL) -lboost_unit_test_framework
 
 # main:main.o polynomial.o ciphertext.o cuda_functions.o kernels.o distribution.o yashe.o
 # 	$(CUDA_CC) $(LCUDA) $(ICUDA)  -o $(BIN) main.o polynomial.o ciphertext.o cuda_functions.o kernels.o distribution.o yashe.o -lcufft -Xcompiler $(OPENMP) $(NTL)
 
 benchmarkpoly:benchmark_polynomial.o polynomial.o cuda_functions.o
-		$(CUDA_CC) $(CUDA_ARCH) $(LCUDA) $(ICUDA)  -o $(BENCHMARKPOLYBIN) benchmark_polynomial.o polynomial.o cuda_functions.o  -Xcompiler $(OPENMP) $(NTL) $(LTIME_MEASURE)
+		$(CUDA_CC) $(CUDA_ARCH) $(LCUDA) $(ICUDA)  -o $(BENCHMARKPOLYBIN) benchmark_polynomial.o polynomial.o cuda_functions.o -lcufft -Xcompiler $(OPENMP) $(NTL) $(LTIME_MEASURE)
 
 # main.o:main.cpp
 # 	$(CC) -c main.cpp -o main.o $(LCUDA) $(ICUDA)
@@ -46,7 +46,7 @@ ciphertext.o:ciphertext.cpp
 	$(CC) -c ciphertext.cpp -o ciphertext.o $(NTL) $(LCUDA) $(OPENMP) $(ICUDA)
 
 cuda_functions.o:cuda_functions.cu
-	$(CUDA_CC) $(CUDA_ARCH) -c cuda_functions.cu $(LCUDA) $(ICUDA) -Xcompiler -m64
+	$(CUDA_CC) $(CUDA_ARCH) -c cuda_functions.cu $(LCUDA) $(ICUDA) -lcufft -Xcompiler -m64
 
 
 distribution.o:distribution.cpp

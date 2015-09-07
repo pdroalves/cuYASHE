@@ -272,7 +272,7 @@ BOOST_AUTO_TEST_CASE(wNTest)
 //   }
 
 // }
-
+#ifdef NTTMul
 BOOST_AUTO_TEST_CASE(smulTest)
 {
   const uint64_t P = 18446744069414584321L;
@@ -290,6 +290,7 @@ BOOST_AUTO_TEST_CASE(smulTest)
   }
 
 }
+#endif
 BOOST_AUTO_TEST_CASE(simpleMultiplication)
 {
    // std:: cout <<  NTL::MulMod(6406262673276882058,4,9223372036854829057) << std::endl;
@@ -835,7 +836,7 @@ BOOST_AUTO_TEST_CASE(encryptDecrypt)
 {
   Polynomial a;
 
-  for(int i = 0; i < 10*NTESTS;i++){
+  for(int i = 0; i < NTESTS;i++){
     a.set_coeff(0,conv<ZZ>(rand())%t);
 
     Ciphertext c = cipher.encrypt(a);

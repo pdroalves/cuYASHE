@@ -7,10 +7,16 @@
 #include <stdio.h>
 #include <assert.h>
 
+
+
 cuyasheint_t CUDAFunctions::wN = 0;
 cuyasheint_t *CUDAFunctions::d_W = NULL;
 cuyasheint_t *CUDAFunctions::d_WInv = NULL;
 int CUDAFunctions::N = 0;
+#ifdef CUFFTMUL
+#include <cufft.h>
+typedef double2 Complex;
+#endif
 
 ///////////////////////////////////////
 /// Memory operations
@@ -104,6 +110,7 @@ __host__ cuyasheint_t* CUDAFunctions::callPolynomialAddSub(cudaStream_t stream,c
 ///////////////////////////////////////
 /// MUL
 
+#ifdef PLAINMUL
 __global__ void polynomialPlainMul(const cuyasheint_t *a,const cuyasheint_t *b,cuyasheint_t *c,const int N,const int NPolis){
   // Each block computes one coefficient of c
   // We need 2*N blocks for each residue!
@@ -141,8 +148,70 @@ __global__ void polynomialPlainMul(const cuyasheint_t *a,const cuyasheint_t *b,c
 
   // }
 }
+#endif
+#ifdef CUFFTMUL
+
+__global__ void copyIntegerToComplex(Complex *a,cuyasheint_t *b,int size){
+  const int tid = threadIdx.x + blockDim.x*blockIdx.x;
+
+  if(tid < size ){
+      a[tid].x =  (b[tid]);
+      // printf("%ld => %f\n\n",b[tid],a[tid].x);
+      a[tid].y = 0;
+  }else{
+    a[tid].x = 0;
+    a[tid].y = 0;
+  }
+}
+
+__global__ void copyAndNormalizeComplexRealPartToInteger(cuyasheint_t *b,Complex *a,int size,double scale){
+  const int tid = threadIdx.x + blockDim.x*blockIdx.x;
+  int value;
+  double fvalue;
+  // double frac;
+  if(tid < size ){
+      fvalue = a[tid].x * scale;
+      value = rint(fvalue);
+      // frac = fmodf(fvalue,1);
+      // if( frac >= 0.5f)
+      //   value += 1;
+
+      // value =  (a[tid].x * scale);
+      b[tid] = value;
+      // printf("%f) %f  => %ld\n\n",a[tid].x, a[tid].x * scale,value);
+
+      // b[tid] =  __ddouble2ull_rd(a[tid].x/scale);
+  }
+}
+////////////////////////////////////////////////////////////////////////////////
+// Complex operations
+////////////////////////////////////////////////////////////////////////////////
+
+// Complex multiplication
+static __device__ inline Complex ComplexMul(Complex a, Complex b)
+{
+    Complex c;
+    c.x = a.x * b.x - a.y * b.y;
+    c.y = a.x * b.y + a.y * b.x;
+    return c;
+}
 
 
+// Complex pointwise multiplication
+static __global__ void polynomialcuFFTMul(const Complex *a, const Complex *b,Complex *c,int size_c,int size)
+{
+    const int tid = threadIdx.x + blockDim.x*blockIdx.x;
+
+    if(tid < size  ){
+        c[tid] = ComplexMul(a[tid], b[tid]);
+    }else{
+      c[tid].x = 0;
+      c[tid].y = 0;
+    }
+}
+#endif
+
+#ifdef NTTMUL
 __device__ __host__ uint64_t s_rem (uint64_t a)
 {
   // Special reduction for prime 2^64-2^32+1
@@ -288,7 +357,7 @@ __global__ void polynomialNTTMul(cuyasheint_t *a,const cuyasheint_t *b,const int
       a[tid] = a_value*b_value % 18446744069414584321;
   }
 }
-
+#endif
 
 __host__ cuyasheint_t* CUDAFunctions::callPolynomialMul(cudaStream_t stream,cuyasheint_t *a,cuyasheint_t *b,int N,int NPolis){
   // This method expects that both arrays are aligned
@@ -403,6 +472,97 @@ __host__ cuyasheint_t* CUDAFunctions::callPolynomialMul(cudaStream_t stream,cuya
 
     cudaFree(d_A);
     cudaFree(d_B);
+
+  #elif defined(CUFFTMUL)
+    int size = N*NPolis;
+    int size_a = N;
+    int size_b = N;
+    int size_c = N;
+    int signal_size = N;
+    Complex *d_a;
+    Complex *d_b;
+    Complex *d_c;
+    cudaError_t result;
+
+    result = cudaMalloc((void**)&d_result,size*sizeof(cuyasheint_t));
+    assert(result == cudaSuccess);
+
+    result = cudaMalloc((void **)&d_a, size*sizeof(Complex));
+    assert(result == cudaSuccess);
+
+    #ifdef VERBOSE
+    std::cout << "cudaMalloc: "<< cudaGetErrorString(result) << std::endl;
+    #endif
+    result = cudaMalloc((void **)&d_b, size*sizeof(Complex));
+    #ifdef VERBOSE
+    std::cout << "cudaMalloc: "<< cudaGetErrorString(result) << std::endl;
+    #endif
+    result = cudaMalloc((void **)&d_c, size*sizeof(Complex));
+    #ifdef VERBOSE
+    std::cout << "cudaMalloc: "<< cudaGetErrorString(result) << std::endl;
+    #endif
+
+
+    dim3 blockDim(32);
+    dim3 gridDim(size/32 + (size % 32 == 0? 0:1));
+    copyIntegerToComplex<<< gridDim,blockDim >>>(d_a,a,size);
+    #ifdef VERBOSE
+    std::cout << "copyIntegerToComplex kernel:" << cudaGetErrorString(cudaGetLastError()) << std::endl;
+    #endif
+    copyIntegerToComplex<<< gridDim,blockDim >>>(d_b,b,size);
+    #ifdef VERBOSE
+    std::cout << "copyIntegerToComplex kernel:" << cudaGetErrorString(cudaGetLastError()) << std::endl;
+    #endif
+
+    cufftHandle plan;
+    cufftResult fftResult;
+    fftResult = cufftPlan1d(&plan, signal_size, CUFFT_Z2Z, 1);
+    assert(fftResult == CUFFT_SUCCESS);
+
+    #ifdef VERBOSE
+    std::cout << "cufftPlan1d: "<< fftResult << std::endl;
+    #endif
+
+    for(int i = 0; i < NPolis; i ++){
+      int phase = N*i;
+      // Apply FFT
+      fftResult = cufftExecZ2Z(plan, (cufftDoubleComplex *)(d_a+phase), (cufftDoubleComplex *)(d_a+phase), CUFFT_FORWARD);
+      assert(fftResult == CUFFT_SUCCESS);
+      // std::cout << "cufftExecZ2Z: "<< fftResult << std::endl;
+
+      fftResult = cufftExecZ2Z(plan, (cufftDoubleComplex *)(d_b+phase), (cufftDoubleComplex *)(d_b+phase), CUFFT_FORWARD);
+      assert(fftResult == CUFFT_SUCCESS);
+      // std::cout << "cufftExecZ2Z: "<< fftResult << std::endl;
+
+    }
+
+    polynomialcuFFTMul<<<gridDim,blockDim>>>(d_a,d_b,d_c,size_c,size);
+    assert(cudaGetLastError() == cudaSuccess);
+    #ifdef VERBOSE
+    std::cout << "ComplexPointwiseMul kernel:" << cudaGetErrorString(cudaGetLastError()) << std::endl;
+    #endif
+
+    for(int i = 0; i < NPolis; i ++){
+      int phase = N*i;
+      //getLastCudaError("Kernel execution failed [ ComplexPointwiseMulAndScale ]");
+      // Apply inverse FFT
+      fftResult = cufftExecZ2Z(plan, (cufftDoubleComplex *)(d_c+phase), (cufftDoubleComplex *)(d_c+phase), CUFFT_INVERSE);
+      assert(fftResult == CUFFT_SUCCESS);
+      // std::cout << "cufftExecZ2Z: "<< fftResult << std::endl;
+    }
+    copyAndNormalizeComplexRealPartToInteger<<< gridDim,blockDim >>>(d_result,d_c,size,1.0f/signal_size);
+    assert(cudaGetLastError() == cudaSuccess);
+
+    #ifdef VERBOSE
+    std::cout << "copyAndNormalizeComplexRealPartToInteger kernel:" << cudaGetErrorString(cudaGetLastError()) << std::endl;
+    #endif
+
+  //Destroy CUFFT context
+  cufftDestroy(plan);
+  cudaFree(d_a);
+  cudaFree(d_b);
+  cudaFree(d_c);
+
 
   #endif
 
