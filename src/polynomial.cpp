@@ -10,6 +10,7 @@ ZZ Polynomial::global_mod = ZZ(0);
 Polynomial *(Polynomial::global_phi) = NULL;
 
 void Polynomial::update_device_data(){
+
     if(this->get_device_updated())
       return;
 
@@ -96,6 +97,9 @@ void Polynomial::crt(){
     // if(this->CRTProduct == NULL or this->CRTPrimes == NULL){
     //     throw -1;
     // }
+
+    // Escapes, if possible
+
     std::vector<cuyasheint_t> P = this->CRTPrimes;
     this->polyCRT.resize(P.size());
 
@@ -122,7 +126,17 @@ void Polynomial::crt(){
     this->set_host_updated(true);
     this->set_device_updated(false);
 }
-
+uint64_t get_cycles(void) {
+  unsigned int hi, lo;
+  asm (
+    "cpuid\n\t"/*serialize*/
+    "rdtsc\n\t"/*read the clock*/
+    "mov %%edx, %0\n\t"
+    "mov %%eax, %1\n\t" 
+    : "=r" (hi), "=r" (lo):: "%rax", "%rbx", "%rcx", "%rdx"
+  );
+  return ((uint64_t) lo) | (((uint64_t) hi) << 32);
+}
 void Polynomial::icrt(){
   // Escapes, if possible
   if(this->get_host_updated())
@@ -133,53 +147,37 @@ void Polynomial::icrt(){
   std::vector<cuyasheint_t> P = this->CRTPrimes;
   ZZ M = this->CRTProduct;
 
-  // std::cout << "M: " << M << std::endl;
-  // std::cout << "Mod: " << this->get_mod() << std::endl;
-  Polynomial icrt(this->get_mod(),this->get_phi(),this->get_crt_spacing());
-  for(unsigned int i = 0; i < this->polyCRT.size();i++){
+  // Polynomial icrt(this->get_mod(),this->get_phi(),this->get_crt_spacing());
+  this->set_coeffs();//Discards all coeffs
+
+  // 4M cycles per iteration
+  for(unsigned int i = 0; i < this->CRTPrimes.size();i++){
+    // uint64_t start_cycle = get_cycles();
     // Convert CRT representations to Polynomial
     // Polynomial xi(this->get_mod(),this->get_phi(),this->get_crt_spacing());
+  
     Polynomial xi(this->get_mod(),this->get_phi(),this->get_crt_spacing());
     xi.set_coeffs(this->polyCRT[i]);
     // Asserts that each residue is in the correct field
     ZZ pi = ZZ(P[i]);
-    // std::cout << "pi: " << pi << std::endl;
     xi %= pi;
 
     ZZ Mpi= M/pi;
-    // std::cout << "Mpi: " << Mpi << std::endl;
-
+    //
     ZZ InvMpi = NTL::InvMod(Mpi%pi,pi);
+    //
 
-    // Polynomial step = ((xi*InvMpi % pi)*Mpi) % M;
-    Polynomial step(xi);
 
-    // std::cout << "step: " << step.to_string() << std::endl;
-    // std::cout << "InvMpi: " << InvMpi << std::endl;
-    step *= InvMpi;
-    // std::cout << "step*InvMpi: " << step.to_string() << std::endl;
-    step %= pi;
-    // std::cout << "step*InvMpi mod pi: " << step.to_string() << std::endl;
-    step *= Mpi;
-    // std::cout << "(step*InvMpi mod pi)*Mpi: " << step.to_string() << std::endl;
-    step %= M;
-    // std::cout << "(step*InvMpi mod pi)*Mpi mod M: " << step.to_string() << std::endl;
 
-    // std::cout << "step: " << step.to_string() << std::endl;
-    // std::cout << "icrt: " << icrt.to_string() << std::endl;
-    icrt.CPUAddition(&step);
-    // std::cout << "icrt+step: " << icrt.to_string() << std::endl;
-    icrt %= M;
+    xi = ((xi*InvMpi)%pi)*Mpi;
 
+    this->CPUAddition(&xi);
+    // uint64_t end_cycle = get_cycles();
+    // std::cout << "Cycles for each icrt iteration: " << (end_cycle-start_cycle) << std::endl;
   }
-  icrt %= M;
-  // std::cout << "M: "<< M << std::endl;
-  // if(!NTL::IsZero(this->get_mod()))
-    // icrt %= this->get_mod();
-  // std::cout << "icrt: "<< icrt.to_string() << std::endl << "get_mod: " << this->get_mod() << std::endl;
-  // icrt %= Polynomial::global_phi;
-  icrt.normalize();
-  this->copy(icrt);
+
+  (*this) %= M;
+  this->normalize();
   this->set_host_updated(true);
   return;
 }

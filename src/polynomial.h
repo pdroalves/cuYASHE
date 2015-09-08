@@ -421,16 +421,14 @@ class Polynomial{
     }
     Polynomial operator*(ZZ b){
       Polynomial p(*this);
-      if(!this->get_host_updated()){
-        // Convert to polynomial and send to device
-        Polynomial B(this->get_mod(),this->get_phi(),this->get_crt_spacing());
-        B.set_coeff(0,b);
-        return p*B;
-      }
+      if(!this->get_host_updated())
+        // We cannot store ZZ integers in device's memory
+        this->icrt();
+      
 
       #pragma omp parallel for
       for(int i = 0; i <= p.deg();i++)
-        p.set_coeff(i,conv<ZZ>(p.get_coeff(i)*b));
+        p.set_coeff(i,p.get_coeff(i)*b);
       p.set_device_updated(false);
       return p;
     }
@@ -442,7 +440,7 @@ class Polynomial{
       Polynomial p(*this);
 
       if(!this->get_host_updated()){
-        #warning "Polynomial mod on device not implemented!";
+        //
         this->icrt();
       }
 
@@ -480,28 +478,61 @@ class Polynomial{
       return *this;
     }
     Polynomial operator+(long b){
-      return (*this)+ZZ(b);
+      Polynomial p(*this);
+      if(!this->get_host_updated()){
+        CUDAFunctions::callPolynomialOPInteger(ADD,this->stream,p.get_device_crt_residues(),b,this->deg()+1,Polynomial::CRTPrimes.size());
+        return p;
+      }else{
+        return (*this)+ZZ(b);
+      }
     }
     Polynomial operator+=(long b){
       this->copy( ((*this)+b));
       return *this;
     }
     Polynomial operator-(long b){
-      return (*this)-ZZ(b);
+      Polynomial p(*this);
+      if(!this->get_host_updated()){
+        CUDAFunctions::callPolynomialOPInteger(SUB,this->stream,p.get_device_crt_residues(),b,this->deg()+1,Polynomial::CRTPrimes.size());
+        return p;
+      }else{
+        return (*this)-ZZ(b);
+      }
     }
     Polynomial operator-=(long b){
       this->copy( ((*this)-b));
       return *this;
     }
     Polynomial operator*(long b){
-      return (*this)*ZZ(b);
+      Polynomial p(*this);
+      if(!this->get_host_updated()){
+        CUDAFunctions::callPolynomialOPInteger(MUL,this->stream,p.get_device_crt_residues(),b,this->deg()+1,Polynomial::CRTPrimes.size());
+        return p;
+      }else{
+        return (*this)*ZZ(b);
+      }
     }
     Polynomial operator*=(long b){
       this->copy( ((*this)*conv<ZZ>(b)));
       return *this;
     }
     Polynomial operator/(long b){
-      return (*this)/ZZ(b);
+      Polynomial p(*this);
+      if(!this->get_host_updated()){
+        CUDAFunctions::callPolynomialOPInteger(DIV,this->stream,p.get_device_crt_residues(),b,this->deg()+1,Polynomial::CRTPrimes.size());
+        return p;
+      }else{
+        return (*this)/ZZ(b);
+      }
+    }
+    Polynomial operator%(long b){
+      Polynomial p(*this);
+      if(!this->get_host_updated()){
+        CUDAFunctions::callPolynomialOPInteger(MOD,this->stream,p.get_device_crt_residues(),b,this->deg()+1,Polynomial::CRTPrimes.size());
+        return p;
+      }else{
+        return (*this)%ZZ(b);
+      }
     }
     Polynomial operator/=(long b){
       this->copy( ((*this)/conv<ZZ>(b)));
@@ -534,8 +565,16 @@ class Polynomial{
     void CPUAddition(Polynomial *b){
       // Forces the addition to be executed by CPU
       // This method supposes that there is no need to apply CRT/ICRT on operands
-      for( int i = 0; i <= std::max(this->deg(),b->deg()); i++)
-        this->set_coeff(i,this->get_coeff(i) + b->get_coeff(i));
+      std::vector<ZZ> results(std::max(this->deg(),b->deg())+1);
+      std::vector<ZZ> this_coeffs = this->get_coeffs();
+      std::vector<ZZ> b_coeffs = b->get_coeffs();
+
+      #pragma omp parallel for 
+      for( unsigned int i = 0; i <= std::max(this->deg(),b->deg()); i++){
+        ZZ value = (i < this_coeffs.size()? this_coeffs[i]:ZZ(0)) + (i < b_coeffs.size()? b_coeffs[i]:ZZ(0));
+        results[i] = (value);
+      }
+      this->set_coeffs(results);
     }
 
     void CPUSubtraction(Polynomial *b){
@@ -624,28 +663,32 @@ class Polynomial{
     }
     void set_coeffs(std::vector<cuyasheint_t> values){
 
-      if(!this->get_host_updated()){
-        this->icrt();
-      }
-
       // Replaces all coefficients
       this->coefs.resize(values.size());
       for(std::vector<cuyasheint_t>::iterator iter = values.begin();iter != values.end();iter++){
         this->coefs[iter-values.begin()] = conv<ZZ>(*iter);
       }
       this->expected_degree = this->coefs.size()-1;
-
+      this->set_device_updated(false);
+      this->set_host_updated(true);
     }
     void set_coeffs(std::vector<ZZ> values){
-
-      if(!this->get_host_updated()){
-        this->icrt();
-      }
 
       // Replaces all coefficients
       this->coefs = values;
       this->expected_degree = this->coefs.size()-1;
 
+      this->set_device_updated(false);
+      this->set_host_updated(true);
+    }
+    void set_coeffs(){
+
+      // Replaces all coefficients
+      this->coefs.clear();
+      this->expected_degree = this->coefs.size()-1;
+
+      this->set_device_updated(false);
+      this->set_host_updated(true);
     }
     std::vector<std::vector<cuyasheint_t> > get_crt_residues(){
       std::vector<std::vector<cuyasheint_t> > crt_residues_copy(this->polyCRT);

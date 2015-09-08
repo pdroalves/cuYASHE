@@ -236,6 +236,7 @@ BOOST_AUTO_TEST_CASE(zeroAdd)
 
 }
 
+#ifdef NTTMUL
 BOOST_AUTO_TEST_CASE(wNTest)
 {
   cuyasheint_t *W;
@@ -261,6 +262,7 @@ BOOST_AUTO_TEST_CASE(wNTest)
     BOOST_REQUIRE(NTL::MulMod(NTL::to_ZZ(W[i]),NTL::to_ZZ(WInv[i]),PZZ) == 1);
 
 }
+#endif
 
 // BOOST_AUTO_TEST_CASE(sremTest)
 // {

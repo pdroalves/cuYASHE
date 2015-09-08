@@ -8,15 +8,16 @@
 #include <assert.h>
 
 
-
+#ifdef NTTMUL
 cuyasheint_t CUDAFunctions::wN = 0;
 cuyasheint_t *CUDAFunctions::d_W = NULL;
 cuyasheint_t *CUDAFunctions::d_WInv = NULL;
-int CUDAFunctions::N = 0;
-#ifdef CUFFTMUL
-#include <cufft.h>
+#elif defined(CUFFTMUL)
+cufftHandle CUDAFunctions::plan;
 typedef double2 Complex;
 #endif
+
+int CUDAFunctions::N = 0;
 
 ///////////////////////////////////////
 /// Memory operations
@@ -97,7 +98,7 @@ __host__ cuyasheint_t* CUDAFunctions::callPolynomialAddSub(cudaStream_t stream,c
   assert(result == cudaSuccess);
 
   // polynomialAdd <<< gridDim,blockDim, 0, stream >>> (a,b,d_new_array,size);
-  polynomialAddSub <<< gridDim,blockDim >>> (OP,a,b,d_new_array,size);
+  polynomialAddSub <<< gridDim,blockDim ,1,stream>>> (OP,a,b,d_new_array,size);
   #ifdef VERBOSE
   std::cout << gridDim.x << " " << blockDim.x << std::endl;
   std::cout << "polynomialAdd kernel:" << cudaGetErrorString(cudaGetLastError()) << std::endl;
@@ -359,6 +360,46 @@ __global__ void polynomialNTTMul(cuyasheint_t *a,const cuyasheint_t *b,const int
 }
 #endif
 
+__global__ void polynomialOPInteger(int opcode,cuyasheint_t *a,cuyasheint_t b,int size){
+  // We have one thread per polynomial coefficient on 32 threads-block.
+  // For CRT polynomial adding, all representations should be concatenated aligned
+  const int tid = threadIdx.x + blockDim.x*blockIdx.x;
+ 
+  if(tid < size )
+      // Coalesced access to global memory. Doing this way we reduce required bandwich.
+
+    switch(opcode)
+    {
+    case ADD:
+      if(tid == 0)
+        a[tid] += b;
+    case SUB:
+      if(tid == 0)
+        a[tid] -= b;
+    case DIV:
+        a[tid] /= b;
+    case MUL:
+        a[tid] *= b;
+    case MOD:
+        a[tid] %= b;   
+    }
+  
+}
+
+__host__ void CUDAFunctions::callPolynomialOPInteger(int opcode,cudaStream_t stream,cuyasheint_t *a,cuyasheint_t b,int N,int NPolis)
+{
+  // This method just multiply all elements of array a and store the result inplace
+  const int size = N*NPolis;
+
+  const int ADDGRIDXDIM = (size%ADDBLOCKXDIM == 0? size/ADDBLOCKXDIM : size/ADDBLOCKXDIM + 1);
+  const dim3 gridDim(ADDGRIDXDIM);
+  const dim3 blockDim(ADDBLOCKXDIM);
+
+  polynomialOPInteger<<< gridDim,blockDim, 1, stream>>> (opcode,a,b,N*NPolis);
+  assert(cudaGetLastError() == cudaSuccess);
+
+}
+
 __host__ cuyasheint_t* CUDAFunctions::callPolynomialMul(cudaStream_t stream,cuyasheint_t *a,cuyasheint_t *b,int N,int NPolis){
   // This method expects that both arrays are aligned
 
@@ -475,8 +516,6 @@ __host__ cuyasheint_t* CUDAFunctions::callPolynomialMul(cudaStream_t stream,cuya
 
   #elif defined(CUFFTMUL)
     int size = N*NPolis;
-    int size_a = N;
-    int size_b = N;
     int size_c = N;
     int signal_size = N;
     Complex *d_a;
@@ -490,47 +529,29 @@ __host__ cuyasheint_t* CUDAFunctions::callPolynomialMul(cudaStream_t stream,cuya
     result = cudaMalloc((void **)&d_a, size*sizeof(Complex));
     assert(result == cudaSuccess);
 
-    #ifdef VERBOSE
-    std::cout << "cudaMalloc: "<< cudaGetErrorString(result) << std::endl;
-    #endif
     result = cudaMalloc((void **)&d_b, size*sizeof(Complex));
-    #ifdef VERBOSE
-    std::cout << "cudaMalloc: "<< cudaGetErrorString(result) << std::endl;
-    #endif
+    assert(result == cudaSuccess);
+    
     result = cudaMalloc((void **)&d_c, size*sizeof(Complex));
-    #ifdef VERBOSE
-    std::cout << "cudaMalloc: "<< cudaGetErrorString(result) << std::endl;
-    #endif
-
+    assert(result == cudaSuccess);    
 
     dim3 blockDim(32);
     dim3 gridDim(size/32 + (size % 32 == 0? 0:1));
     copyIntegerToComplex<<< gridDim,blockDim >>>(d_a,a,size);
-    #ifdef VERBOSE
-    std::cout << "copyIntegerToComplex kernel:" << cudaGetErrorString(cudaGetLastError()) << std::endl;
-    #endif
+    assert(cudaGetLastError() == cudaSuccess);
+   
     copyIntegerToComplex<<< gridDim,blockDim >>>(d_b,b,size);
-    #ifdef VERBOSE
-    std::cout << "copyIntegerToComplex kernel:" << cudaGetErrorString(cudaGetLastError()) << std::endl;
-    #endif
+    assert(cudaGetLastError() == cudaSuccess);
 
-    cufftHandle plan;
     cufftResult fftResult;
-    fftResult = cufftPlan1d(&plan, signal_size, CUFFT_Z2Z, 1);
-    assert(fftResult == CUFFT_SUCCESS);
-
-    #ifdef VERBOSE
-    std::cout << "cufftPlan1d: "<< fftResult << std::endl;
-    #endif
-
     for(int i = 0; i < NPolis; i ++){
       int phase = N*i;
       // Apply FFT
-      fftResult = cufftExecZ2Z(plan, (cufftDoubleComplex *)(d_a+phase), (cufftDoubleComplex *)(d_a+phase), CUFFT_FORWARD);
+      fftResult = cufftExecZ2Z(CUDAFunctions::plan, (cufftDoubleComplex *)(d_a+phase), (cufftDoubleComplex *)(d_a+phase), CUFFT_FORWARD);
       assert(fftResult == CUFFT_SUCCESS);
       // std::cout << "cufftExecZ2Z: "<< fftResult << std::endl;
 
-      fftResult = cufftExecZ2Z(plan, (cufftDoubleComplex *)(d_b+phase), (cufftDoubleComplex *)(d_b+phase), CUFFT_FORWARD);
+      fftResult = cufftExecZ2Z(CUDAFunctions::plan, (cufftDoubleComplex *)(d_b+phase), (cufftDoubleComplex *)(d_b+phase), CUFFT_FORWARD);
       assert(fftResult == CUFFT_SUCCESS);
       // std::cout << "cufftExecZ2Z: "<< fftResult << std::endl;
 
@@ -538,27 +559,21 @@ __host__ cuyasheint_t* CUDAFunctions::callPolynomialMul(cudaStream_t stream,cuya
 
     polynomialcuFFTMul<<<gridDim,blockDim>>>(d_a,d_b,d_c,size_c,size);
     assert(cudaGetLastError() == cudaSuccess);
-    #ifdef VERBOSE
-    std::cout << "ComplexPointwiseMul kernel:" << cudaGetErrorString(cudaGetLastError()) << std::endl;
-    #endif
+
 
     for(int i = 0; i < NPolis; i ++){
       int phase = N*i;
       //getLastCudaError("Kernel execution failed [ ComplexPointwiseMulAndScale ]");
       // Apply inverse FFT
-      fftResult = cufftExecZ2Z(plan, (cufftDoubleComplex *)(d_c+phase), (cufftDoubleComplex *)(d_c+phase), CUFFT_INVERSE);
+      fftResult = cufftExecZ2Z(CUDAFunctions::plan, (cufftDoubleComplex *)(d_c+phase), (cufftDoubleComplex *)(d_c+phase), CUFFT_INVERSE);
       assert(fftResult == CUFFT_SUCCESS);
       // std::cout << "cufftExecZ2Z: "<< fftResult << std::endl;
     }
     copyAndNormalizeComplexRealPartToInteger<<< gridDim,blockDim >>>(d_result,d_c,size,1.0f/signal_size);
     assert(cudaGetLastError() == cudaSuccess);
 
-    #ifdef VERBOSE
-    std::cout << "copyAndNormalizeComplexRealPartToInteger kernel:" << cudaGetErrorString(cudaGetLastError()) << std::endl;
-    #endif
 
   //Destroy CUFFT context
-  cufftDestroy(plan);
   cudaFree(d_a);
   cudaFree(d_b);
   cudaFree(d_c);
@@ -611,5 +626,10 @@ __host__ void CUDAFunctions::init(int N){
 
     free(h_W);
     free(h_WInv);
+    #elif defined(CUFFTMUL)
+      cufftResult fftResult;
+      fftResult = cufftPlan1d(&CUDAFunctions::plan, N, CUFFT_Z2Z, 1);
+      assert(fftResult == CUFFT_SUCCESS);
+
     #endif
     }

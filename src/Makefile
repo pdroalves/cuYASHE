@@ -1,5 +1,7 @@
-CUDA_CC = nvcc -O0 -G -g -std=c++11
-CC = g++ -std=c++11 -g -Wall -m64
+OPT = -O3
+
+CUDA_CC = nvcc $(OPT) -G -g -std=c++11
+CC = g++ -std=c++11 -g -Wall -m64 $(OPT)
 
 OPENMP = -fopenmp
 
