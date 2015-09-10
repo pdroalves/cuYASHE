@@ -15,7 +15,7 @@ class Yashe{
     static int d;
     static Polynomial phi;
     static ZZ q;
-    static ZZ t;
+    static uint64_t t;
     static ZZ w;
     static std::vector<Polynomial> gamma;
     static Polynomial h;

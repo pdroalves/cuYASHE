@@ -2,14 +2,26 @@
 #include "common.h"
 
 int Yashe::d = 0;
-Polynomial Yashe::phi = Polynomial();
+Polynomial Yashe::phi;
 ZZ Yashe::q = ZZ(0);
-ZZ Yashe::t = ZZ(0);
+uint64_t Yashe::t = 0;
 ZZ Yashe::w = ZZ(0);
 int Yashe::lwq = 0;
 Polynomial Yashe::h = Polynomial();
 std::vector<Polynomial> Yashe::gamma;
 Polynomial Yashe::f = Polynomial();
+
+uint64_t arch_cycles() {
+  unsigned int hi, lo;
+  asm (
+    "cpuid\n\t"/*serialize*/
+    "rdtsc\n\t"/*read the clock*/
+    "mov %%edx, %0\n\t"
+    "mov %%eax, %1\n\t" 
+    : "=r" (hi), "=r" (lo):: "%rax", "%rbx", "%rcx", "%rdx"
+  );
+  return ((uint64_t) lo) | (((uint64_t) hi) << 32);
+}
 
 void Yashe::generate_keys(){
   #ifdef DEBUG
@@ -23,8 +35,7 @@ void Yashe::generate_keys(){
   #endif
 
   Polynomial g = this->xkey.get_sample(phi.deg()-1);
-  g %= phi;
-  g %= q;
+  g.reduce();
   // Polynomial g;
   // g.set_coeff(0,1);
   // g.set_coeff(1,1);
@@ -38,8 +49,7 @@ void Yashe::generate_keys(){
   Polynomial fInv;
   while(1==1){
     Polynomial fl = xkey.get_sample(phi.deg()-1);
-    fl %= phi;
-    fl %= q;
+    fl.reduce();
     // Polynomial fl;
     // fl.set_coeff(0,1);
     // fl.set_coeff(3,1);
@@ -47,7 +57,7 @@ void Yashe::generate_keys(){
     f = fl*t + 1;
 
     // std::cout << "phi " << this->phi << std::endl;
-    f %= phi;
+    f.reduce();
     f %= q;
 
     #ifdef DEBUG
@@ -58,7 +68,8 @@ void Yashe::generate_keys(){
       #ifdef VERBOSE
       std::cout << "Computing invmod of f "<< std::endl;
       #endif
-      fInv = Polynomial::InvMod(f,phi);
+      // fInv = Polynomial::InvMod(f,phi);
+      fInv = f;
       #ifdef VERBOSE
       std::cout << "Done." << std::endl;
       #endif
@@ -71,10 +82,12 @@ void Yashe::generate_keys(){
       #endif
     }
   }
+  f.crt();
+  f.update_device_data();
 
   h = fInv*g;
   h *= t;
-  h %= phi;
+  h.reduce();
   h %= q;
   gamma.resize(lwq);
   for(int k = 0 ; k < lwq; k ++){
@@ -82,18 +95,18 @@ void Yashe::generate_keys(){
 
     for(int j = 0; j < k;j ++){
       gamma[k] *= w;
-      gamma[k] %= phi;
+      gamma[k].reduce();
     }
 
     Polynomial e = xerr.get_sample(phi.deg()-1);
-    e %= phi;
+    e.reduce();
     e %= q;
     Polynomial s = xerr.get_sample(phi.deg()-1);
-    s %= phi;
+    s.reduce();
     e %= q;
 
     gamma[k] += e + h*s;
-    gamma[k] %= phi;
+    gamma[k].reduce();
     gamma[k] %= q;
     #ifdef DEBUG
     std::cout << "e = " << e << std::endl;
@@ -111,7 +124,6 @@ void Yashe::generate_keys(){
 }
 
 Ciphertext Yashe::encrypt(Polynomial m){
-
   // ZZ delta;
   ZZ delta = (q/t); // q/t
   #ifdef DEBUG
@@ -119,12 +131,10 @@ Ciphertext Yashe::encrypt(Polynomial m){
   #endif
 
   Polynomial ps = xerr.get_sample(phi.deg()-1);
-  ps %= phi;
-  ps %= q;
   Polynomial e = xerr.get_sample(phi.deg()-1);
-  e %= phi;
-  e %= q;
-  
+  e.crt();
+  e.update_device_data();
+
   #ifdef DEBUG
   std::cout << "ps: "<< ps <<std::endl;
   #endif
@@ -134,11 +144,18 @@ Ciphertext Yashe::encrypt(Polynomial m){
 
   Polynomial p;
 
+  // p = (h*ps);
+  // p += e;
+  // p += m*delta;
+  // p.reduce();
+  // p %= q;
+
   p = (h*ps);
-  p += e;
-  p += m*delta;
-  p %= phi;
-  p %= q;
+
+  uint64_t start = arch_cycles();
+  p = p + e + m*delta;
+  uint64_t stop = arch_cycles();
+  // std::cout << (stop-start) << " cycles to encrypt." << std::endl;
 
   #ifdef DEBUG
   std::cout << "ciphertext: "<< p <<std::endl;
@@ -151,17 +168,22 @@ Polynomial Yashe::decrypt(Ciphertext c){
 
   Polynomial g;
   if(c.aftermul){
-    g = f*f*c % phi;
+    g = f*f*c;
   }else{
-    g = f*c % phi;
+      g = f*c;
   }
+  g.reduce();
+
 
   // Polynomial reduced_g = Polynomial::rem(g,phi);
   // reduced_g.icrt();
   #ifdef DEBUG
   std::cout << "g = f*c % phi: "<< reduced_g <<std::endl;
   #endif
-  g *= t; // This operation should not be modular
+  uint64_t start = arch_cycles();
+  g = g * t; // This operation should not be modular
+  uint64_t stop = arch_cycles();
+  std::cout << (stop-start) << " cycles to decrypt." << std::endl;
 
   ZZ coeff = g.get_coeff(0);
   ZZ quot;

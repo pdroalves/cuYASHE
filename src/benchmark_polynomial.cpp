@@ -20,8 +20,6 @@ double compute_time_ms(struct timespec start,struct timespec stop){
   return (( stop.tv_sec - start.tv_sec )*BILLION + ( stop.tv_nsec - start.tv_nsec ))/MILLION;
 }
 
-
-
 // Get current date/time, format is YYYYMMDDHHmmss
 const std::string current_date_time() {
     time_t     now = time(0);
@@ -67,7 +65,7 @@ int main(int argc,char* argv[]){
     gpu_mult_without_memcopy_filename = "gpu_mult_without_memcopy_"+current_date_time()+"_"+suffix+".dat";
     gpu_add_with_memcopy_filename = "gpu_add_with_memcopy_"+current_date_time()+"_"+suffix+".dat";
     gpu_mult_with_memcopy_filename = "gpu_mult_with_memcopy_"+current_date_time()+"_"+suffix+".dat";
-  }else{   
+  }else{
 
     copyHtD_filename = "copyHtD_"+current_date_time()+".dat";
     copyDtH_filename = "copyDtH_"+current_date_time()+".dat";
@@ -95,7 +93,8 @@ int main(int argc,char* argv[]){
   std::cout << "Writing gpu_mult_without_memcopy data to " << gpu_mult_without_memcopy_filename << std::endl;
   std::cout << "Writing gpu_add_with_memcopy data to " << gpu_add_with_memcopy_filename << std::endl;
   std::cout << "Writing gpu_mult_with_memcopy data to " << gpu_mult_with_memcopy_filename << std::endl;
-     
+
+  ZZ_pX NTL_Phi;
   ZZ q;
   NTL::power2(q,127);
   q -= conv<ZZ>("1");
@@ -105,7 +104,7 @@ int main(int argc,char* argv[]){
   clock_gettime( CLOCK_REALTIME, &start);
   sleep(1);
   clock_gettime( CLOCK_REALTIME, &stop);
-  diff = compute_time_ms(start,stop)/N;
+  diff = compute_time_ms(start,stop);
   std::cout << "1 sec: " << diff << std::endl;
 
   Polynomial::global_mod = q; // Defines default GF(q)
@@ -121,6 +120,9 @@ int main(int argc,char* argv[]){
     clock_gettime( CLOCK_REALTIME, &start);
     Polynomial::BuildNthCyclotomic(&phi, d); // generate an cyclotomic polynomial
     clock_gettime( CLOCK_REALTIME, &stop);
+    for(int i = 0; i <= phi.deg();i++)
+      NTL::SetCoeff(NTL_Phi,i,conv<ZZ_p>(phi.get_coeff(i)));
+    ZZ_pE::init(NTL_Phi);
     diff = compute_time_ms(start,stop);
     std::cout << "Irreducible polynomial generated in " << diff << " ms." << std::endl;
     std::cout << "Generating " << phi.deg() << " degree polynomials." << std::endl;
@@ -152,6 +154,7 @@ int main(int argc,char* argv[]){
     clock_gettime( CLOCK_REALTIME, &stop);
     diff = compute_time_ms(start,stop)/N;
     std::cout << "Copy) Host to Device: " << diff << " ms" << std::endl;
+    copyHtD << d << " " << diff << std::endl;
 
     Polynomial::random(&a,d-1);
     a.crt();
@@ -166,6 +169,7 @@ int main(int argc,char* argv[]){
     clock_gettime( CLOCK_REALTIME, &stop);
     diff = compute_time_ms(start,stop)/N;
     std::cout << "Copy) Device to host: " << diff << " ms" << std::endl;
+    copyDtH << d << " " << diff << std::endl;
 
     ///////////////////////////////////////////////
     // CRT/ICRT
@@ -180,18 +184,18 @@ int main(int argc,char* argv[]){
     clock_gettime( CLOCK_REALTIME, &stop);
     diff = compute_time_ms(start,stop)/N;
     std::cout << "CRT) Foward: " << diff << " ms" << std::endl;
-    crt << N << diff  << std::endl;
+    crt << d << " " << diff  << std::endl;
 
     clock_gettime( CLOCK_REALTIME, &start);
+    a.update_host_data();
     for(int i = 0; i < N;i++){
-      a.set_host_updated(false);
       a.icrt();
       cudaDeviceSynchronize();
     }
     clock_gettime( CLOCK_REALTIME, &stop);
     diff = compute_time_ms(start,stop)/N;
     std::cout << "CRT) Inverse: " << diff << " ms" << std::endl;
-    icrt << N << diff  << std::endl;
+    icrt << d << " " << diff  << std::endl;
 
     ///////////////////////////////////////////////
     // ADD
@@ -210,7 +214,7 @@ int main(int argc,char* argv[]){
     clock_gettime( CLOCK_REALTIME, &stop);
     diff = compute_time_ms(start,stop)/N;
     std::cout << "ADD) Time measured with memory copy: " << diff << " ms" << std::endl;
-    gpu_add_with_memcopy << N << diff  << std::endl;
+    gpu_add_with_memcopy << d << " " << diff  << std::endl;
     // Time measured without memory copy
     Polynomial::random(&a,d-1);
     Polynomial::random(&b,d-1);
@@ -229,7 +233,7 @@ int main(int argc,char* argv[]){
     clock_gettime( CLOCK_REALTIME, &stop);
     diff = compute_time_ms(start,stop)/N;
     std::cout << "ADD) Time measured without memory copy: " << diff << " ms" << std::endl;
-    gpu_add_without_memcopy << N << diff  << std::endl;
+    gpu_add_without_memcopy << d << " " << diff  << std::endl;
 
     ///////////////////////////////////////////////
     // MUL
@@ -250,7 +254,7 @@ int main(int argc,char* argv[]){
     clock_gettime( CLOCK_REALTIME, &stop);
     diff = compute_time_ms(start,stop)/N;
     std::cout << "MUL) Time measured with memory copy: " << diff << " ms" << std::endl;
-    gpu_mult_with_memcopy << N << diff  << std::endl;
+    gpu_mult_with_memcopy << d << " " << diff  << std::endl;
 
     // Time measured without memory copy
     Polynomial::random(&a,d-1);
@@ -271,7 +275,7 @@ int main(int argc,char* argv[]){
     clock_gettime( CLOCK_REALTIME, &stop);
     diff = compute_time_ms(start,stop)/N;
     std::cout << "MUL) Time measured without memory copy: " << diff << " ms" << std::endl;
-    gpu_mult_without_memcopy << N << diff  << std::endl;
+    gpu_mult_without_memcopy << d << " " << diff  << std::endl;
 
   }
 }

@@ -1,5 +1,6 @@
 #include "cuda_functions.h"
 #include "common.h"
+#include "polynomial.h"
 #include <cuda.h>
 #include <cuda_runtime_api.h>
 #include <cuda_runtime.h>
@@ -37,6 +38,9 @@ __global__ void realignCRTResidues(int oldSpacing,int newSpacing, cuyasheint_t *
 __host__ cuyasheint_t* CUDAFunctions::callRealignCRTResidues(cudaStream_t stream,int oldSpacing,int newSpacing, cuyasheint_t *array,int residuesSize,int residuesQty){
   if(oldSpacing == newSpacing)
     return NULL;
+  #ifdef VERBOSE
+  std::cout << "Realigning..." << std::endl;
+  #endif
   const int size = residuesSize*residuesQty;
   int ADDGRIDXDIM = (size%ADDBLOCKXDIM == 0? size/ADDBLOCKXDIM : size/ADDBLOCKXDIM + 1);
   dim3 gridDim(ADDGRIDXDIM);
@@ -44,16 +48,9 @@ __host__ cuyasheint_t* CUDAFunctions::callRealignCRTResidues(cudaStream_t stream
 
   cuyasheint_t *d_new_array;
   cudaError_t result = cudaMalloc((void**)&d_new_array,newSpacing*residuesQty*sizeof(cuyasheint_t));
-  #ifdef VERBOSE
-  std::cout << "cudaMalloc:" << cudaGetErrorString(result) << " "<< newSpacing*residuesQty*sizeof(cuyasheint_t) << " bytes" <<std::endl;
-  #endif
   assert(result == cudaSuccess);
 
   realignCRTResidues <<< gridDim,blockDim,1,stream >>> (oldSpacing,newSpacing,array,d_new_array,residuesSize,residuesQty);
-  #ifdef VERBOSE
-  std::cout << gridDim.x << " " << blockDim.x << std::endl;
-  std::cout << "polynomialAdd kernel:" << cudaGetErrorString(cudaGetLastError()) << std::endl;
-  #endif
   assert(cudaGetLastError() == cudaSuccess);
 
   return d_new_array;
@@ -98,7 +95,7 @@ __host__ cuyasheint_t* CUDAFunctions::callPolynomialAddSub(cudaStream_t stream,c
   assert(result == cudaSuccess);
 
   // polynomialAdd <<< gridDim,blockDim, 0, stream >>> (a,b,d_new_array,size);
-  polynomialAddSub <<< gridDim,blockDim ,1,stream>>> (OP,a,b,d_new_array,size);
+  polynomialAddSub <<< gridDim,blockDim >>> (OP,a,b,d_new_array,size);
   #ifdef VERBOSE
   std::cout << gridDim.x << " " << blockDim.x << std::endl;
   std::cout << "polynomialAdd kernel:" << cudaGetErrorString(cudaGetLastError()) << std::endl;
@@ -149,8 +146,7 @@ __global__ void polynomialPlainMul(const cuyasheint_t *a,const cuyasheint_t *b,c
 
   // }
 }
-#endif
-#ifdef CUFFTMUL
+#elif defined(CUFFTMUL)
 
 __global__ void copyIntegerToComplex(Complex *a,cuyasheint_t *b,int size){
   const int tid = threadIdx.x + blockDim.x*blockIdx.x;
@@ -210,9 +206,7 @@ static __global__ void polynomialcuFFTMul(const Complex *a, const Complex *b,Com
       c[tid].y = 0;
     }
 }
-#endif
-
-#ifdef NTTMUL
+#elif defined(NTTMUL)
 __device__ __host__ uint64_t s_rem (uint64_t a)
 {
   // Special reduction for prime 2^64-2^32+1
@@ -231,7 +225,7 @@ __device__ __host__ uint64_t s_rem (uint64_t a)
   uint64_t res = ((x1<<32) + x0);
 
   return res;
-} 
+}
 
 __device__ __host__  uint64_t s_mul(volatile uint64_t a,volatile uint64_t b){
   // Multiply and reduce a and b by prime 2^64-2^32+1
@@ -241,7 +235,7 @@ __device__ __host__  uint64_t s_mul(volatile uint64_t a,volatile uint64_t b){
   #ifdef __CUDA_ARCH__
   uint64_t cHi = __umul64hi(a,b);
   uint64_t cLo = a*b;
- 
+
 
   // Reduce
   uint64_t x3 = (cHi >> 32);
@@ -252,7 +246,7 @@ __device__ __host__  uint64_t s_mul(volatile uint64_t a,volatile uint64_t b){
   uint64_t X1 = (x1<<32);
   uint64_t X2 = (x2<<32);
 
-  
+
   uint64_t res = (X1+X2+x0-x2-x3);
   bool testA = (((x2+x3) > X1+X2+x0) && !((X1+X2 < X1) ||  ((X1+X2)+x0 < x0)));
   bool testB = ((res >= P) );
@@ -273,8 +267,8 @@ __device__ __host__  uint64_t s_mul(volatile uint64_t a,volatile uint64_t b){
   //   res += 4294967295L;
   // }
    #else
-  uint64_t res = (((__uint128_t)a) * ((__uint128_t)b) )%P; 
-  // __uint128_t c = ((__uint128_t)a) * ((__uint128_t)b); 
+  uint64_t res = (((__uint128_t)a) * ((__uint128_t)b) )%P;
+  // __uint128_t c = ((__uint128_t)a) * ((__uint128_t)b);
   // uint64_t cHi = (c>>64);
   // uint64_t cLo = (c & UINT64_MAX);
   #endif
@@ -302,15 +296,16 @@ __host__ __device__ int expand(int idxL, int N1, int N2){
 
 __device__ __host__ void NTTIteration(cuyasheint_t *W,
                                       cuyasheint_t *WInv,
+                                      const int i,
                                       const int j,
                                       const int N,
                                       const int R,
                                       const int Ns,
                                       const cuyasheint_t* data0,
-                                      cuyasheint_t *data1, 
+                                      cuyasheint_t *data1,
                                       const int type){
 	uint64_t v[2];
-	int idxS = j;
+	int idxS = j+i;
 	// int wIndex;
 	cuyasheint_t *w;
 	if(type == FORWARD)
@@ -319,9 +314,9 @@ __device__ __host__ void NTTIteration(cuyasheint_t *W,
 		w = WInv;
 
 	for(int r=0; r<R; r++){
-    v[r] = s_mul(data0[idxS+r*N/R],w[j]);
+    v[r] = s_mul(data0[idxS+r*N/R],w[i]);
   }
-		
+
 	butterfly(v);
 	int idxD = expand(j,Ns,R);
 	for(int r=0; r<R;r++){
@@ -329,17 +324,18 @@ __device__ __host__ void NTTIteration(cuyasheint_t *W,
     if(type == FORWARD)
   		data1[idxD+r*Ns] = v[r];
     else
-      data1[idxD+r*Ns] = v[r]/2;
+      data1[idxD+r*Ns] = v[r];
   }
 }
 
 __global__ void NTT(cuyasheint_t *d_W,cuyasheint_t *d_WInv,const int N, const int R, const int Ns, cuyasheint_t* dataI, cuyasheint_t* dataO,const int type){
 
+  const int ntt_index = (blockIdx.x)*N;
   for(int i = 0; i < N/R; i += 1024){
     // " Threads virtuais "
-    const int j = (blockIdx.x)*N + (threadIdx.x+i);
+    const int j = (threadIdx.x+i);
     if( j < N*gridDim.x)
-      NTTIteration(d_W,d_WInv,j, N, R, Ns, dataI, dataO,type);
+      NTTIteration(d_W,d_WInv,ntt_index,j, N, R, Ns, dataI, dataO,type);
   }
 }
 
@@ -354,8 +350,8 @@ __global__ void polynomialNTTMul(cuyasheint_t *a,const cuyasheint_t *b,const int
       uint64_t b_value = b[tid];
 
       // In-place
-      // a[tid] = s_mul(a_value,b_value);
-      a[tid] = a_value*b_value % 18446744069414584321;
+      a[tid] = s_mul(a_value,b_value);
+      // a[tid] = a_value*b_value % 18446744069414584321;
   }
 }
 #endif
@@ -364,7 +360,7 @@ __global__ void polynomialOPInteger(int opcode,cuyasheint_t *a,cuyasheint_t b,in
   // We have one thread per polynomial coefficient on 32 threads-block.
   // For CRT polynomial adding, all representations should be concatenated aligned
   const int tid = threadIdx.x + blockDim.x*blockIdx.x;
- 
+
   if(tid < size )
       // Coalesced access to global memory. Doing this way we reduce required bandwich.
 
@@ -381,9 +377,9 @@ __global__ void polynomialOPInteger(int opcode,cuyasheint_t *a,cuyasheint_t b,in
     case MUL:
         a[tid] *= b;
     case MOD:
-        a[tid] %= b;   
+        a[tid] %= b;
     }
-  
+
 }
 
 __host__ void CUDAFunctions::callPolynomialOPInteger(int opcode,cudaStream_t stream,cuyasheint_t *a,cuyasheint_t b,int N,int NPolis)
@@ -427,7 +423,7 @@ __host__ cuyasheint_t* CUDAFunctions::callPolynomialMul(cudaStream_t stream,cuya
     // int blocks = ((2*N*NPolis) % ADDBLOCKXDIM == 0? (2*N*NPolis)/ADDBLOCKXDIM : (2*N*NPolis)/ADDBLOCKXDIM+1);
     // dim3 gridDim(blocks,blocks);
     dim3 gridDim(N*NPolis,1);
-    polynomialPlainMul<<<gridDim,blockDim,1,stream>>>(a,b,d_result,N,NPolis);
+    polynomialPlainMul<<<gridDim,blockDim>>>(a,b,d_result,N,NPolis);
     assert(cudaGetLastError() == cudaSuccess);
   #elif defined(NTTMUL)
         // std::cout << "NTT multiplication" << std::endl;
@@ -460,28 +456,27 @@ __host__ cuyasheint_t* CUDAFunctions::callPolynomialMul(cudaStream_t stream,cuya
       assert(cudaGetLastError() == cudaSuccess);
       std::swap(a,d_a);
     }
-    std::swap(a,d_a);      
+    std::swap(a,d_a);
 
-    // for(int Ns=1; Ns<N; Ns*=RADIX){
-    //   NTT<<<gridDim,blockDim,1,stream >>>(CUDAFunctions::d_W,CUDAFunctions::d_WInv,N,RADIX,Ns,b,d_b,FORWARD);
-    //   std::swap(b,d_b);
-    //   assert(cudaGetLastError() == cudaSuccess);
-    // }
-    // // Multiply
-    // dim3 blockDimMul(ADDBLOCKXDIM);
-    // dim3 gridDimMul((size)/ADDBLOCKXDIM+1); // We expect that ADDBLOCKXDIM always divide size
-    // polynomialNTTMul<<<gridDimMul,blockDimMul,1,stream>>>(d_a,d_b,size);
-    // assert(cudaGetLastError() == cudaSuccess);
+    for(int Ns=1; Ns<N; Ns*=RADIX){
+      NTT<<<gridDim,blockDim,1,stream >>>(CUDAFunctions::d_W,CUDAFunctions::d_WInv,N,RADIX,Ns,b,d_b,FORWARD);
+      assert(cudaGetLastError() == cudaSuccess);
+      std::swap(b,d_b);
+    }
+    // Multiply
+    dim3 blockDimMul(ADDBLOCKXDIM);
+    dim3 gridDimMul((size)/ADDBLOCKXDIM+1); // We expect that ADDBLOCKXDIM always divide size
+    polynomialNTTMul<<<gridDimMul,blockDimMul>>>(d_a,d_b,size);
+    assert(cudaGetLastError() == cudaSuccess);
 
     // // Inverse
     for(int Ns=1; Ns<N; Ns*=RADIX){
       NTT<<<gridDim,blockDim,1,stream >>>(CUDAFunctions::d_W,CUDAFunctions::d_WInv,N,RADIX,Ns,d_a,d_result,INVERSE);
       assert(cudaGetLastError() == cudaSuccess);
-      std::swap(d_a,d_result);      
+      std::swap(d_a,d_result);
     }
-    std::swap(d_a,d_result);      
-    cudaFree(d_a);
-    cudaFree(d_b);
+    // cudaFree(d_a);
+    // cudaFree(d_b);
   #elif defined(FFTMUL)
     // Allocates memory for temporary arrays on device
     // Each polynomial's degree gets doubled
@@ -501,14 +496,14 @@ __host__ cuyasheint_t* CUDAFunctions::callPolynomialMul(cudaStream_t stream,cuya
 
     assert(blockDim.x*gridDim.x >= N);
     // Forward
-    fft_radix16<<<gridDim,blockDim,1,stream>>>(a,d_result,N);
+    fft_radix16<<<gridDim,blockDim>>>(a,d_result,N);
     assert(cudaGetLastError() == cudaSuccess);
 
     // Multiply
-    // polynomialFFTMul<<<gridDim,blockDim,1,stream>>>(d_A,d_B,N*NPolis);
+    // polynomialFFTMul<<<gridDim,blockDim>>>(d_A,d_B,N*NPolis);
 
     // Inverse
-    // fft_radix16<<<gridDim,blockDim,1,stream>>>(d_A,d_result,N,NPolis,INVERSE);
+    // fft_radix16<<<gridDim,blockDim>>>(d_A,d_result,N,NPolis,INVERSE);
     // assert(cudaGetLastError() == cudaSuccess);
 
     cudaFree(d_A);
@@ -531,15 +526,15 @@ __host__ cuyasheint_t* CUDAFunctions::callPolynomialMul(cudaStream_t stream,cuya
 
     result = cudaMalloc((void **)&d_b, size*sizeof(Complex));
     assert(result == cudaSuccess);
-    
+
     result = cudaMalloc((void **)&d_c, size*sizeof(Complex));
-    assert(result == cudaSuccess);    
+    assert(result == cudaSuccess);
 
     dim3 blockDim(32);
     dim3 gridDim(size/32 + (size % 32 == 0? 0:1));
     copyIntegerToComplex<<< gridDim,blockDim >>>(d_a,a,size);
     assert(cudaGetLastError() == cudaSuccess);
-   
+
     copyIntegerToComplex<<< gridDim,blockDim >>>(d_b,b,size);
     assert(cudaGetLastError() == cudaSuccess);
 
@@ -585,51 +580,95 @@ __host__ cuyasheint_t* CUDAFunctions::callPolynomialMul(cudaStream_t stream,cuya
 }
 
 __host__ void CUDAFunctions::init(int N){
-    CUDAFunctions::N = N;
+  CUDAFunctions::N = N;
 
   #ifdef NTTMUL
-    // #ifdef VERBOSE
-    std::cout << "Will compute W." << std::endl;
-    // #endif
+  // #ifdef VERBOSE
+  std::cout << "Will compute W." << std::endl;
+  // #endif
 
-    cuyasheint_t *h_W;
-    cuyasheint_t *h_WInv;
+  cuyasheint_t *h_W;
+  cuyasheint_t *h_WInv;
 
-    ZZ PZZ = conv<ZZ>("18446744069414584321");
-    cuyasheint_t k = conv<cuyasheint_t>(PZZ-1)/N;
-    ZZ wNZZ = NTL::PowerMod(ZZ(7),k,PZZ);
-    assert((PZZ-1)%(N) == 0);
-    // const cuyasheint_t k = (P-1)/N;
-    wN = conv<cuyasheint_t>(wNZZ);
-    std::cout << wN << std::endl;;
+  ZZ PZZ = conv<ZZ>("18446744069414584321");
+  cuyasheint_t k = conv<cuyasheint_t>(PZZ-1)/N;
+  ZZ wNZZ = NTL::PowerMod(ZZ(7),k,PZZ);
+  assert((PZZ-1)%(N) == 0);
+  // const cuyasheint_t k = (P-1)/N;
+  wN = conv<cuyasheint_t>(wNZZ);
+  std::cout << wN << std::endl;;
 
-    cudaError_t result;
-    h_W = (cuyasheint_t*)malloc(N*sizeof(cuyasheint_t));
-    result = cudaMalloc((void**)&d_W,N*sizeof(cuyasheint_t));
-    assert(result == cudaSuccess);
-    h_WInv = (cuyasheint_t*)malloc(N*sizeof(cuyasheint_t));
-    result = cudaMalloc((void**)&d_WInv,N*sizeof(cuyasheint_t));
-    assert(result == cudaSuccess);
+  cudaError_t result;
+  h_W = (cuyasheint_t*)malloc(N*sizeof(cuyasheint_t));
+  result = cudaMalloc((void**)&d_W,N*sizeof(cuyasheint_t));
+  assert(result == cudaSuccess);
+  h_WInv = (cuyasheint_t*)malloc(N*sizeof(cuyasheint_t));
+  result = cudaMalloc((void**)&d_WInv,N*sizeof(cuyasheint_t));
+  assert(result == cudaSuccess);
 
-    // Computes 1-th column from W
-    for(int j = 0; j < N; j++)
-        h_W[j] = conv<cuyasheint_t>(NTL::PowerMod(wNZZ,j,PZZ));
+  // Computes 1-th column from W
+  for(int j = 0; j < N; j++)
+      h_W[j] = conv<cuyasheint_t>(NTL::PowerMod(wNZZ,j,PZZ));
 
-    // Computes 1-th column from WInv
-    for(int j = 0; j < N; j++)
-        h_WInv[j] = conv<cuyasheint_t>(NTL::InvMod(conv<ZZ>(h_W[j]),PZZ ));
+  // Computes 1-th column from WInv
+  for(int j = 0; j < N; j++)
+      h_WInv[j] = conv<cuyasheint_t>(NTL::InvMod(conv<ZZ>(h_W[j]),PZZ ));
 
-    result = cudaMemcpy (d_W,h_W , N*sizeof(cuyasheint_t),cudaMemcpyHostToDevice);
-    assert(result == cudaSuccess);
-    result = cudaMemcpy(d_WInv,h_WInv , N*sizeof(cuyasheint_t),cudaMemcpyHostToDevice);
-    assert(result == cudaSuccess);
+  result = cudaMemcpy (d_W,h_W , N*sizeof(cuyasheint_t),cudaMemcpyHostToDevice);
+  assert(result == cudaSuccess);
+  result = cudaMemcpy(d_WInv,h_WInv , N*sizeof(cuyasheint_t),cudaMemcpyHostToDevice);
+  assert(result == cudaSuccess);
 
-    free(h_W);
-    free(h_WInv);
-    #elif defined(CUFFTMUL)
-      cufftResult fftResult;
-      fftResult = cufftPlan1d(&CUDAFunctions::plan, N, CUFFT_Z2Z, 1);
-      assert(fftResult == CUFFT_SUCCESS);
+  free(h_W);
+  free(h_WInv);
+  #elif defined(CUFFTMUL)
+    cufftResult fftResult;
+    fftResult = cufftPlan1d(&CUDAFunctions::plan, N, CUFFT_Z2Z, 1);
+    assert(fftResult == CUFFT_SUCCESS);
 
+  #endif
+}
+
+__global__ void polynomialReduction(cuyasheint_t *a,const int half,const int N,const int NPolis){     
+  // This kernel must have N*Npolis/2 threads
+
+  const int tid = threadIdx.x + blockIdx.x*blockDim.x;
+  const int cid = tid & (N/2-1); // We suppose that N = 2^k
+  const int residueID = tid*2 / N; 
+
+  if(2*tid < N*NPolis){
+    a[residueID*N + cid] -= a[residueID*N + cid + half];
+    __syncthreads();
+    a[residueID*N + cid + half] = 0;
+  }
+}
+
+void Polynomial::reduce(){
+  // Just like DivRem, but here we reduce a with a cyclotomic polynomial
+  Polynomial phi = this->get_phi();
+  if(!this->get_device_updated()){
+    #ifdef VERBOSE
+    std::cout << "Reduce on host." << std::endl;
     #endif
-    }
+    Polynomial quot;
+    Polynomial rem;
+    std::cout << phi.to_string() << std::endl;
+    Polynomial::DivRem((*this),phi,quot, rem);
+    this->copy(rem);
+    return;
+  }
+  const int half = phi.deg()/2;
+  const int N = this->CRTSPACING;
+  const int NPolis = this->CRTPrimes.size();
+  const int size = N*NPolis/2;
+
+  dim3 blockDim(32);
+  dim3 gridDim(size/32 + (size % 32 == 0? 0:1));
+
+  polynomialReduction<<<gridDim,blockDim>>>( this->get_device_crt_residues(),
+                                              half,
+                                              N,
+                                              NPolis);
+  cudaError_t result = cudaGetLastError();
+  assert(result == cudaSuccess);
+}

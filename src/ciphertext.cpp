@@ -35,7 +35,8 @@ Ciphertext Ciphertext::operator*(Ciphertext b){
   std::cout << "Yashe::t " << Yashe::t << std::endl;
   #endif
 
-  Polynomial g = C1*C2*(Yashe::t) % Yashe::phi;
+  Polynomial g = C1*C2*(Yashe::t);
+  g.reduce();
   Polynomial pmult;
   for(int i = 0; i <= g.deg();i++){
     ZZ quot;
@@ -54,7 +55,8 @@ Ciphertext Ciphertext::operator*(Ciphertext b){
   this->aftermul = true;
 
   this->level = std::max(this->level,b.level)+1;
-
+  this->set_device_updated(false);
+  this->set_host_updated(true);
   return *this;
 
 }

@@ -68,8 +68,7 @@ struct PolySuite
 
 struct YasheSuite
 {
-    ZZ t;
-    long t_long;
+    uint64_t t;
     Yashe cipher;
     int degree;
     Polynomial phi;
@@ -88,15 +87,13 @@ struct YasheSuite
         Polynomial::global_mod = q;
         ZZ_p::init(q); // Defines GF(q)
 
-        t_long = 35951;
-        // t_long = 2;
-        t = ZZ(t_long);
+        t = 35951;
         degree = 4;
         int w = 72;
 
         Polynomial::BuildNthCyclotomic(&phi, degree); // generate an cyclotomic polynomial
         #ifdef VERBOSE
-        std::cout << "Cyclotomic polynomial: " << R << std::endl;
+        std::cout << "Cyclotomic polynomial: " << phi.to_string() << std::endl;
         #endif
         phi.set_mod(Polynomial::global_mod);
         Polynomial::global_phi = &phi;
@@ -228,9 +225,9 @@ BOOST_AUTO_TEST_CASE(zeroAdd)
   // r.icrt();
 
   #ifdef VERBOSE
-  std::cout << "r: " << r << std::endl;
-  std::cout << "a: " << a<<std::endl;
-  std::cout << "b: " << b<<std::endl;
+  std::cout << "r: " << r.to_string() << std::endl;
+  std::cout << "a: " << a.to_string() <<std::endl;
+  std::cout << "b: " << b.to_string() <<std::endl;
   #endif
   BOOST_REQUIRE(r == a);
 

@@ -8,8 +8,21 @@ ZZ Polynomial::CRTProduct = ZZ(1);
 std::vector<cuyasheint_t> Polynomial::CRTPrimes(0);
 ZZ Polynomial::global_mod = ZZ(0);
 Polynomial *(Polynomial::global_phi) = NULL;
+bool Polynomial::phi_set = false;
 
-void Polynomial::update_device_data(){
+uint64_t cycles() {
+  unsigned int hi, lo;
+  asm (
+    "cpuid\n\t"/*serialize*/
+    "rdtsc\n\t"/*read the clock*/
+    "mov %%edx, %0\n\t"
+    "mov %%eax, %1\n\t" 
+    : "=r" (hi), "=r" (lo):: "%rax", "%rbx", "%rcx", "%rdx"
+  );
+  return ((uint64_t) lo) | (((uint64_t) hi) << 32);
+}
+
+void Polynomial::update_device_data(unsigned int usable_ratio){
 
     if(this->get_device_updated())
       return;
@@ -21,13 +34,10 @@ void Polynomial::update_device_data(){
     cudaError_t result;
     this->ON_COPY = true;
 
-
-    result = cudaMalloc((void**)&this->d_polyCRT,this->CRTSPACING*(this->polyCRT.size())*sizeof(cuyasheint_t));
-    #ifdef VERBOSE
-    std::cout << "cudaMalloc:" << cudaGetErrorString(result) << " "<< this->CRTSPACING*(this->polyCRT.size())*sizeof(cuyasheint_t) << " bytes" <<std::endl;
-    #endif
-    assert(result == cudaSuccess);
-
+    // if(this->d_polyCRT == NULL){
+      result = cudaMalloc((void**)&this->d_polyCRT,this->CRTSPACING*(this->polyCRT.size())*sizeof(cuyasheint_t));
+      assert(result == cudaSuccess);
+    // }
 
     // result = cudaMemset((void*)this->d_polyCRT,0,this->CRTSPACING*(this->polyCRT.size())*sizeof(cuyasheint_t));
     // #ifdef VERBOSE
@@ -39,14 +49,10 @@ void Polynomial::update_device_data(){
     // aux = (cuyasheint_t*)malloc(this->CRTSPACING*(this->polyCRT.size())*sizeof(cuyasheint_t));
     aux = (cuyasheint_t*)calloc(this->CRTSPACING*(this->polyCRT.size()),sizeof(cuyasheint_t));
     for(unsigned int i=0;i < this->polyCRT.size();i++){
-      memcpy(aux+this->CRTSPACING*i,&(this->polyCRT[i][0]),(this->polyCRT[i].size())*sizeof(cuyasheint_t));
+      memcpy(aux+this->CRTSPACING*i,&(this->polyCRT[i][0]),(this->polyCRT[i].size()/usable_ratio)*sizeof(cuyasheint_t));
     }
 
     result = cudaMemcpy(this->d_polyCRT, aux , this->CRTSPACING*(this->polyCRT.size())*sizeof(cuyasheint_t), cudaMemcpyHostToDevice);
-
-    #ifdef VERBOSE
-    std::cout << "cudaMemcpyAsync" << i << ": " << cudaGetErrorString(result) << " "<<(this->polyCRT[i].size())*sizeof(cuyasheint_t) << " bytes to position "<< this->CRTSPACING*i*sizeof(int) <<std::endl;
-    #endif
     assert(result == cudaSuccess);
 
     // result = cudaDeviceSynchronize();
@@ -61,6 +67,10 @@ void Polynomial::update_host_data(){
     if(this->get_host_updated())
       return;
 
+    #ifdef VERBOSE
+    std::cout << "Copying data to CPU." << std::endl;
+    #endif
+
     cudaError_t result;
 
     if(this->polyCRT.size() != Polynomial::CRTPrimes.size())
@@ -71,9 +81,7 @@ void Polynomial::update_host_data(){
     // aux = (cuyasheint_t*) calloc (this->polyCRT.size()*this->CRTSPACING,sizeof(cuyasheint_t));
     aux = (cuyasheint_t*) malloc (this->polyCRT.size()*this->CRTSPACING*sizeof(cuyasheint_t));
     result = cudaMemcpy(aux , this->d_polyCRT, this->polyCRT.size()*this->CRTSPACING*sizeof(cuyasheint_t), cudaMemcpyDeviceToHost);
-    #ifdef VERBOSE
-    std::cout << "cudaMemCpy: " << cudaGetErrorString(result) <<" "<< this->polyCRT.size()*this->CRTSPACING*sizeof(cuyasheint_t) <<std::endl;
-    #endif
+    assert(result == cudaSuccess);
     result = cudaDeviceSynchronize();
     assert(result == cudaSuccess);
     //
@@ -126,7 +134,88 @@ void Polynomial::crt(){
     this->set_host_updated(true);
     this->set_device_updated(false);
 }
-uint64_t get_cycles(void) {
+
+void Polynomial::icrt(){
+  // Escapes, if possible
+  if(!this->get_host_updated())
+    // return;
+  // else
+    this->update_host_data();
+
+  std::vector<cuyasheint_t> P = this->CRTPrimes;
+  ZZ M = this->CRTProduct;
+
+  // Backup original modulus
+  ZZ q = ZZ_p::modulus();
+  ZZ_p::init(M);
+
+  uint64_t start = cycles();
+  // Convert all CRT representations to Polynomial
+  std::vector<ZZ_pEX> X(this->polyCRT.size(),ZZ_pEX());
+  for(int index = 0; index < X.size(); index ++){
+      std::vector<cuyasheint_t> v = (this->polyCRT).at(index);
+
+      ZZ_pEX z(v.size());
+      for(std::vector<cuyasheint_t>::iterator iter = v.begin(); iter != v.end(); iter++){
+        unsigned int index = iter-v.begin();
+        NTL::SetCoeff(z,index,conv<ZZ_p>(*iter));
+      }
+      X[index] = z;
+  }
+  uint64_t end = cycles();
+  // std::cout << "ZZ_pEX convertion: " << (end-start) << std::endl;
+
+  // Computes each summation value
+  start = cycles();
+  std::vector<ZZ_pEX> icrti(P.size());
+  for(std::vector<cuyasheint_t>::iterator pi = P.begin(); pi != P.end(); pi++){
+          int index = pi-P.begin();
+          ZZ_p Mpi = conv<ZZ_p>(M / (*pi));
+
+          ZZ_p::init(ZZ(*pi));
+
+          ZZ_p innerMpi = conv<ZZ_p>(M / (*pi));
+          ZZ_p ZZMpiInnerInv = NTL::inv(innerMpi);
+          ZZ_pEX xi = X[index] * ZZ_pEX(ZZMpiInnerInv);
+
+          ZZ_p::init(M);
+
+          icrti[index] = ZZ_pEX(xi) * Mpi;
+  }
+  end = cycles();
+  // std::cout << "icrt computation: " << (end-start) << std::endl;
+
+  // Sum all
+  start = cycles();
+  ZZ_pEX result;
+  for(std::vector<ZZ_pEX>::iterator iter = icrti.begin(); iter != icrti.end();iter++)
+    // We only add the first P.size() irst elements
+    result += (*iter);
+  end = cycles();
+  // std::cout << "sum all: " << (end-start) << std::endl;
+
+  // Recover original mod
+  ZZ_p::init(q);
+  // Set to 0 all non-used coefficients
+  this->set_coeffs(NTL::deg(result)+1);//Discards all coeffs
+  
+  start = cycles();
+  // Set new coefficients
+  for(int index = 0; index <= NTL::deg(result); index++){
+      ZZ r = conv<ZZ>(NTL::coeff(NTL::rep(result[index]),0));// Gambiarra
+      ZZ_p value = conv<ZZ_p>(r);//This applies mod q
+
+      this->set_coeff(index,conv<ZZ>(value));
+  }
+  end = cycles();
+  // std::cout << "Convertion back " << (end-start) << std::endl;
+
+  this->normalize();
+  this->set_host_updated(true);
+  return;
+}
+
+uint64_t polynomial_get_cycles() {
   unsigned int hi, lo;
   asm (
     "cpuid\n\t"/*serialize*/
@@ -136,50 +225,6 @@ uint64_t get_cycles(void) {
     : "=r" (hi), "=r" (lo):: "%rax", "%rbx", "%rcx", "%rdx"
   );
   return ((uint64_t) lo) | (((uint64_t) hi) << 32);
-}
-void Polynomial::icrt(){
-  // Escapes, if possible
-  if(this->get_host_updated())
-    return;
-  else
-    this->update_host_data();
-
-  std::vector<cuyasheint_t> P = this->CRTPrimes;
-  ZZ M = this->CRTProduct;
-
-  // Polynomial icrt(this->get_mod(),this->get_phi(),this->get_crt_spacing());
-  this->set_coeffs();//Discards all coeffs
-
-  // 4M cycles per iteration
-  for(unsigned int i = 0; i < this->CRTPrimes.size();i++){
-    // uint64_t start_cycle = get_cycles();
-    // Convert CRT representations to Polynomial
-    // Polynomial xi(this->get_mod(),this->get_phi(),this->get_crt_spacing());
-  
-    Polynomial xi(this->get_mod(),this->get_phi(),this->get_crt_spacing());
-    xi.set_coeffs(this->polyCRT[i]);
-    // Asserts that each residue is in the correct field
-    ZZ pi = ZZ(P[i]);
-    xi %= pi;
-
-    ZZ Mpi= M/pi;
-    //
-    ZZ InvMpi = NTL::InvMod(Mpi%pi,pi);
-    //
-
-
-
-    xi = ((xi*InvMpi)%pi)*Mpi;
-
-    this->CPUAddition(&xi);
-    // uint64_t end_cycle = get_cycles();
-    // std::cout << "Cycles for each icrt iteration: " << (end_cycle-start_cycle) << std::endl;
-  }
-
-  (*this) %= M;
-  this->normalize();
-  this->set_host_updated(true);
-  return;
 }
 
 void Polynomial::DivRem(Polynomial a,Polynomial b,Polynomial &quot,Polynomial &rem){
@@ -224,8 +269,8 @@ int isPowerOfTwo (unsigned int x){
 
 void Polynomial::BuildNthCyclotomic(Polynomial *phi,unsigned int n){
 
-  for(int i =0; i <= phi->deg(); i++)
-    phi->set_coeff(i,0);
+  phi->set_coeffs();
+
   if(isPowerOfTwo(n)){
     #ifdef VERBOSE
     std::cout << n << " is power of 2" << std::endl;
@@ -271,3 +316,71 @@ Polynomial Polynomial::get_phi(){
 
   return *(Polynomial::global_phi);
 }
+
+// void Polynomial::XGCD(Polynomial& d, Polynomial& s, Polynomial& t,  Polynomial& a,  Polynomial& b){
+//   ZZ z;
+
+//   if (b.is_zero()) {
+//     s.set_coeffs();
+//     s.set_coeff(0,1);
+//     t.set_coeffs();
+//     d = a;
+//   }else if (a.is_zero()) {
+//     t.set_coeffs();
+//     t.set_coeff(0,1);
+//     s.set_coeffs();
+//     d = b;
+//   }else {
+//     long e = max(a.deg(), b.deg()) + 1;
+
+//     Polynomial temp(e), u(e), v(e),
+//           u0(e), v0(e),
+//           u1(e), v1(e),
+//           u2(e), v2(e), q(e);
+
+
+//     (u1.set_coeff(0,1)); (v1.set_coeffs());
+//     (u2.set_coeffs()); (v2.set_coeff(0,1));
+//     u = a; v = b;
+
+//     do {
+//        Polynomial::DivRem(q, u, u, v);
+//        std::swap(u, v);
+//        u0 = u2;
+//        v0 = v2;
+//        temp = q * u2;
+//        u2 = u1 - temp;
+//        temp = q * v2;
+//        v2 = v1 - temp;
+//        u1 = u0;
+//        v1 = v0;
+//     } while (!v.is_zero());
+
+//     d = u;
+//     s = u1;
+//     t = v1;
+//   }
+
+//   if (d.is_zero()) return;
+//   if (d.lead_coeff() == 1) return;
+
+//   /* make gcd monic */
+
+//   inv(z, d.lead_coeff());
+//   d = d * z;
+//   s = s * z;
+//   t = t * z;
+// }
+
+// void Polynomial::InvMod(Polynomial& x, const Polynomial& a, const Polynomial& f)
+// {
+//    if (a.deg()) >= f.deg()) || f.deg()) == 0) LogicError("InvMod: bad args");
+
+//    Polynomial d, xx, t;
+
+//    XGCD(d, xx, t, a, f);
+//    if (!d.is_one())
+//       InvModError("ZZ_pEX InvMod: can't compute multiplicative inverse");
+
+//    x = xx;
+// }
