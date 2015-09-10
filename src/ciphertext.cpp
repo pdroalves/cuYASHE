@@ -1,20 +1,12 @@
 #include "ciphertext.h"
 #include "yashe.h"
 
-Ciphertext Ciphertext::operator+(Ciphertext b){
+// Ciphertext Ciphertext::operator+(Ciphertext b){
 
-  Polynomial poly_a(*this);
-  Polynomial poly_b(b);
-
-  Polynomial c = poly_a+poly_b;
-
-  int new_level = max(this->level,b.level);
-
-  this->copy(c);
-  this->level = new_level;
-
-  return *this;
-}
+//   Ciphertext c = (Polynomial)(*this) + (Polynomial)(b);
+//   c.level = max(this->level,b.level);
+//   return c;
+// }
 
 Ciphertext Ciphertext::operator*(Ciphertext b){
 

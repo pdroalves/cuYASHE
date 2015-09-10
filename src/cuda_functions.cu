@@ -652,7 +652,6 @@ void Polynomial::reduce(){
     #endif
     Polynomial quot;
     Polynomial rem;
-    std::cout << phi.to_string() << std::endl;
     Polynomial::DivRem((*this),phi,quot, rem);
     this->copy(rem);
     return;

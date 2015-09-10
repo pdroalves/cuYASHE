@@ -31,6 +31,8 @@ class Polynomial{
       this->expected_degree = -1;
       this->set_host_updated(true);
       this->set_device_updated(false);
+      this->set_crt_computed(false);
+      this->set_icrt_computed(true);
       if(this->global_mod > 0){
         // If a global mod is defined, use it
         this->mod = this->global_mod; // Doesn't copy. Uses the reference.
@@ -59,6 +61,8 @@ class Polynomial{
       this->expected_degree = -1;
       this->set_host_updated(true);
       this->set_device_updated(false);
+      this->set_crt_computed(false);
+      this->set_icrt_computed(true);
       this->mod = ZZ(p);// Copy
 
       if(this->global_phi){
@@ -80,6 +84,8 @@ class Polynomial{
       this->expected_degree = -1;
       this->set_host_updated(true);
       this->set_device_updated(false);
+      this->set_crt_computed(false);
+      this->set_icrt_computed(true);
       this->mod = ZZ(p);// Copy
       *(this->phi) = Polynomial(P);// Copy
 
@@ -99,6 +105,8 @@ class Polynomial{
       this->expected_degree = -1;
       this->set_host_updated(true);
       this->set_device_updated(false);
+      this->set_crt_computed(false);
+      this->set_icrt_computed(true);
       if(this->global_mod > 0){
         // If a global mod is defined, use it
         this->mod = this->global_mod; // Doesn't copy. Uses the reference.
@@ -122,6 +130,8 @@ class Polynomial{
       this->expected_degree = -1;
       this->set_host_updated(true);
       this->set_device_updated(false);
+      this->set_crt_computed(false);
+      this->set_icrt_computed(true);
       this->mod = ZZ(p);// Copy
       this->phi = &P;// Copy
 
@@ -142,6 +152,8 @@ class Polynomial{
       this->expected_degree = -1;
       this->set_host_updated(true);
       this->set_device_updated(false);
+      this->set_crt_computed(false);
+      this->set_icrt_computed(true);
       this->mod = ZZ(p);// Copy
 
       // CRT Spacing set to spacing
@@ -176,6 +188,8 @@ class Polynomial{
       // this->expected_degree = b.deg();
       if(this != Polynomial::global_phi)
         this->set_phi(b.get_phi());
+      this->set_crt_computed(b.get_crt_computed());
+      this->set_icrt_computed(b.get_icrt_computed());
       #ifdef VERBOSE
       stop = polynomial_get_cycles();
       std::cout << (stop-start) << " cycles to copy" << std::endl;
@@ -190,7 +204,7 @@ class Polynomial{
     // }
 
     std::string to_string(){
-      if(!this->get_host_updated()){
+      if(!this->get_icrt_computed()){
         this->icrt();
       }
 
@@ -208,6 +222,7 @@ class Polynomial{
         return *this;
     }
     Polynomial operator+(Polynomial b){
+      #ifdef ADDONCPUINPOSSIBLE
       if(!this->get_device_updated() && !b.get_device_updated()){
         // CPU add
         #ifdef VERBOSE
@@ -217,7 +232,7 @@ class Polynomial{
         c.CPUAddition(&b);
         return c;
       }else{
-
+      #endif
         #ifdef VERBOSE
         std::cout << "Operator+ on GPU" << std::endl;
         #endif
@@ -264,7 +279,9 @@ class Polynomial{
         c.set_device_updated(true);
         cudaDeviceSynchronize();
         return c;
+      #ifdef ADDONCPUINPOSSIBLE
       }
+      #endif
     }
     Polynomial operator+=(Polynomial b){
       this->set_device_crt_residues( ((*this)+b).get_device_crt_residues());
@@ -826,6 +843,8 @@ class Polynomial{
     void update_device_data(unsigned int usable_ratio=1);
     void set_device_updated(bool b){
       this->DEVICE_IS_UPDATE = b;
+      if(!b)
+        this->set_crt_computed(false);
     }
     bool get_device_updated(){
       return this->DEVICE_IS_UPDATE;
@@ -833,11 +852,24 @@ class Polynomial{
     void update_host_data();
     void set_host_updated(bool b){
       this->HOST_IS_UPDATED = b;
+      if(!b)
+        this->set_icrt_computed(false);
     }
     bool get_host_updated(){
       return this->HOST_IS_UPDATED;
     }
-
+    void set_crt_computed(bool b){
+      this->CRT_COMPUTED = b;
+    }
+    bool get_crt_computed(){
+      return this->CRT_COMPUTED;
+    }
+    void set_icrt_computed(bool b){
+      this->ICRT_COMPUTED = b;
+    }
+    bool get_icrt_computed(){
+      return this->ICRT_COMPUTED;
+    }
 
     int deg(){
       if(!this->get_host_updated())
@@ -954,6 +986,8 @@ class Polynomial{
     bool ON_COPY;
     bool HOST_IS_UPDATED;
     bool DEVICE_IS_UPDATE;
+    bool CRT_COMPUTED;
+    bool ICRT_COMPUTED;
     //Functions and methods
 
 };

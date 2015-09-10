@@ -36,11 +36,7 @@ void Yashe::generate_keys(){
 
   Polynomial g = this->xkey.get_sample(phi.deg()-1);
   g.reduce();
-  // Polynomial g;
-  // g.set_coeff(0,1);
-  // g.set_coeff(1,1);
-  // g.set_coeff(2,655615110);
-  // g.set_coeff(3,1);
+  g %= q;
 
   #ifdef DEBUG
   std::cout << "g = " << g << std::endl;
@@ -82,7 +78,6 @@ void Yashe::generate_keys(){
       #endif
     }
   }
-  f.crt();
   f.update_device_data();
 
   h = fInv*g;
@@ -132,7 +127,7 @@ Ciphertext Yashe::encrypt(Polynomial m){
 
   Polynomial ps = xerr.get_sample(phi.deg()-1);
   Polynomial e = xerr.get_sample(phi.deg()-1);
-  e.crt();
+  ps.update_device_data();
   e.update_device_data();
 
   #ifdef DEBUG
@@ -144,16 +139,11 @@ Ciphertext Yashe::encrypt(Polynomial m){
 
   Polynomial p;
 
-  // p = (h*ps);
-  // p += e;
-  // p += m*delta;
-  // p.reduce();
-  // p %= q;
-
-  p = (h*ps);
-
   uint64_t start = arch_cycles();
-  p = p + e + m*delta;
+  p = h*ps + e;
+  p += m*delta;
+  p.reduce();
+  p %= q;
   uint64_t stop = arch_cycles();
   // std::cout << (stop-start) << " cycles to encrypt." << std::endl;
 
@@ -173,7 +163,6 @@ Polynomial Yashe::decrypt(Ciphertext c){
       g = f*c;
   }
   g.reduce();
-
 
   // Polynomial reduced_g = Polynomial::rem(g,phi);
   // reduced_g.icrt();

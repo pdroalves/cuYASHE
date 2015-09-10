@@ -140,44 +140,12 @@ int main(int argc,char* argv[]){
     Polynomial a;
     Polynomial b;
     ///////////////////////////////////////////////
-    // Copy
-    //
-    Polynomial::random(&a,d-1);
-    a.set_device_updated(false);
-    a.crt();
-    clock_gettime( CLOCK_REALTIME, &start);
-    for(int i = 0; i < N;i++){
-      a.update_device_data();
-      a.set_device_updated(false);
-      cudaDeviceSynchronize();
-    }
-    clock_gettime( CLOCK_REALTIME, &stop);
-    diff = compute_time_ms(start,stop)/N;
-    std::cout << "Copy) Host to Device: " << diff << " ms" << std::endl;
-    copyHtD << d << " " << diff << std::endl;
-
-    Polynomial::random(&a,d-1);
-    a.crt();
-    a.update_device_data();
-    a.set_host_updated(false);
-    clock_gettime( CLOCK_REALTIME, &start);
-    for(int i = 0; i < N;i++){
-      a.update_host_data();
-      a.set_host_updated(false);
-      cudaDeviceSynchronize();
-    }
-    clock_gettime( CLOCK_REALTIME, &stop);
-    diff = compute_time_ms(start,stop)/N;
-    std::cout << "Copy) Device to host: " << diff << " ms" << std::endl;
-    copyDtH << d << " " << diff << std::endl;
-
-    ///////////////////////////////////////////////
     // CRT/ICRT
     //
     Polynomial::random(&a,d-1);
     clock_gettime( CLOCK_REALTIME, &start);
     for(int i = 0; i < N;i++){
-      a.set_device_updated(false);
+      a.set_crt_computed(false);
       a.crt();
       cudaDeviceSynchronize();
     }
@@ -189,6 +157,7 @@ int main(int argc,char* argv[]){
     clock_gettime( CLOCK_REALTIME, &start);
     a.update_host_data();
     for(int i = 0; i < N;i++){
+      a.set_icrt_computed(false);
       a.icrt();
       cudaDeviceSynchronize();
     }
@@ -202,6 +171,8 @@ int main(int argc,char* argv[]){
     // Time measured with memory copy
     Polynomial::random(&a,d-1);
     Polynomial::random(&b,d-1);
+    std::cout << a.to_string() << std::endl;        
+
     clock_gettime( CLOCK_REALTIME, &start);
     for(int i = 0; i < N;i++){
 
@@ -219,9 +190,7 @@ int main(int argc,char* argv[]){
     Polynomial::random(&a,d-1);
     Polynomial::random(&b,d-1);
 
-    a.crt();
     a.update_device_data();
-    b.crt();
     b.update_device_data();
 
     clock_gettime( CLOCK_REALTIME, &start);
@@ -261,9 +230,7 @@ int main(int argc,char* argv[]){
     Polynomial::random(&b,d-1);
     a.update_crt_spacing(2*d);
     b.update_crt_spacing(2*d);
-    a.crt();
     a.update_device_data();
-    b.crt();
     b.update_device_data();
 
     clock_gettime( CLOCK_REALTIME, &start);

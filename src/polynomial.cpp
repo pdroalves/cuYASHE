@@ -26,6 +26,8 @@ void Polynomial::update_device_data(unsigned int usable_ratio){
 
     if(this->get_device_updated())
       return;
+    else if(!this->get_crt_computed())
+      this->crt();
 
     #ifdef VERBOSE
     std::cout << "Copying data to GPU." << std::endl;
@@ -66,6 +68,8 @@ void Polynomial::update_device_data(unsigned int usable_ratio){
 void Polynomial::update_host_data(){
     if(this->get_host_updated())
       return;
+    else if(!this->get_icrt_computed())
+      this->icrt();
 
     #ifdef VERBOSE
     std::cout << "Copying data to CPU." << std::endl;
@@ -108,6 +112,12 @@ void Polynomial::crt(){
 
     // Escapes, if possible
 
+    
+    if(this->get_crt_computed())
+      return;
+    else if(!this->get_host_updated())
+      this->update_host_data();
+    
     std::vector<cuyasheint_t> P = this->CRTPrimes;
     this->polyCRT.resize(P.size());
 
@@ -133,14 +143,18 @@ void Polynomial::crt(){
 
     this->set_host_updated(true);
     this->set_device_updated(false);
+    this->set_crt_computed(true);
+    this->set_icrt_computed(true);
 }
 
 void Polynomial::icrt(){
   // Escapes, if possible
-  if(!this->get_host_updated())
-    // return;
-  // else
+  if(this->get_icrt_computed())
+    return;
+  else if(!this->get_host_updated()){
+    this->set_icrt_computed(true);//If we do not set this, we get a infinite loop
     this->update_host_data();
+  }
 
   std::vector<cuyasheint_t> P = this->CRTPrimes;
   ZZ M = this->CRTProduct;
@@ -212,6 +226,7 @@ void Polynomial::icrt(){
 
   this->normalize();
   this->set_host_updated(true);
+  this->set_icrt_computed(true);
   return;
 }
 
