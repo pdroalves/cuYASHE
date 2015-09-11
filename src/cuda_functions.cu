@@ -89,19 +89,29 @@ __host__ cuyasheint_t* CUDAFunctions::callPolynomialAddSub(cudaStream_t stream,c
 
   cuyasheint_t *d_new_array;
   cudaError_t result = cudaMalloc((void**)&d_new_array,size*sizeof(cuyasheint_t));
-  #ifdef VERBOSE
-  std::cout << "cudaMalloc:" << cudaGetErrorString(result) << " "<< size*sizeof(cuyasheint_t) << " bytes" <<std::endl;
-  #endif
   assert(result == cudaSuccess);
 
-  // polynomialAdd <<< gridDim,blockDim, 0, stream >>> (a,b,d_new_array,size);
-  polynomialAddSub <<< gridDim,blockDim >>> (OP,a,b,d_new_array,size);
+  polynomialAddSub <<< gridDim,blockDim,1,stream >>> (OP,a,b,d_new_array,size);
   #ifdef VERBOSE
   std::cout << gridDim.x << " " << blockDim.x << std::endl;
   std::cout << "polynomialAdd kernel:" << cudaGetErrorString(cudaGetLastError()) << std::endl;
   #endif
 
   return d_new_array;
+}
+
+__host__ void CUDAFunctions::callPolynomialAddSubInPlace(cudaStream_t stream,cuyasheint_t *a,cuyasheint_t *b,int size,int OP){
+  // This method expects that both arrays are aligned
+  // Add and store in array a
+  int ADDGRIDXDIM = (size%ADDBLOCKXDIM == 0? size/ADDBLOCKXDIM : size/ADDBLOCKXDIM + 1);
+  dim3 gridDim(ADDGRIDXDIM);
+  dim3 blockDim(ADDBLOCKXDIM);
+
+  polynomialAddSub <<< gridDim,blockDim,1,stream >>> (OP,a,b,a,size);
+  #ifdef VERBOSE
+  std::cout << gridDim.x << " " << blockDim.x << std::endl;
+  std::cout << "polynomialAdd kernel:" << cudaGetErrorString(cudaGetLastError()) << std::endl;
+  #endif
 }
 ///////////////////////////////////////
 
@@ -227,7 +237,7 @@ __device__ __host__ uint64_t s_rem (uint64_t a)
   return res;
 }
 
-__device__ __host__  uint64_t s_mul(volatile uint64_t a,volatile uint64_t b){
+__device__ __host__  uint64_t s_mul(uint64_t a,uint64_t b){
   // Multiply and reduce a and b by prime 2^64-2^32+1
   const uint64_t P = 18446744069414584321;
 

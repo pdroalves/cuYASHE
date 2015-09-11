@@ -20,6 +20,7 @@ Polynomial Distribution::get_sample(int degree){
     break;
   }
 
+  p.set_coeffs(degree+1);
   for(int i = 0; i <= degree; i++)
     p.set_coeff(i,(rand() % mod - mod/2) - phase);
 

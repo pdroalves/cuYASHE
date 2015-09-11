@@ -1,4 +1,4 @@
-OPT = -O0
+OPT = -O3
 
 CUDA_CC = nvcc $(OPT) -G -g -std=c++11
 CC = g++ -std=c++11 -g -Wall -Wfatal-errors -m64 $(OPT)
@@ -53,8 +53,8 @@ distribution.o:distribution.cpp
 yashe.o:yashe.cpp
 	$(CC) -c yashe.cpp -o yashe.o $(NTL) $(OPENMP) $(LCUDA) $(ICUDA)
 
-test_ntt: test_ntt.cu
-	$(CUDA_CC) $(CUDA_ARCH) test_ntt.cu -o ../bin/test_ntt -lntl -lgmp -m64
+test_ntt: test_ntt.cu polynomial.o ciphertext.o yashe.o
+	nvcc -O3 -G -g -std=c++11 -arch=sm_35 test_ntt.cu polynomial.cpp ciphertext.cpp yashe.o cuda_functions.cu distribution.cpp -o ../bin/test_ntt -lcufft -Xcompiler  -fopenmp -Intl -lntl -lgmp -m64
 
 
 test_mul: polynomial.o cuda_functions.o

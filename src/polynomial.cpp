@@ -319,18 +319,8 @@ void Polynomial::BuildNthCyclotomic(Polynomial *phi,unsigned int n){
 }
 
 Polynomial Polynomial::get_phi(){
-  // Returns a copy of phi
-  // std::cout << "getphi!" << std::endl;
-  // if(this->phi == NULL){
-  //   // std::cout << "Using global phi." << std::endl;
-  //   return *(this->global_phi);
-  // }
-  // std::cout << "Using local phi: " << this->phi->to_string() << std::endl;
-  // // return *(this->phi);
-  // return *(this->phi);
-
-  return *(Polynomial::global_phi);
-}
+      return *(Polynomial::global_phi);
+    }
 
 // void Polynomial::XGCD(Polynomial& d, Polynomial& s, Polynomial& t,  Polynomial& a,  Polynomial& b){
 //   ZZ z;

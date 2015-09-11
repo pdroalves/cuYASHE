@@ -33,24 +33,24 @@ class Polynomial{
       this->set_device_updated(false);
       this->set_crt_computed(false);
       this->set_icrt_computed(true);
-      if(this->global_mod > 0){
+      if(Polynomial::global_mod > 0)
         // If a global mod is defined, use it
-        this->mod = this->global_mod; // Doesn't copy. Uses the reference.
-      }
-      if(this->global_phi){
+        this->mod = Polynomial::global_mod; // Doesn't copy. Uses the reference.
+      
+      if(Polynomial::global_phi){
         // If a global phi is defined, use it
-        this->phi = this->global_phi; // Doesn't copy. Uses the reference.
+        this->phi = Polynomial::global_phi; // Doesn't copy. Uses the reference.
 
         // If the irreductible polynomial have degree N, this polynomial's degree will be limited to N-1
-        this->CRTSPACING = this->global_phi->deg();
-      }else{
+        this->CRTSPACING = Polynomial::global_phi->deg();
+      }else
         // CRT Spacing not set
         this->CRTSPACING = -1;
-      }
+      
 
-      if(Polynomial::phi_set){
+      if(Polynomial::phi_set)
         this->coefs.resize(this->get_phi().deg()+1);
-      }
+      
 
       #ifdef VERBOSE
         std::cout << "Polynomial constructed with CRTSPACING " << this->CRTSPACING << " and no mod or phi elements" << std::endl;
@@ -65,9 +65,9 @@ class Polynomial{
       this->set_icrt_computed(true);
       this->mod = ZZ(p);// Copy
 
-      if(this->global_phi){
+      if(Polynomial::global_phi){
       //   // If a global phi is defined, use it
-        this->phi = this->global_phi; // Doesn't copy. Uses the reference.
+        this->phi = Polynomial::global_phi; // Doesn't copy. Uses the reference.
       }
       // CRT Spacing not set
       this->CRTSPACING = -1;
@@ -107,13 +107,13 @@ class Polynomial{
       this->set_device_updated(false);
       this->set_crt_computed(false);
       this->set_icrt_computed(true);
-      if(this->global_mod > 0){
+      if(Polynomial::global_mod > 0){
         // If a global mod is defined, use it
-        this->mod = this->global_mod; // Doesn't copy. Uses the reference.
+        this->mod = Polynomial::global_mod; // Doesn't copy. Uses the reference.
       }
-      if(this->global_phi){
+      if(Polynomial::global_phi){
       //   // If a global phi is defined, use it
-        this->phi = this->global_phi; // Doesn't copy. Uses the reference.
+        this->phi = Polynomial::global_phi; // Doesn't copy. Uses the reference.
       }
       // CRT Spacing set to spacing
       this->CRTSPACING = spacing;
@@ -177,19 +177,30 @@ class Polynomial{
       start = polynomial_get_cycles();
       #endif
 
+
       this->CRTSPACING = b.CRTSPACING;
       this->set_host_updated(b.get_host_updated());
       this->set_device_updated(b.get_device_updated());
+
       this->polyCRT = b.get_crt_residues();
+
       if(b.get_host_updated())
         this->set_coeffs(b.get_coeffs());
+
       this->d_polyCRT = b.get_device_crt_residues();
-      this->set_mod(b.get_mod());
-      // this->expected_degree = b.deg();
-      if(this != Polynomial::global_phi)
-        this->set_phi(b.get_phi());
+
+      // The line below takes 66k cycles to return. We will comment it for now.
+      // this->set_mod(b.get_mod());
+      
+      // if(this != Polynomial::global_phi){
+        // The line below takes 1M cycles to return. We will comment it for now.
+        // this->set_phi(b.get_phi());
+      // }
+
+      this->expected_degree = b.get_expected_degre();
       this->set_crt_computed(b.get_crt_computed());
       this->set_icrt_computed(b.get_icrt_computed());
+
       #ifdef VERBOSE
       stop = polynomial_get_cycles();
       std::cout << (stop-start) << " cycles to copy" << std::endl;
@@ -284,7 +295,62 @@ class Polynomial{
       #endif
     }
     Polynomial operator+=(Polynomial b){
-      this->set_device_crt_residues( ((*this)+b).get_device_crt_residues());
+      #ifdef ADDONCPUINPOSSIBLE
+      if(!this->get_device_updated() && !b.get_device_updated()){
+        // CPU add
+        #ifdef VERBOSE
+        std::cout << "Operator+ on CPU" << std::endl;
+        #endif
+        this->CPUAddition(&b);
+        return *this;
+      }else{
+      #endif
+        #ifdef VERBOSE
+        std::cout << "Operator+ on GPU" << std::endl;
+        #endif
+        // Check align
+        if(this->CRTSPACING != b.CRTSPACING){
+          int new_spacing = std::max(this->CRTSPACING,b.CRTSPACING);
+          this->update_crt_spacing(new_spacing);
+          b.update_crt_spacing(new_spacing);
+        }
+
+        #ifdef VERBOSE
+        std::cout << "Adding:" << std::endl;
+        // std::cout << "this: " << this->to_string() << std::endl;
+        // std::cout << "other " << b.to_string() << std::endl;
+        #endif
+
+        // Apply CRT and copy data to global memory, if needed
+        #pragma omp parallel sections num_threads(2)
+        {
+            #pragma omp section
+            {
+
+                if(!this->get_device_updated()){
+                  this->crt();
+                  this->update_device_data();
+                }
+
+            }
+            #pragma omp section
+            {
+                if(!b.get_device_updated()){
+                    b.crt();
+                    b.update_device_data();
+                }
+            }
+        }
+
+
+        CUDAFunctions::callPolynomialAddSubInPlace(this->stream,this->get_device_crt_residues(),b.get_device_crt_residues(),(int)(this->CRTSPACING*Polynomial::CRTPrimes.size()),ADD);
+
+        this->set_host_updated(false);
+        this->set_device_updated(true);
+        cudaDeviceSynchronize();
+      #ifdef ADDONCPUINPOSSIBLE
+      }
+      #endif
       return *this;
     }
     Polynomial operator-(Polynomial b){
@@ -675,15 +741,16 @@ class Polynomial{
     // gets and sets
     ZZ get_mod(){
       // Returns a copy of mod
-      return ZZ(this->mod);
+      return this->mod;
     }
     void set_mod(ZZ value){
-      this->mod = ZZ(value);
+      this->mod = value;
       #ifdef VERBOSE
         std::cout << "Polynomial mod set to " << this->mod << std::endl;
       #endif
     }
     Polynomial get_phi();
+
     void set_phi(Polynomial p){
       this->phi = &p;
       #ifdef VERBOSE
@@ -966,6 +1033,8 @@ class Polynomial{
     // static void XGCD(Polynomial &d, Polynomial &s,Polynomial &t, Polynomial &a,  Polynomial &b);
     static void BuildNthCyclotomic(Polynomial *phi, unsigned int n);
     static void random(Polynomial *a,int degree){
+      a->set_coeffs(degree+1);
+
       if(a->get_mod() > 0)
         for(int i = 0;i <= degree;i++)
           a->set_coeff(i,ZZ(rand())%a->get_mod());
