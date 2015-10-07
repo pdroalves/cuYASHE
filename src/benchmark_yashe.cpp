@@ -2,7 +2,7 @@
 #include <fstream>
 #include <iterator>
 #include <iomanip>
-#include "common.h"
+#include "settings.h"
 #include "yashe.h"
 #include "polynomial.h"
 #include "ciphertext.h"
@@ -269,14 +269,14 @@ int main(int argc, char* argv[]){
     //     }
         
     // clock_gettime( CLOCK_REALTIME, &stop);
-    //     diff = compute_time_ms(start,stop)/N;
-    //     std::cout << "Homomorphic Homomorphic Multiplication) Time measured with memory copy: " << diff << " ms" << std::endl;
-    //     mult_with_memcopy << d << " " << diff << std::endl;;
+    // diff = compute_time_ms(start,stop)/N;
+    // std::cout << "Homomorphic Multiplication) Time measured with memory copy: " << diff << " ms" << std::endl;
+    // mult_with_memcopy << d << " " << diff << std::endl;;
 
-    //     ct_a.crt();
-    //     ct_b.crt();
-    //     ct_a.update_device_data();
-    //     ct_b.update_device_data();
+    // ct_a.crt();
+    // ct_b.crt();
+    // ct_a.update_device_data();
+    // ct_b.update_device_data();
         
     // clock_gettime( CLOCK_REALTIME, &start);
     //     for(int i = 0; i < N;i++){
@@ -292,7 +292,7 @@ int main(int argc, char* argv[]){
         
     // clock_gettime( CLOCK_REALTIME, &stop);
     //     diff = compute_time_ms(start,stop)/N;
-    //     std::cout << "Homomorphic Homomorphic Multiplication) Time measured without memory copy: " << diff << " ms" << std::endl;
+    //     std::cout << "Homomorphic Multiplication) Time measured without memory copy: " << diff << " ms" << std::endl;
     //     mult_without_memcopy << d << " " << diff << std::endl;;
 
         c = ct_a;

@@ -1,6 +1,6 @@
 #include "benchmark_polynomial.h"
 #include "polynomial.h"
-#include "common.h"
+#include "settings.h"
 #include <iostream>
 #include <fstream>
 #include <iterator>

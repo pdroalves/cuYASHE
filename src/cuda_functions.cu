@@ -1,5 +1,5 @@
 #include "cuda_functions.h"
-#include "common.h"
+#include "settings.h"
 #include "polynomial.h"
 #include <cuda.h>
 #include <cuda_runtime_api.h>
@@ -665,19 +665,25 @@ void Polynomial::reduce(){
     Polynomial::DivRem((*this),phi,quot, rem);
     this->copy(rem);
     return;
+  }else{
+
+    // #ifdef VERBOSE
+    std::cout << "Reduce on device." << std::endl;
+    // #endif
+
+    const int half = phi.deg()/2;
+    const int N = this->CRTSPACING;
+    const int NPolis = this->CRTPrimes.size();
+    const int size = N*NPolis/2;
+
+    dim3 blockDim(32);
+    dim3 gridDim(size/32 + (size % 32 == 0? 0:1));
+
+    polynomialReduction<<<gridDim,blockDim>>>( this->get_device_crt_residues(),
+                                                half,
+                                                N,
+                                                NPolis);
+    cudaError_t result = cudaGetLastError();
+    assert(result == cudaSuccess);
   }
-  const int half = phi.deg()/2;
-  const int N = this->CRTSPACING;
-  const int NPolis = this->CRTPrimes.size();
-  const int size = N*NPolis/2;
-
-  dim3 blockDim(32);
-  dim3 gridDim(size/32 + (size % 32 == 0? 0:1));
-
-  polynomialReduction<<<gridDim,blockDim>>>( this->get_device_crt_residues(),
-                                              half,
-                                              N,
-                                              NPolis);
-  cudaError_t result = cudaGetLastError();
-  assert(result == cudaSuccess);
 }

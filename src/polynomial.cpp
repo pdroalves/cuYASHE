@@ -1,5 +1,5 @@
 #include "polynomial.h"
-#include "common.h"
+#include "settings.h"
 #include <omp.h>
 #include <assert.h>
 #include <string.h>
@@ -22,6 +22,19 @@ uint64_t cycles() {
   return ((uint64_t) lo) | (((uint64_t) hi) << 32);
 }
 
+
+Polynomial Polynomial::operator+(Polynomial b){
+  return common_addition<Polynomial>(this,&b);
+}
+
+Polynomial Polynomial::operator+=(Polynomial b){
+  common_addition_inplace<Polynomial>(this,&b);
+  return *this;
+}
+
+Polynomial Polynomial::operator*(Polynomial b){
+  return common_multiplication<Polynomial>(this,&b);
+}
 void Polynomial::update_device_data(unsigned int usable_ratio){
 
     if(this->get_device_updated())
@@ -66,10 +79,12 @@ void Polynomial::update_device_data(unsigned int usable_ratio){
 }
 
 void Polynomial::update_host_data(){
+    // uint64_t start = cycles();
+
     if(this->get_host_updated())
       return;
-    else if(!this->get_icrt_computed())
-      this->icrt();
+    // else if(!this->get_icrt_computed())
+      // this->icrt();
 
     #ifdef VERBOSE
     std::cout << "Copying data to CPU." << std::endl;
@@ -81,26 +96,35 @@ void Polynomial::update_host_data(){
       this->polyCRT.resize(Polynomial::CRTPrimes.size());
 
     // Copy all data to host
-    cuyasheint_t *aux;
-    // aux = (cuyasheint_t*) calloc (this->polyCRT.size()*this->CRTSPACING,sizeof(cuyasheint_t));
-    aux = (cuyasheint_t*) malloc (this->polyCRT.size()*this->CRTSPACING*sizeof(cuyasheint_t));
-    result = cudaMemcpy(aux , this->d_polyCRT, this->polyCRT.size()*this->CRTSPACING*sizeof(cuyasheint_t), cudaMemcpyDeviceToHost);
-    assert(result == cudaSuccess);
-    result = cudaDeviceSynchronize();
-    assert(result == cudaSuccess);
-    //
+    // cuyasheint_t *aux;
+    // // aux = (cuyasheint_t*) calloc (this->polyCRT.size()*this->CRTSPACING,sizeof(cuyasheint_t));
+    // aux = (cuyasheint_t*) malloc (this->polyCRT.size()*this->CRTSPACING*sizeof(cuyasheint_t));
+    // result = cudaMemcpy(aux , this->d_polyCRT, this->polyCRT.size()*this->CRTSPACING*sizeof(cuyasheint_t), cudaMemcpyDeviceToHost);
+    // assert(result == cudaSuccess);
+    // // result = cudaDeviceSynchronize();
+    // // assert(result == cudaSuccess);
+    // //
+    // for(unsigned int i=0;i < this->polyCRT.size();i++){
+    //   // if(this->polyCRT[i].size() != (unsigned int)(this->CRTSPACING))
+    //     // this->polyCRT[i].resize(this->CRTSPACING);
+    //     // for(unsigned int j=0; j < (unsigned int)(this->CRTSPACING);j++){
+    //       // this->polyCRT[i][j] = aux[j+i*this->CRTSPACING];
+    //     // }
+
+    //   this->polyCRT[i][0] = aux[i*this->CRTSPACING];
+    // }
+
     for(unsigned int i=0;i < this->polyCRT.size();i++){
       if(this->polyCRT[i].size() != (unsigned int)(this->CRTSPACING))
         this->polyCRT[i].resize(this->CRTSPACING);
-        // *(this->polyCRT[i][0]) = *(aux[i*this->CRTSPACING]);
-        // memcpy(&(this->polyCRT[i])[this->polyCRT[i][0].size() - this->CRTSPACING], &aux[i*this->CRTSPACING],  this->CRTSPACING * sizeof(cuyasheint_t));
-        // std::copy(&(aux) + i*this->CRTSPACING,&(aux) + (i+1)*this->CRTSPACING,this->polyCRT[i][0]);
-        for(unsigned int j=0; j < (unsigned int)(this->CRTSPACING);j++){
-          this->polyCRT[i][j] = aux[j+i*this->CRTSPACING];
-        }
+      result = cudaMemcpyAsync(&this->polyCRT[i][0] , this->d_polyCRT + i*this->CRTSPACING, this->CRTSPACING*sizeof(cuyasheint_t), cudaMemcpyDeviceToHost,this->get_stream());
+      assert(result == cudaSuccess);
     }
-    free(aux);
+    result = cudaDeviceSynchronize();
+    assert(result == cudaSuccess);
     this->set_host_updated(true);
+  // uint64_t end = cycles();
+  // std::cout << "update host " << (end-start) << std::endl;
 }
 
 void Polynomial::crt(){
@@ -156,73 +180,26 @@ void Polynomial::icrt(){
     this->update_host_data();
   }
 
-  std::vector<cuyasheint_t> P = this->CRTPrimes;
-  ZZ M = this->CRTProduct;
+  ZZ M = Polynomial::CRTProduct;
+  std::vector<cuyasheint_t> primes = Polynomial::CRTPrimes;
 
-  // Backup original modulus
-  ZZ q = ZZ_p::modulus();
-  ZZ_p::init(M);
+  // Discards all coefficients and prepare to receive new this->CRTSPACING coefficients
+  this->set_coeffs(this->CRTSPACING);
 
-  uint64_t start = cycles();
-  // Convert all CRT representations to Polynomial
-  std::vector<ZZ_pEX> X(this->polyCRT.size(),ZZ_pEX());
-  for(int index = 0; index < X.size(); index ++){
-      std::vector<cuyasheint_t> v = (this->polyCRT).at(index);
 
-      ZZ_pEX z(v.size());
-      for(std::vector<cuyasheint_t>::iterator iter = v.begin(); iter != v.end(); iter++){
-        unsigned int index = iter-v.begin();
-        NTL::SetCoeff(z,index,conv<ZZ_p>(*iter));
-      }
-      X[index] = z;
+  // Iteration over all primes
+  for(unsigned int i = 0; i < primes.size();i++){
+    // Get a prime
+    ZZ pi = ZZ(primes[i]);
+
+    ZZ Mpi = M/pi;
+    ZZ invMpi = NTL::InvMod(Mpi%pi,pi);
+
+    // Iteration over coefficients
+    for(unsigned int j = 0; j < this->polyCRT[i].size();j++){
+      this->coefs[i] += Mpi*( invMpi*(this->polyCRT[i][j]) % pi);  
+    }
   }
-  uint64_t end = cycles();
-  // std::cout << "ZZ_pEX convertion: " << (end-start) << std::endl;
-
-  // Computes each summation value
-  start = cycles();
-  std::vector<ZZ_pEX> icrti(P.size());
-  for(std::vector<cuyasheint_t>::iterator pi = P.begin(); pi != P.end(); pi++){
-          int index = pi-P.begin();
-          ZZ_p Mpi = conv<ZZ_p>(M / (*pi));
-
-          ZZ_p::init(ZZ(*pi));
-
-          ZZ_p innerMpi = conv<ZZ_p>(M / (*pi));
-          ZZ_p ZZMpiInnerInv = NTL::inv(innerMpi);
-          ZZ_pEX xi = X[index] * ZZ_pEX(ZZMpiInnerInv);
-
-          ZZ_p::init(M);
-
-          icrti[index] = ZZ_pEX(xi) * Mpi;
-  }
-  end = cycles();
-  // std::cout << "icrt computation: " << (end-start) << std::endl;
-
-  // Sum all
-  start = cycles();
-  ZZ_pEX result;
-  for(std::vector<ZZ_pEX>::iterator iter = icrti.begin(); iter != icrti.end();iter++)
-    // We only add the first P.size() irst elements
-    result += (*iter);
-  end = cycles();
-  // std::cout << "sum all: " << (end-start) << std::endl;
-
-  // Recover original mod
-  ZZ_p::init(q);
-  // Set to 0 all non-used coefficients
-  this->set_coeffs(NTL::deg(result)+1);//Discards all coeffs
-  
-  start = cycles();
-  // Set new coefficients
-  for(int index = 0; index <= NTL::deg(result); index++){
-      ZZ r = conv<ZZ>(NTL::coeff(NTL::rep(result[index]),0));// Gambiarra
-      ZZ_p value = conv<ZZ_p>(r);//This applies mod q
-
-      this->set_coeff(index,conv<ZZ>(value));
-  }
-  end = cycles();
-  // std::cout << "Convertion back " << (end-start) << std::endl;
 
   this->normalize();
   this->set_host_updated(true);

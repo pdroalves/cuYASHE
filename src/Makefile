@@ -24,8 +24,10 @@ BENCHMARKYASHEBIN= $(INSTALL)/benchmark_yashe
 
 all: tests benchmarks
 
-tests: polynomial.o cuda_functions.o test.o ciphertext.o distribution.o yashe.o
-	$(CUDA_CC) $(CUDA_ARCH) $(LCUDA) $(ICUDA)  -o $(TESTBIN) test.o polynomial.o cuda_functions.o ciphertext.o distribution.o yashe.o -lcufft -Xcompiler $(OPENMP) $(NTL) -lboost_unit_test_framework
+tests:  polynomial.o cuda_functions.o test.o test_ctpt.o test_crt.o ciphertext.o distribution.o yashe.o 
+	$(CUDA_CC) $(CUDA_ARCH) $(LCUDA) $(ICUDA) -o $(TESTBIN) test.o polynomial.o cuda_functions.o ciphertext.o distribution.o yashe.o -lcufft -Xcompiler $(OPENMP) $(NTL) -lboost_unit_test_framework
+	$(CUDA_CC) $(CUDA_ARCH) $(LCUDA) $(ICUDA) -o $(TESTBIN)_ctpt test_ctpt.o polynomial.o cuda_functions.o ciphertext.o distribution.o yashe.o -lcufft -Xcompiler $(OPENMP) $(NTL)
+	$(CUDA_CC) $(CUDA_ARCH) $(LCUDA) $(ICUDA) -o $(TESTBIN)_crt test_crt.o polynomial.o cuda_functions.o ciphertext.o distribution.o yashe.o -lcufft -Xcompiler $(OPENMP) $(NTL)
 
 benchmarks:benchmark_yashe.o yashe.o benchmark_polynomial.o polynomial.o cuda_functions.o distribution.o ciphertext.o
 		$(CUDA_CC) $(CUDA_ARCH) $(LCUDA) $(ICUDA)  -o $(BENCHMARKPOLYBIN) benchmark_polynomial.o polynomial.o cuda_functions.o -lcufft -Xcompiler $(OPENMP) $(NTL) $(LTIME_MEASURE)
@@ -53,12 +55,18 @@ distribution.o:distribution.cpp
 yashe.o:yashe.cpp
 	$(CC) -c yashe.cpp -o yashe.o $(NTL) $(OPENMP) $(LCUDA) $(ICUDA)
 
-test_ntt: test_ntt.cu polynomial.o ciphertext.o yashe.o
-	nvcc -O3 -G -g -std=c++11 -arch=sm_35 test_ntt.cu polynomial.cpp ciphertext.cpp yashe.o cuda_functions.cu distribution.cpp -o ../bin/test_ntt -lcufft -Xcompiler  -fopenmp -Intl -lntl -lgmp -m64
+common.o:common.cpp
+	$(CC) -c common.cpp -o common.o $(NTL) $(OPENMP) $(LCUDA) $(ICUDA)
 
+test_ctpt.o: test_ctpt.cu
+	$(CUDA_CC) -c test_ctpt.cu -o test_ctpt.o  $(NTL)
+
+test_crt.o: test_crt.cu
+	$(CUDA_CC) -c test_crt.cu -o test_crt.o  $(NTL)
 
 test_mul: polynomial.o cuda_functions.o
 	$(CUDA_CC) $(CUDA_ARCH) -G -g test_mul.cu polynomial.cpp cuda_functions.cu -o ../bin/test_mul -lntl -lgmp
+
 test.o:test.cu
 	$(CUDA_CC) -c test.cu -o test.o  -lboost_unit_test_framework $(NTL)
 

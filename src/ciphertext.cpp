@@ -2,20 +2,24 @@
 #include "yashe.h"
 
 Ciphertext Ciphertext::operator+(Ciphertext b){
-  Polynomial C = (Polynomial)(*this)+(Polynomial)(b);
-  Ciphertext c = &(C);
+  Ciphertext c = common_addition<Ciphertext>(this,&b);
   c.level = std::max(this->level,b.level);
+
   return c;
 }
 
 Ciphertext Ciphertext::operator+(Polynomial b){
-
-  Polynomial A = *this;
-  Polynomial B = b;
-  Polynomial C = A+B;
-  
-  Ciphertext c(&C);
+  Polynomial p = common_addition<Polynomial>(this,&b);
+  Ciphertext c(p);
   return c;
+}
+Ciphertext Ciphertext::operator+=(Ciphertext b){
+  common_addition_inplace<Ciphertext>(this,&b);
+  return *this;
+}
+Ciphertext Ciphertext::operator+=(Polynomial b){
+  common_addition_inplace<Polynomial>(this,&b);
+  return *this;
 }
 
 Ciphertext Ciphertext::operator*(Ciphertext b){

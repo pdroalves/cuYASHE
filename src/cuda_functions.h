@@ -3,7 +3,7 @@
 #include <cuda_runtime.h>
 #include <stdint.h>
 #include <assert.h>
-#include "common.h"
+#include "settings.h"
 #include <NTL/ZZ.h>
 #ifdef CUFFTMUL
 #include <cufft.h>

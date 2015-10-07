@@ -1,5 +1,5 @@
 #include "yashe.h"
-#include "common.h"
+#include "settings.h"
 
 int Yashe::d = 0;
 Polynomial Yashe::phi;
@@ -163,16 +163,17 @@ Polynomial Yashe::decrypt(Ciphertext c){
       g = f*c;
   }
   g.reduce();
+  uint64_t start = arch_cycles();
+  g.icrt();
+  uint64_t stop = arch_cycles();
+  std::cout << (stop-start) << " cycles to icrt decrypt." << std::endl;
 
   // Polynomial reduced_g = Polynomial::rem(g,phi);
   // reduced_g.icrt();
   #ifdef DEBUG
   std::cout << "g = f*c % phi: "<< reduced_g <<std::endl;
   #endif
-  uint64_t start = arch_cycles();
   g = g * t; // This operation should not be modular
-  uint64_t stop = arch_cycles();
-  std::cout << (stop-start) << " cycles to decrypt." << std::endl;
 
   ZZ coeff = g.get_coeff(0);
   ZZ quot;

@@ -8,12 +8,15 @@
 #include <NTL/ZZ_pXFactoring.h>
 #include <cuda_runtime.h>
 #include "cuda_functions.h"
+#include "settings.h"
 #include "common.h"
 #include <algorithm>
 
 NTL_CLIENT
 
 uint64_t polynomial_get_cycles();
+
+// template Polynomial common_addition<Polynomial>(Polynomial *a,Polynomial *b);
 
 class Polynomial{
   public:
@@ -232,127 +235,8 @@ class Polynomial{
         #endif
         return *this;
     }
-    Polynomial operator+(Polynomial b){
-      #ifdef ADDONCPUINPOSSIBLE
-      if(!this->get_device_updated() && !b.get_device_updated()){
-        // CPU add
-        #ifdef VERBOSE
-        std::cout << "Operator+ on CPU" << std::endl;
-        #endif
-        Polynomial c(*this);
-        c.CPUAddition(&b);
-        return c;
-      }else{
-      #endif
-        #ifdef VERBOSE
-        std::cout << "Operator+ on GPU" << std::endl;
-        #endif
-        // Check align
-        if(this->CRTSPACING != b.CRTSPACING){
-          int new_spacing = std::max(this->CRTSPACING,b.CRTSPACING);
-          this->update_crt_spacing(new_spacing);
-          b.update_crt_spacing(new_spacing);
-        }
-
-        #ifdef VERBOSE
-        std::cout << "Adding:" << std::endl;
-        // std::cout << "this: " << this->to_string() << std::endl;
-        // std::cout << "other " << b.to_string() << std::endl;
-        #endif
-
-        // Apply CRT and copy data to global memory, if needed
-        #pragma omp parallel sections num_threads(2)
-        {
-            #pragma omp section
-            {
-
-                if(!this->get_device_updated()){
-                  this->crt();
-                  this->update_device_data();
-                }
-
-            }
-            #pragma omp section
-            {
-                if(!b.get_device_updated()){
-                    b.crt();
-                    b.update_device_data();
-                }
-            }
-        }
-
-
-        cuyasheint_t *d_result = CUDAFunctions::callPolynomialAddSub(this->stream,this->get_device_crt_residues(),b.get_device_crt_residues(),(int)(this->CRTSPACING*Polynomial::CRTPrimes.size()),ADD);
-
-        Polynomial c(this->get_mod(),this->get_phi(),this->CRTSPACING);
-        c.set_device_crt_residues(d_result);
-        c.set_host_updated(false);
-        c.set_device_updated(true);
-        cudaDeviceSynchronize();
-        return c;
-      #ifdef ADDONCPUINPOSSIBLE
-      }
-      #endif
-    }
-    Polynomial operator+=(Polynomial b){
-      #ifdef ADDONCPUINPOSSIBLE
-      if(!this->get_device_updated() && !b.get_device_updated()){
-        // CPU add
-        #ifdef VERBOSE
-        std::cout << "Operator+ on CPU" << std::endl;
-        #endif
-        this->CPUAddition(&b);
-        return *this;
-      }else{
-      #endif
-        #ifdef VERBOSE
-        std::cout << "Operator+ on GPU" << std::endl;
-        #endif
-        // Check align
-        if(this->CRTSPACING != b.CRTSPACING){
-          int new_spacing = std::max(this->CRTSPACING,b.CRTSPACING);
-          this->update_crt_spacing(new_spacing);
-          b.update_crt_spacing(new_spacing);
-        }
-
-        #ifdef VERBOSE
-        std::cout << "Adding:" << std::endl;
-        // std::cout << "this: " << this->to_string() << std::endl;
-        // std::cout << "other " << b.to_string() << std::endl;
-        #endif
-
-        // Apply CRT and copy data to global memory, if needed
-        #pragma omp parallel sections num_threads(2)
-        {
-            #pragma omp section
-            {
-
-                if(!this->get_device_updated()){
-                  this->crt();
-                  this->update_device_data();
-                }
-
-            }
-            #pragma omp section
-            {
-                if(!b.get_device_updated()){
-                    b.crt();
-                    b.update_device_data();
-                }
-            }
-        }
-
-
-        CUDAFunctions::callPolynomialAddSubInPlace(this->stream,this->get_device_crt_residues(),b.get_device_crt_residues(),(int)(this->CRTSPACING*Polynomial::CRTPrimes.size()),ADD);
-
-        this->set_host_updated(false);
-        this->set_device_updated(true);
-        cudaDeviceSynchronize();
-      #ifdef ADDONCPUINPOSSIBLE
-      }
-      #endif
-      return *this;
-    }
+    Polynomial operator+(Polynomial b);
+    Polynomial operator+=(Polynomial b);
     Polynomial operator-(Polynomial b){
       // Check align
       if(this->CRTSPACING != b.CRTSPACING){
@@ -401,55 +285,7 @@ class Polynomial{
       this->set_device_crt_residues( ((*this)-b).get_device_crt_residues());
       return *this;
     }
-    Polynomial operator*(Polynomial b){
-
-      // Check align
-      int new_spacing = pow(2,ceil(log2(this->deg()+b.deg())));
-        if(new_spacing < CUDAFunctions::N)
-          new_spacing = CUDAFunctions::N;
-        else if(new_spacing != CUDAFunctions::N){
-          // Re-compute W matrix
-          CUDAFunctions::init(new_spacing);
-      }
-      this->update_crt_spacing(new_spacing);
-      b.update_crt_spacing(new_spacing);
-
-      #ifdef VERBOSE
-      std::cout << "Mul:" << std::endl;
-      // std::cout << "this: " << this->to_string() << std::endl;
-      // std::cout << "other " << b.to_string() << std::endl;
-      #endif
-
-      // Apply CRT and copy data to global memory, if needed
-      #pragma omp sections
-      {
-          #pragma omp section
-          {
-
-              if(!this->get_device_updated()){
-                this->crt();
-                this->update_device_data(2);
-              }
-
-          }
-          #pragma omp section
-          {
-              if(!b.get_device_updated()){
-                  b.crt();
-                  b.update_device_data(2);
-              }
-          }
-      }
-
-      cuyasheint_t *d_result = CUDAFunctions::callPolynomialMul(this->stream,this->get_device_crt_residues(),b.get_device_crt_residues(),this->CRTSPACING,this->CRTPrimes.size());
-
-      Polynomial c(this->get_mod(),this->get_phi(),this->CRTSPACING);
-      c.set_device_crt_residues(d_result);
-      c.set_host_updated(false);
-      c.set_device_updated(true);
-      // cudaDeviceSynchronize();
-      return c;
-    }
+    Polynomial operator*(Polynomial b);
     Polynomial operator*=(Polynomial b){
       this->set_device_crt_residues( ((*this)*b).get_device_crt_residues());
       return *this;
@@ -1042,22 +878,29 @@ class Polynomial{
         for(int i = 0;i <= degree;i++)
           a->set_coeff(i,ZZ(rand()) % a->global_mod);
     }
+    cudaStream_t get_stream(){
+      return this->stream;
+    }
+    void set_stream(){
+      cudaStreamCreate(&this->stream);
+    }
   private:
     // Attributes
-    cudaStream_t stream;
-    int expected_degree; // This variable stores the expected degree for this polinomial
-    std::vector<ZZ> coefs;
-    std::vector<std::vector<cuyasheint_t> > polyCRT; // Must be initialized by crt()
-    cuyasheint_t *d_polyCRT; // Must be initialized on CRTSPACING definition and updated by crt(), if needed
-    ZZ mod;
-    Polynomial *phi;
-
     bool ON_COPY;
     bool HOST_IS_UPDATED;
     bool DEVICE_IS_UPDATE;
     bool CRT_COMPUTED;
     bool ICRT_COMPUTED;
     //Functions and methods
+  protected:
+    std::vector<ZZ> coefs;
+    std::vector<std::vector<cuyasheint_t> > polyCRT; // Must be initialized by crt()
+    cuyasheint_t *d_polyCRT; // Must be initialized on CRTSPACING definition and updated by crt(), if needed
+
+    ZZ mod;
+    Polynomial *phi;
+    cudaStream_t stream;
+    int expected_degree; // This variable stores the expected degree for this polinomial
 
 };
 #endif

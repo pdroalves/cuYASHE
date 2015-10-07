@@ -7,31 +7,164 @@ class Ciphertext: public Polynomial{
   public:
     Ciphertext operator+(Ciphertext b);
     Ciphertext operator+(Polynomial b);
-    Ciphertext operator+=(Ciphertext b){
-      this->set_device_crt_residues( ((*this)+b).get_device_crt_residues());
-      return *this;
-    }
-    Ciphertext operator+=(Polynomial b){
-      this->set_device_crt_residues( ((*this)+b).get_device_crt_residues());
-      return *this;
-    }
+    Ciphertext operator+=(Ciphertext b);
+    //   this->set_device_crt_residues( ((*this)+b).get_device_crt_residues());
+    //   return *this;
+    // }
+    Ciphertext operator+=(Polynomial b);
     Ciphertext operator*(Ciphertext b);
     void convert();
     Ciphertext operator=(Polynomial p){
       level = 0;
       this->copy(p);
       return *this;
-    }
+    } 
+    // Constructors
     Ciphertext(Polynomial *p){
-        level = 0;
         this->copy(*p);
     }
     Ciphertext(Polynomial p){
-        level = 0;
         this->copy(p);
     }
     Ciphertext(){
-      level = 0;
+      this->set_stream();
+      this->expected_degree = -1;
+      this->set_host_updated(true);
+      this->set_device_updated(false);
+      this->set_crt_computed(false);
+      this->set_icrt_computed(true);
+      if(Polynomial::global_mod > 0)
+        // If a global mod is defined, use it
+        this->mod = Polynomial::global_mod; // Doesn't copy. Uses the reference.
+      
+      if(Polynomial::global_phi){
+        // If a global phi is defined, use it
+        this->phi = Polynomial::global_phi; // Doesn't copy. Uses the reference.
+
+        // If the irreductible polynomial have degree N, this polynomial's degree will be limited to N-1
+        this->CRTSPACING = Polynomial::global_phi->deg();
+      }else
+        // CRT Spacing not set
+        this->CRTSPACING = -1;
+      
+
+      if(Polynomial::phi_set)
+        this->coefs.resize(this->get_phi().deg()+1);
+      
+
+      #ifdef VERBOSE
+        std::cout << "Polynomial constructed with CRTSPACING " << this->CRTSPACING << " and no mod or phi elements" << std::endl;
+      #endif
+    }
+    Ciphertext(ZZ p){
+      this->set_stream();
+      this->expected_degree = -1;
+      this->set_host_updated(true);
+      this->set_device_updated(false);
+      this->set_crt_computed(false);
+      this->set_icrt_computed(true);
+      this->mod = ZZ(p);// Copy
+
+      if(Polynomial::global_phi){
+      //   // If a global phi is defined, use it
+        this->phi = Polynomial::global_phi; // Doesn't copy. Uses the reference.
+      }
+      // CRT Spacing not set
+      this->CRTSPACING = -1;
+
+      if(Polynomial::phi_set){
+        this->coefs.resize(this->get_phi().deg()+1);
+      }
+      #ifdef VERBOSE
+        std::cout << "Polynomial constructed with CRTSPACING " << this->CRTSPACING << ", mod "  << this->mod << " but no phi."<< std::endl;
+      #endif
+    }
+    Ciphertext(ZZ p,Polynomial P){
+      this->set_stream();
+      this->expected_degree = -1;
+      this->set_host_updated(true);
+      this->set_device_updated(false);
+      this->set_crt_computed(false);
+      this->set_icrt_computed(true);
+      this->mod = ZZ(p);// Copy
+      *(this->phi) = Polynomial(P);// Copy
+
+      // CRT Spacing should store the expected number of coefficients
+      // If the irreductible polynomial have degree N, this polynomial's degree will be limited to N-1
+      this->CRTSPACING = this->phi->deg();
+
+      if(Polynomial::phi_set){
+        this->coefs.resize(this->get_phi().deg()+1);
+      }
+      #ifdef VERBOSE
+        std::cout << "Polynomial constructed with CRTSPACING " << this->CRTSPACING << ", mod "  << this->mod <<" and phi " << this-> phi << std::endl;
+      #endif
+    }
+    Ciphertext(int spacing){
+      this->set_stream();
+      this->expected_degree = -1;
+      this->set_host_updated(true);
+      this->set_device_updated(false);
+      this->set_crt_computed(false);
+      this->set_icrt_computed(true);
+      if(Polynomial::global_mod > 0){
+        // If a global mod is defined, use it
+        this->mod = Polynomial::global_mod; // Doesn't copy. Uses the reference.
+      }
+      if(Polynomial::global_phi){
+      //   // If a global phi is defined, use it
+        this->phi = Polynomial::global_phi; // Doesn't copy. Uses the reference.
+      }
+      // CRT Spacing set to spacing
+      this->CRTSPACING = spacing;
+      if(Polynomial::phi_set){
+        this->coefs.resize(this->get_phi().deg()+1);
+      }
+
+      #ifdef VERBOSE
+        std::cout << "Polynomial constructed with CRTSPACING " << this->CRTSPACING << " and no mod or phi elements" << std::endl;
+      #endif
+    }
+    Ciphertext(ZZ p,Polynomial P,int spacing){
+      this->set_stream();
+      this->expected_degree = -1;
+      this->set_host_updated(true);
+      this->set_device_updated(false);
+      this->set_crt_computed(false);
+      this->set_icrt_computed(true);
+      this->mod = ZZ(p);// Copy
+      this->phi = &P;// Copy
+
+      // std::cout << this->get_phi().to_string() << std::endl;
+
+      // CRT Spacing set to spacing
+      this->CRTSPACING = spacing;
+
+      if(Polynomial::phi_set){
+        this->coefs.resize(this->get_phi().deg()+1);
+      }
+      #ifdef VERBOSE
+        std::cout << "Polynomial constructed with CRTSPACING " << this->CRTSPACING << ", mod "  << this->mod <<" and phi " << this->phi << std::endl;
+      #endif
+    }
+    Ciphertext(ZZ p,int spacing){
+      this->set_stream();
+      this->expected_degree = -1;
+      this->set_host_updated(true);
+      this->set_device_updated(false);
+      this->set_crt_computed(false);
+      this->set_icrt_computed(true);
+      this->mod = ZZ(p);// Copy
+
+      // CRT Spacing set to spacing
+      this->CRTSPACING = spacing;
+
+      if(Polynomial::phi_set){
+        this->coefs.resize(this->get_phi().deg()+1);
+      }
+      #ifdef VERBOSE
+        std::cout << "Polynomial constructed with CRTSPACING " << this->CRTSPACING << ", mod "  << this->mod << std::endl;
+      #endif
     }
 
     void copy(Polynomial p){

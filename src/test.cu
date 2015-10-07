@@ -6,7 +6,7 @@
 #include "polynomial.h"
 #include "ciphertext.h"
 #include "yashe.h"
-#include "common.h"
+#include "settings.h"
 #include "cuda_functions.h"
 #include <cuda.h>
 #include <cuda_runtime_api.h>

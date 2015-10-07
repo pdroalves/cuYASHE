@@ -34,24 +34,15 @@ uint64_t get_cycles() {
 
 
 int main(void){
-    uint64_t t;
-    Yashe cipher;
-    int degree;
+    const int degree = 4096;
     Polynomial phi;
     ZZ_pX NTL_Phi;
 
     srand (36251);
-
-    // Params
     ZZ q;
     q = conv<ZZ>("1171313591017775093490277364417L");
-    // q = conv<ZZ>("655615111");
     Polynomial::global_mod = q;
     ZZ_p::init(q); // Defines GF(q)
-
-    t = 35951;
-    degree = 4096;
-    int w = 72;
 
     Polynomial::BuildNthCyclotomic(&phi, degree); // generate an cyclotomic polynomial
     phi.set_mod(Polynomial::global_mod);
@@ -64,82 +55,60 @@ int main(void){
     }
     ZZ_pE::init(NTL_Phi);
 
-    CUDAFunctions::init(2*degree);
-
     Polynomial::gen_crt_primes(Polynomial::global_mod,degree);
-
-    // Yashe
-    cipher = Yashe();
-
-    Yashe::d = degree;
-    Yashe::phi = phi;
-    Yashe::q = q;
-    // std::cout << ZZ_p::modulus() << std::endl;
-    // std::cout << q << std::endl;
-
-    Yashe::t = t;
-    Yashe::w = w;
-    Yashe::lwq = floor(NTL::log(q)/(log(2)*w)+1);
-
-    cipher.generate_keys();
-
+    
     //////////
     struct timespec start, stop;
 
-    Ciphertext cA;
-    Ciphertext cB;
     Polynomial pA;
-    Polynomial pB;
 
-    Ciphertext::random(&cA,degree-1);
-    Ciphertext::random(&cB,degree-1);
     Polynomial::random(&pA,degree-1);
-    Polynomial::random(&pB,degree-1);
     
-    cA.update_device_data();
-    cB.update_device_data();
-
     std::cout << "Starting..." << std::endl << std::endl;
     clock_gettime( CLOCK_REALTIME, &start);
     for(unsigned int i = 0; i < 100;i++){
-      Ciphertext c = cA+cB;
+      pA.crt();
       cudaError_t result = cudaDeviceSynchronize();
       assert(result == cudaSuccess);
+      pA.set_crt_computed(false);
     }
     clock_gettime( CLOCK_REALTIME, &stop);
-    std::cout << "Ciphertext sum: " << compute_time_ms(start,stop)/100 << std::endl;
+    std::cout << "Polynomial CRT: " << compute_time_ms(start,stop)/100 << std::endl;
 
 
     clock_gettime( CLOCK_REALTIME, &start);
     for(unsigned int i = 0; i < 100;i++){
-      cA += cB;
+      pA.update_device_data();
       cudaError_t result = cudaDeviceSynchronize();
       assert(result == cudaSuccess);
+      pA.set_device_updated(false);
     }
     clock_gettime( CLOCK_REALTIME, &stop);
-    std::cout << "Ciphertext inplace sum: " << compute_time_ms(start,stop)/100 << std::endl;
+    std::cout << "Polynomial device update: " << compute_time_ms(start,stop)/100 << std::endl;
 
-
-    pA.update_device_data();
-    pB.update_device_data();
+    pA.set_device_updated(true);
+    pA.set_host_updated(false);
 
     clock_gettime( CLOCK_REALTIME, &start);
     for(unsigned int i = 0; i < 100;i++){
-      Polynomial p = pA+pB;
+      pA.update_host_data();
       cudaError_t result = cudaDeviceSynchronize();
       assert(result == cudaSuccess);
+      pA.set_host_updated(false);
     }
     clock_gettime( CLOCK_REALTIME, &stop);
-    std::cout << "Polynomial sum: " << compute_time_ms(start,stop)/100 << std::endl;
+    std::cout << "Polynomial host update: " << compute_time_ms(start,stop)/100 << std::endl;
 
+    pA.set_host_updated(true);
 
     clock_gettime( CLOCK_REALTIME, &start);
     for(unsigned int i = 0; i < 100;i++){
-      pA += pB;
+      pA.icrt();
       cudaError_t result = cudaDeviceSynchronize();
       assert(result == cudaSuccess);
+      pA.set_icrt_computed(false);
     }
     clock_gettime( CLOCK_REALTIME, &stop);
-    std::cout << "Polynomial inplace sum: " << compute_time_ms(start,stop)/100 << std::endl;
+    std::cout << "Polynomial ICRT: " << compute_time_ms(start,stop)/100 << std::endl;
 
 }
