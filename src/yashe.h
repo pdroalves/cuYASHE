@@ -21,6 +21,7 @@ class Yashe{
     static Polynomial h;
     static Polynomial f;
     static int lwq;
+    static ZZ WDMasking;
     Yashe(){
       const int sigma_err = 8;
       const float gaussian_std_deviation = sigma_err*0.4;

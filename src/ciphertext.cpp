@@ -22,7 +22,23 @@ Ciphertext Ciphertext::operator+=(Polynomial b){
   return *this;
 }
 
+uint64_t cycles() {
+  unsigned int hi, lo;
+  asm (
+    "cpuid\n\t"/*serialize*/
+    "rdtsc\n\t"/*read the clock*/
+    "mov %%edx, %0\n\t"
+    "mov %%eax, %1\n\t" 
+    : "=r" (hi), "=r" (lo):: "%rax", "%rbx", "%rcx", "%rdx"
+  );
+  return ((uint64_t) lo) | (((uint64_t) hi) << 32);
+}
+
+
 Ciphertext Ciphertext::operator*(Ciphertext b){
+  // uint64_t start,end;
+
+  // start = cycles();
 
   Ciphertext c1(*this);
   Ciphertext c2(b);
@@ -55,6 +71,9 @@ Ciphertext Ciphertext::operator*(Ciphertext b){
   this->level = std::max(this->level,b.level)+1;
   this->set_device_updated(false);
   this->set_host_updated(true);
+  // end = cycles();
+  // std::cout << "ciphertext mult " << (end-start) << std::endl;
+
   return *this;
 
 }
@@ -68,34 +87,30 @@ void Ciphertext::convert(){
 
 void Ciphertext::keyswitch(){
 
-      std::vector<Polynomial> P(Yashe::lwq);
-      this->worddecomp(&P);
-      this->set_coeffs(std::vector<cuyasheint_t>());//Discards all coefficients
 
-      for(int i = 0; i < Yashe::lwq; i ++){
-        Polynomial p = (P[i]);
-        *this += p*(Yashe::gamma[i]);
-      }
-      this->reduce();
+  std::vector<Polynomial> P(Yashe::lwq);
+  this->worddecomp(&P);
+  this->set_coeffs(std::vector<cuyasheint_t>());//Discards all coefficients
+
+  for(int i = 0; i < Yashe::lwq; i ++){
+    Polynomial p = (P[i]);
+    *this += p*(Yashe::gamma[i]);
+  }
+  this->reduce();
+
+
 }
 
 void Ciphertext::worddecomp(std::vector<Polynomial> *P){
-      //
-      // Todo
-      // std::cout << "worddecomp implemented for ciphertext." << std::endl;
-      // throw exception();
 
-      ZZ MASKING = NTL::LeftShift(ZZ(1),conv<long>(Yashe::w - 1));
-
-      for(int i = 0; i <= this->deg(); i++){
-        ZZ c = this->get_coeff(i);
-        int j = 0;
-        while(c > 0){
-          Polynomial p = P->at(j);
-          p.set_coeff(i,(c&MASKING));
-          c = NTL::RightShift(c,conv<long>(Yashe::w));
-          j++;
-        }
-      }
-
+  for(int i = 0; i <= this->deg(); i++){
+    ZZ c = this->get_coeff(i);
+    int j = 0;
+    while(c > 0){
+      Polynomial p = P->at(j);
+      p.set_coeff(i,(c & Yashe::WDMasking));
+      c = NTL::RightShift(c,conv<long>(Yashe::w));
+      j++;
+    }
+  }
 }

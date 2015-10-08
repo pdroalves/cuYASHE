@@ -10,17 +10,6 @@ ZZ Polynomial::global_mod = ZZ(0);
 Polynomial *(Polynomial::global_phi) = NULL;
 bool Polynomial::phi_set = false;
 
-uint64_t cycles() {
-  unsigned int hi, lo;
-  asm (
-    "cpuid\n\t"/*serialize*/
-    "rdtsc\n\t"/*read the clock*/
-    "mov %%edx, %0\n\t"
-    "mov %%eax, %1\n\t" 
-    : "=r" (hi), "=r" (lo):: "%rax", "%rbx", "%rcx", "%rdx"
-  );
-  return ((uint64_t) lo) | (((uint64_t) hi) << 32);
-}
 
 
 Polynomial Polynomial::operator+(Polynomial b){

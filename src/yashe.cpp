@@ -10,6 +10,7 @@ int Yashe::lwq = 0;
 Polynomial Yashe::h = Polynomial();
 std::vector<Polynomial> Yashe::gamma;
 Polynomial Yashe::f = Polynomial();
+ZZ Yashe::WDMasking = ZZ(0);
 
 uint64_t arch_cycles() {
   unsigned int hi, lo;
@@ -109,6 +110,9 @@ void Yashe::generate_keys(){
     std::cout << "gamma[" << k << "] = " << gamma[k] << std::endl;
     #endif
   }
+
+  // Word decomp mask
+  WDMasking = NTL::LeftShift(ZZ(1),conv<long>(Yashe::w - 1));
 
   #ifdef VERBOSE
   std::cout << "Keys generated." << std::endl;
