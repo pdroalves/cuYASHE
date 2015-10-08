@@ -724,7 +724,7 @@ class Polynomial{
         std::cout << "Primes size: " << primes_size << std::endl;
         cuyasheint_t n;
 
-        while( (M < (2*degree)*q*q*q) ){
+        while( (M < (2*degree)*q*q) ){
             n = NTL::GenPrime_long(primes_size);
             if( std::find(P.begin(), P.end(), n) == P.end()){
               // Does not contains
@@ -776,9 +776,12 @@ class Polynomial{
 
     int deg(){
       if(!this->get_host_updated())
-        return this->expected_degree;        
-      else
-        return this->coefs.size()-1;
+        this->icrt();
+      return this->coefs.size()-1;
+      // if(!this->get_host_updated())
+        // return this->expected_degree;        
+      // else
+        // return this->coefs.size()-1;
     }
     ZZ lead_coeff(){
       if(this->deg() >= 0){
@@ -853,6 +856,7 @@ class Polynomial{
       ZZ_pEX inv_a_ntl =  NTL::InvMod(a_ntl, b_ntl);
 
       Polynomial result;
+      result.set_coeffs(b.deg()+1);
       for(int i = 0; i <= b.deg();i++){
         ZZ ntl_value;
         if( NTL::IsZero(NTL::coeff(inv_a_ntl,i)) )

@@ -37,7 +37,7 @@ struct PolySuite
     PolySuite(){
         BOOST_TEST_MESSAGE("setup PolySuite");
 
-        degree = 128;
+        degree = 8;
         CUDAFunctions::init(degree);
 
         Polynomial::global_mod = conv<ZZ>("1171313591017775093490277364417L"); // Defines default GF(q)
@@ -209,6 +209,11 @@ BOOST_AUTO_TEST_CASE(multipleAddsWithDifferentDegrees)
     b_ntl += a_ntl;
   }
 
+  #ifdef VERBOSE
+  std::cout << "b: " << b.to_string() << std::endl;
+  std::cout << "b_ntl: " << b_ntl << std::endl;
+  #endif
+
   BOOST_REQUIRE(NTL::deg(b_ntl) == b.deg());
   for(int i = 0;i <= b.deg();i++)
     BOOST_REQUIRE(conv<ZZ>(NTL::rep(b_ntl[i])[0]) == b.get_coeff(i));
@@ -222,7 +227,6 @@ BOOST_AUTO_TEST_CASE(zeroAdd)
   Polynomial::random(&a,degree-1);
 
   Polynomial r = a + b;
-  // r.icrt();
 
   #ifdef VERBOSE
   std::cout << "r: " << r.to_string() << std::endl;
@@ -365,9 +369,9 @@ BOOST_AUTO_TEST_CASE(simpleMultiplication)
 
     result = cudaMemcpy(h_c,d_c,  N*NPOLYS*sizeof(cuyasheint_t), cudaMemcpyDeviceToHost);
     assert(result == cudaSuccess);
-    for(int i = 0; i < N; i++)
-      std::cout << h_c[i] << " ";
-    std::cout << std::endl;
+    // for(int i = 0; i < N; i++)
+      // std::cout << h_c[i] << " ";
+    // std::cout << std::endl;
 
     for(int j = 0; j < NPOLYS;j++)
       for(int i = 0; i < N; i++){
@@ -377,8 +381,8 @@ BOOST_AUTO_TEST_CASE(simpleMultiplication)
           ntl_value = 0L;
         else
           ntl_value = conv<ZZ>(NTL::rep(NTL::coeff(c_ntl,i))[0]);
-        std::cout << "h_c " << h_c[i+j*N] << std::endl;
-        std::cout << "ntl_value: " <<ntl_value << std::endl;
+        // std::cout << "h_c " << h_c[i+j*N] << std::endl;
+        // std::cout << "ntl_value: " <<ntl_value << std::endl;
         BOOST_REQUIRE(h_c[i+j*N] == ntl_value);
       }
     cudaFree(d_a);
@@ -793,12 +797,21 @@ BOOST_AUTO_TEST_CASE(modularInversion)
   Polynomial a;
   Polynomial::random(&a,Polynomial::global_phi->deg()-1);
 
-  std::cout << Polynomial::global_phi->to_string() << std::endl;
+  std::cout << "Phi: " << Polynomial::global_phi->to_string() << std::endl;
+  
   Polynomial aInv = Polynomial::InvMod(a,Polynomial::global_phi);
-  std::cout << a.to_string() << std::endl;
-  std::cout << aInv.to_string() << std::endl;
-  Polynomial result = a*aInv % a.get_phi();
-  std::cout << result.to_string() << std::endl;
+  
+  std::cout << "a: " << a.to_string() << std::endl;
+  std::cout << "aInv: " << aInv.to_string() << std::endl;
+  
+  Polynomial result = a*aInv;
+  result %= Polynomial::global_mod;
+  
+  std::cout << "a*aInv = " <<result.to_string() << std::endl;
+  result.reduce();
+
+  std::cout << "a*aInv % Phi = " <<result.to_string() << std::endl;
+  
   result %= a.get_mod();
 
   Polynomial one = Polynomial();

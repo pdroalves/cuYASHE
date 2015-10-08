@@ -139,19 +139,19 @@ void Polynomial::crt(){
 
     // We pick each prime
     for(std::vector<cuyasheint_t>::iterator iter_prime = P.begin(); iter_prime != P.end(); iter_prime++){
-        int index = iter_prime - P.begin();//Debug
+      int index = iter_prime - P.begin();//Debug
 
-        // Apply mod at each coefficient
-        std::vector<cuyasheint_t> rep = this->polyCRT[index];
-        rep.resize(array.size());
-        for(std::vector<ZZ>::iterator iter = array.begin();iter != array.end();iter++){
-          // std::cout << "Prime: " << *iter_prime << std::endl;
-          int array_i = iter-array.begin();//Debug
-          rep[array_i] = conv<cuyasheint_t>(*iter % (*iter_prime));
-          // std::cout << "rep : " << rep[array_i] << ", ";
-        }
+      // Apply mod at each coefficient
+      std::vector<cuyasheint_t> rep = this->polyCRT[index];
+      rep.resize(array.size());
+      for(std::vector<ZZ>::iterator iter = array.begin();iter != array.end();iter++){
+        // std::cout << "Prime: " << *iter_prime << std::endl;
+        int array_i = iter-array.begin();//Debug
+        rep[array_i] = conv<cuyasheint_t>(*iter % (*iter_prime));
+        // std::cout << "Original: " << *iter << " % " << *iter_prime << " > rep : " << rep[array_i] << ", " << std::endl;;
+      }
 
-         polyCRT[index] = (rep);
+       polyCRT[index] = (rep);
     }
 
     this->set_host_updated(true);
@@ -185,9 +185,14 @@ void Polynomial::icrt(){
 
     // Iteration over coefficients
     for(unsigned int j = 0; j < this->polyCRT[i].size();j++){
-      this->coefs[i] += Mpi*( invMpi*(this->polyCRT[i][j]) % pi);  
+      // std::cout << this->polyCRT[i][j] << " ";
+      this->coefs[j] += Mpi*( invMpi*(this->polyCRT[i][j]) % pi);  
     }
+    // std::cout << std::endl;
+    
   }
+
+  *this %= M;
 
   this->normalize();
   this->set_host_updated(true);

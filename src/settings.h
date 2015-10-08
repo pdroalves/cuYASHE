@@ -1,7 +1,6 @@
 #ifndef SETTINGS_H
 #define SETTINGS_H
 
-
 // #define PLAINMUL
 // #define NTTMUL
 // #define FFTMUL
@@ -9,15 +8,14 @@
 
 #define ADDBLOCKXDIM 32
 #ifdef CUFFTMUL
-#define CRTPRIMESIZE 31
+#define CRTPRIMESIZE 9
 #else
 #define CRTPRIMESIZE 31
 #endif
-// #define VERBOSE
+#define VERBOSE
 // #define MAYADDONCPU
-// typedef uint32_t cuyasheint_t;
+typedef uint32_t cuyasheint_t;
 // typedef uint64_t cuyasheint_t;
-typedef long cuyasheint_t;
 enum add_mode_t {ADD,SUB,MUL,DIV,MOD};
 enum ntt_mode_t {INVERSE,FORWARD};
 

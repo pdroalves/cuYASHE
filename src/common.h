@@ -2,7 +2,6 @@
 #define COMMON_H
 
 #include <algorithm>
-#include "cuda_functions.h"
 #include "settings.h"
 #include <NTL/ZZ.h>
 #include <NTL/ZZ_pEX.h>
@@ -142,11 +141,12 @@ P common_multiplication(P *a, P *b){
 
   // Check align
   int new_spacing = pow(2,ceil(log2(a->deg()+b->deg())));
-    if(new_spacing < CUDAFunctions::N)
-      new_spacing = CUDAFunctions::N;
-    else if(new_spacing != CUDAFunctions::N){
-      // Re-compute W matrix
-      CUDAFunctions::init(new_spacing);
+  
+  if(new_spacing < CUDAFunctions::N)
+	new_spacing = CUDAFunctions::N;
+	else if(new_spacing != CUDAFunctions::N){
+	// Re-compute W matrix
+	CUDAFunctions::init(new_spacing);
   }
 
   a->update_crt_spacing(new_spacing);

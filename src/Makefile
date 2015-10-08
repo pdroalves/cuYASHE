@@ -1,4 +1,4 @@
-OPT = -O3
+OPT = -O0
 
 CUDA_CC = nvcc $(OPT) -G -g -std=c++11
 CC = g++ -std=c++11 -g -Wall -Wfatal-errors -m64 $(OPT)
@@ -26,8 +26,8 @@ all: tests benchmarks
 
 tests:  polynomial.o cuda_functions.o test.o test_ctpt.o test_crt.o ciphertext.o distribution.o yashe.o 
 	$(CUDA_CC) $(CUDA_ARCH) $(LCUDA) $(ICUDA) -o $(TESTBIN) test.o polynomial.o cuda_functions.o ciphertext.o distribution.o yashe.o -lcufft -Xcompiler $(OPENMP) $(NTL) -lboost_unit_test_framework
-	$(CUDA_CC) $(CUDA_ARCH) $(LCUDA) $(ICUDA) -o $(TESTBIN)_ctpt test_ctpt.o polynomial.o cuda_functions.o ciphertext.o distribution.o yashe.o -lcufft -Xcompiler $(OPENMP) $(NTL)
-	$(CUDA_CC) $(CUDA_ARCH) $(LCUDA) $(ICUDA) -o $(TESTBIN)_crt test_crt.o polynomial.o cuda_functions.o ciphertext.o distribution.o yashe.o -lcufft -Xcompiler $(OPENMP) $(NTL)
+	# $(CUDA_CC) $(CUDA_ARCH) $(LCUDA) $(ICUDA) -o $(TESTBIN)_ctpt test_ctpt.o polynomial.o cuda_functions.o ciphertext.o distribution.o yashe.o -lcufft -Xcompiler $(OPENMP) $(NTL)
+	# $(CUDA_CC) $(CUDA_ARCH) $(LCUDA) $(ICUDA) -o $(TESTBIN)_crt test_crt.o polynomial.o cuda_functions.o ciphertext.o distribution.o yashe.o -lcufft -Xcompiler $(OPENMP) $(NTL)
 
 benchmarks:benchmark_yashe.o yashe.o benchmark_polynomial.o polynomial.o cuda_functions.o distribution.o ciphertext.o
 		$(CUDA_CC) $(CUDA_ARCH) $(LCUDA) $(ICUDA)  -o $(BENCHMARKPOLYBIN) benchmark_polynomial.o polynomial.o cuda_functions.o -lcufft -Xcompiler $(OPENMP) $(NTL) $(LTIME_MEASURE)
