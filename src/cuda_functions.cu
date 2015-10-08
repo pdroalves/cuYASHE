@@ -520,7 +520,7 @@ __host__ cuyasheint_t* CUDAFunctions::callPolynomialMul(cudaStream_t stream,cuya
     cudaFree(d_B);
 
   #elif defined(CUFFTMUL)
-    int size = N*NPolis;
+    const int size = N*NPolis;
     int size_c = N;
     int signal_size = N;
     Complex *d_a;
@@ -667,9 +667,9 @@ void Polynomial::reduce(){
     return;
   }else{
 
-    // #ifdef VERBOSE
+    #ifdef VERBOSE
     std::cout << "Reduce on device." << std::endl;
-    // #endif
+    #endif
 
     const int half = phi.deg()/2;
     const int N = this->CRTSPACING;

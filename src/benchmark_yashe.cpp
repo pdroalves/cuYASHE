@@ -255,23 +255,23 @@ int main(int argc, char* argv[]){
     ct_a = cipher.encrypt(a);
     ct_b = cipher.encrypt(b);
         
-    // clock_gettime( CLOCK_REALTIME, &start);
-    //     for(int i = 0; i < N;i++){
-    //       #ifdef VERBOSE
-    //       std::cout << i << std::endl;
-    //       #endif
+    clock_gettime( CLOCK_REALTIME, &start);
+        for(int i = 0; i < N;i++){
+          #ifdef VERBOSE
+          std::cout << i << std::endl;
+          #endif
 
-    //       Ciphertext c =  (ct_a*ct_b);
-    //       // delete &a;
-    //       // ct_a.set_device_updated(false);
-    //       // ct_b.set_device_updated(false);
-    //       cudaDeviceSynchronize();
-    //     }
+          Ciphertext c =  (ct_a*ct_b);
+          // delete &a;
+          // ct_a.set_device_updated(false);
+          // ct_b.set_device_updated(false);
+          cudaDeviceSynchronize();
+        }
         
-    // clock_gettime( CLOCK_REALTIME, &stop);
-    // diff = compute_time_ms(start,stop)/N;
-    // std::cout << "Homomorphic Multiplication) Time measured with memory copy: " << diff << " ms" << std::endl;
-    // mult_with_memcopy << d << " " << diff << std::endl;;
+    clock_gettime( CLOCK_REALTIME, &stop);
+    diff = compute_time_ms(start,stop)/N;
+    std::cout << "Homomorphic Multiplication) Time measured with memory copy: " << diff << " ms" << std::endl;
+    mult_with_memcopy << d << " " << diff << std::endl;;
 
     // ct_a.crt();
     // ct_b.crt();

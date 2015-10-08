@@ -32,34 +32,26 @@ Ciphertext Ciphertext::operator*(Ciphertext b){
   if(c2.aftermul)
     c2.convert();
 
-  Polynomial C1(c1);
-  Polynomial C2(c2);
-
   #ifdef DEBUG
-  std::cout << "C1 " << C1 << std::endl;
-  std::cout << "C2 " << C2 << std::endl;
+  std::cout << "c1 " << c1 << std::endl;
+  std::cout << "c2 " << c2 << std::endl;
   std::cout << "Yashe::t " << Yashe::t << std::endl;
   #endif
 
-  Polynomial g = C1*C2*(Yashe::t);
+  Polynomial g = common_multiplication<Polynomial>(&c1,&c2)*(Yashe::t);
   g.reduce();
-  Polynomial pmult;
   for(int i = 0; i <= g.deg();i++){
     ZZ quot;
     ZZ diff;
     NTL::DivRem(quot,diff,g.get_coeff(i),Yashe::q);
 
     if(2*diff > Yashe::q)
-      pmult.set_coeff(i,quot+1);
+      this->set_coeff(i,(quot+1) % Yashe::q);
     else
-      pmult.set_coeff(i,quot);
+      this->set_coeff(i,quot % Yashe::q);
   }
 
-  this->copy(pmult);
-  (*this) %= Yashe::q;
-
   this->aftermul = true;
-
   this->level = std::max(this->level,b.level)+1;
   this->set_device_updated(false);
   this->set_host_updated(true);
@@ -84,7 +76,7 @@ void Ciphertext::keyswitch(){
         Polynomial p = (P[i]);
         *this += p*(Yashe::gamma[i]);
       }
-      *this %= Yashe::phi;
+      this->reduce();
 }
 
 void Ciphertext::worddecomp(std::vector<Polynomial> *P){

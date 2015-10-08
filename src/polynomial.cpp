@@ -186,7 +186,6 @@ void Polynomial::icrt(){
   // Discards all coefficients and prepare to receive new this->CRTSPACING coefficients
   this->set_coeffs(this->CRTSPACING);
 
-
   // Iteration over all primes
   for(unsigned int i = 0; i < primes.size();i++){
     // Get a prime
