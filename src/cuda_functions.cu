@@ -436,146 +436,151 @@ __host__ cuyasheint_t* CUDAFunctions::callPolynomialMul(cudaStream_t stream,cuya
     polynomialPlainMul<<<gridDim,blockDim>>>(a,b,d_result,N,NPolis);
     assert(cudaGetLastError() == cudaSuccess);
   #elif defined(NTTMUL)
-        // std::cout << "NTT multiplication" << std::endl;
 
-    // Allocates memory for temporary arrays on device
-    // Each polynomial's degree gets doubled
-    //
-    // d_result is used as auxiliar array
-    const int size = N*NPolis;
-    cuyasheint_t *d_a;
-    cuyasheint_t *d_b;
-    cudaError_t result = cudaMalloc((void**)&d_result,size*sizeof(cuyasheint_t));
-    assert(result == cudaSuccess);
-    result = cudaMalloc((void**)&d_a,size*sizeof(cuyasheint_t));
-    assert(result == cudaSuccess);
-    result = cudaMemset(d_a,0,size*sizeof(cuyasheint_t));
-    assert(result == cudaSuccess);
-    result = cudaMalloc((void**)&d_b,size*sizeof(cuyasheint_t));
-    assert(result == cudaSuccess);
-    result = cudaMemset(d_b,0,size*sizeof(cuyasheint_t));
-    assert(result == cudaSuccess);
+      // std::cout << "NTT multiplication" << std::endl;
 
-    const int RADIX = 2;
-  	dim3 blockDim(std::min(N/RADIX,1024));
-  	dim3 gridDim(NPolis);
+  // Allocates memory for temporary arrays on device
+  // Each polynomial's degree gets doubled
+  //
+  // d_result is used as auxiliar array
+  const int size = N*NPolis;
+  cuyasheint_t *d_a;
+  cuyasheint_t *d_b;
+  cudaError_t result = cudaMalloc((void**)&d_result,size*sizeof(cuyasheint_t));
+  assert(result == cudaSuccess);
+  result = cudaMalloc((void**)&d_a,size*sizeof(cuyasheint_t));
+  assert(result == cudaSuccess);
+  result = cudaMemset(d_a,0,size*sizeof(cuyasheint_t));
+  assert(result == cudaSuccess);
+  result = cudaMalloc((void**)&d_b,size*sizeof(cuyasheint_t));
+  assert(result == cudaSuccess);
+  result = cudaMemset(d_b,0,size*sizeof(cuyasheint_t));
+  assert(result == cudaSuccess);
 
-    // Forward
-    for(int Ns=1; Ns<N; Ns*=RADIX){
-      NTT<<<gridDim,blockDim,1,stream >>>(CUDAFunctions::d_W,CUDAFunctions::d_WInv,N,RADIX,Ns,a,d_a,FORWARD);
-      assert(cudaGetLastError() == cudaSuccess);
-      std::swap(a,d_a);
-    }
+  const int RADIX = 2;
+	dim3 blockDim(std::min(N/RADIX,1024));
+	dim3 gridDim(NPolis);
+
+  // Forward
+  for(int Ns=1; Ns<N; Ns*=RADIX){
+    NTT<<<gridDim,blockDim,1,stream >>>(CUDAFunctions::d_W,CUDAFunctions::d_WInv,N,RADIX,Ns,a,d_a,FORWARD);
+    assert(cudaGetLastError() == cudaSuccess);
     std::swap(a,d_a);
+  }
+  std::swap(a,d_a);
 
-    for(int Ns=1; Ns<N; Ns*=RADIX){
-      NTT<<<gridDim,blockDim,1,stream >>>(CUDAFunctions::d_W,CUDAFunctions::d_WInv,N,RADIX,Ns,b,d_b,FORWARD);
-      assert(cudaGetLastError() == cudaSuccess);
-      std::swap(b,d_b);
-    }
-    // Multiply
-    dim3 blockDimMul(ADDBLOCKXDIM);
-    dim3 gridDimMul((size)/ADDBLOCKXDIM+1); // We expect that ADDBLOCKXDIM always divide size
-    polynomialNTTMul<<<gridDimMul,blockDimMul>>>(d_a,d_b,size);
+  for(int Ns=1; Ns<N; Ns*=RADIX){
+    NTT<<<gridDim,blockDim,1,stream >>>(CUDAFunctions::d_W,CUDAFunctions::d_WInv,N,RADIX,Ns,b,d_b,FORWARD);
     assert(cudaGetLastError() == cudaSuccess);
+    std::swap(b,d_b);
+  }
+  // Multiply
+  dim3 blockDimMul(ADDBLOCKXDIM);
+  dim3 gridDimMul((size)/ADDBLOCKXDIM+1); // We expect that ADDBLOCKXDIM always divide size
+  polynomialNTTMul<<<gridDimMul,blockDimMul>>>(d_a,d_b,size);
+  assert(cudaGetLastError() == cudaSuccess);
 
-    // // Inverse
-    for(int Ns=1; Ns<N; Ns*=RADIX){
-      NTT<<<gridDim,blockDim,1,stream >>>(CUDAFunctions::d_W,CUDAFunctions::d_WInv,N,RADIX,Ns,d_a,d_result,INVERSE);
-      assert(cudaGetLastError() == cudaSuccess);
-      std::swap(d_a,d_result);
-    }
-    // cudaFree(d_a);
-    // cudaFree(d_b);
+  // // Inverse
+  for(int Ns=1; Ns<N; Ns*=RADIX){
+    NTT<<<gridDim,blockDim,1,stream >>>(CUDAFunctions::d_W,CUDAFunctions::d_WInv,N,RADIX,Ns,d_a,d_result,INVERSE);
+    assert(cudaGetLastError() == cudaSuccess);
+    std::swap(d_a,d_result);
+  }
+  // cudaFree(d_a);
+  // cudaFree(d_b);
+  
   #elif defined(FFTMUL)
-    // Allocates memory for temporary arrays on device
-    // Each polynomial's degree gets doubled
-    const int size = N*NPolis;
-    cudaError_t result = cudaMalloc((void**)&d_result,size*sizeof(cuyasheint_t));
-    assert(result == cudaSuccess);
 
-    Complex *d_A;
-    Complex *d_B;
-    result = cudaMalloc((void**)&d_A,size*sizeof(Complex));
-    assert(result == cudaSuccess);
-    result = cudaMalloc((void**)&d_B,size*sizeof(Complex));
-    assert(result == cudaSuccess);
+  // Allocates memory for temporary arrays on device
+  // Each polynomial's degree gets doubled
+  const int size = N*NPolis;
+  cudaError_t result = cudaMalloc((void**)&d_result,size*sizeof(cuyasheint_t));
+  assert(result == cudaSuccess);
 
-    dim3 blockDim(ADDBLOCKXDIM);
-    dim3 gridDim((size)/ADDBLOCKXDIM+1); // We expect that ADDBLOCKXDIM always divice size
+  Complex *d_A;
+  Complex *d_B;
+  result = cudaMalloc((void**)&d_A,size*sizeof(Complex));
+  assert(result == cudaSuccess);
+  result = cudaMalloc((void**)&d_B,size*sizeof(Complex));
+  assert(result == cudaSuccess);
 
-    assert(blockDim.x*gridDim.x >= N);
-    // Forward
-    fft_radix16<<<gridDim,blockDim>>>(a,d_result,N);
-    assert(cudaGetLastError() == cudaSuccess);
+  dim3 blockDim(ADDBLOCKXDIM);
+  dim3 gridDim((size)/ADDBLOCKXDIM+1); // We expect that ADDBLOCKXDIM always divice size
 
-    // Multiply
-    // polynomialFFTMul<<<gridDim,blockDim>>>(d_A,d_B,N*NPolis);
+  assert(blockDim.x*gridDim.x >= N);
+  // Forward
+  fft_radix16<<<gridDim,blockDim>>>(a,d_result,N);
+  assert(cudaGetLastError() == cudaSuccess);
 
-    // Inverse
-    // fft_radix16<<<gridDim,blockDim>>>(d_A,d_result,N,NPolis,INVERSE);
-    // assert(cudaGetLastError() == cudaSuccess);
+  // Multiply
+  // polynomialFFTMul<<<gridDim,blockDim>>>(d_A,d_B,N*NPolis);
 
-    cudaFree(d_A);
-    cudaFree(d_B);
+  // Inverse
+  // fft_radix16<<<gridDim,blockDim>>>(d_A,d_result,N,NPolis,INVERSE);
+  // assert(cudaGetLastError() == cudaSuccess);
+
+  cudaFree(d_A);
+  cudaFree(d_B);
 
   #elif defined(CUFFTMUL)
-    const int size = N*NPolis;
-    int size_c = N;
-    int signal_size = N;
-    Complex *d_a;
-    Complex *d_b;
-    Complex *d_c;
-    cudaError_t result;
+  
+  const int size = N*NPolis;
+  const int size_c = N;
+  const int signal_size = N;
+  Complex *d_a;
+  Complex *d_b;
+  Complex *d_c;
+  cudaError_t result;
 
-    result = cudaMalloc((void**)&d_result,size*sizeof(cuyasheint_t));
-    assert(result == cudaSuccess);
+  result = cudaMalloc((void**)&d_result,size*sizeof(cuyasheint_t));
+  assert(result == cudaSuccess);
 
-    result = cudaMalloc((void **)&d_a, size*sizeof(Complex));
-    assert(result == cudaSuccess);
+  result = cudaMalloc((void **)&d_a, size*sizeof(Complex));
+  assert(result == cudaSuccess);
 
-    result = cudaMalloc((void **)&d_b, size*sizeof(Complex));
-    assert(result == cudaSuccess);
+  result = cudaMalloc((void **)&d_b, size*sizeof(Complex));
+  assert(result == cudaSuccess);
 
-    result = cudaMalloc((void **)&d_c, size*sizeof(Complex));
-    assert(result == cudaSuccess);
+  result = cudaMalloc((void **)&d_c, size*sizeof(Complex));
+  assert(result == cudaSuccess);
 
-    dim3 blockDim(32);
-    dim3 gridDim(size/32 + (size % 32 == 0? 0:1));
-    copyIntegerToComplex<<< gridDim,blockDim >>>(d_a,a,size);
-    assert(cudaGetLastError() == cudaSuccess);
+  dim3 blockDim(32);
+  dim3 gridDim(size/32 + (size % 32 == 0? 0:1));
+  copyIntegerToComplex<<< gridDim,blockDim,1,stream >>>(d_a,a,size);
+  assert(cudaGetLastError() == cudaSuccess);
 
-    copyIntegerToComplex<<< gridDim,blockDim >>>(d_b,b,size);
-    assert(cudaGetLastError() == cudaSuccess);
+  copyIntegerToComplex<<< gridDim,blockDim,1,stream >>>(d_b,b,size);
+  assert(cudaGetLastError() == cudaSuccess);
 
-    cufftResult fftResult;
-    for(int i = 0; i < NPolis; i ++){
-      int phase = N*i;
-      // Apply FFT
-      fftResult = cufftExecZ2Z(CUDAFunctions::plan, (cufftDoubleComplex *)(d_a+phase), (cufftDoubleComplex *)(d_a+phase), CUFFT_FORWARD);
-      assert(fftResult == CUFFT_SUCCESS);
-      // std::cout << "cufftExecZ2Z: "<< fftResult << std::endl;
+  cufftHandle plan;
+  cufftResult fftResult;
+  fftResult = cufftPlan1d(&plan, N, CUFFT_Z2Z, 1);
+  assert(fftResult == CUFFT_SUCCESS);
 
-      fftResult = cufftExecZ2Z(CUDAFunctions::plan, (cufftDoubleComplex *)(d_b+phase), (cufftDoubleComplex *)(d_b+phase), CUFFT_FORWARD);
-      assert(fftResult == CUFFT_SUCCESS);
-      // std::cout << "cufftExecZ2Z: "<< fftResult << std::endl;
+  cufftSetStream(plan, stream);
 
-    }
+  for(int i = 0; i < NPolis; i ++){
+    int phase = N*i;
+    // Apply FFT
+    fftResult = cufftExecZ2Z(plan, (cufftDoubleComplex *)(d_a+phase), (cufftDoubleComplex *)(d_a+phase), CUFFT_FORWARD);
+    assert(fftResult == CUFFT_SUCCESS);
 
-    polynomialcuFFTMul<<<gridDim,blockDim>>>(d_a,d_b,d_c,size_c,size);
-    assert(cudaGetLastError() == cudaSuccess);
+    fftResult = cufftExecZ2Z(plan, (cufftDoubleComplex *)(d_b+phase), (cufftDoubleComplex *)(d_b+phase), CUFFT_FORWARD);
+    assert(fftResult == CUFFT_SUCCESS);
+  }
+
+  polynomialcuFFTMul<<<gridDim,blockDim,1,stream>>>(d_a,d_b,d_c,size_c,size);
+  assert(cudaGetLastError() == cudaSuccess);
 
 
-    for(int i = 0; i < NPolis; i ++){
-      int phase = N*i;
-      //getLastCudaError("Kernel execution failed [ ComplexPointwiseMulAndScale ]");
-      // Apply inverse FFT
-      fftResult = cufftExecZ2Z(CUDAFunctions::plan, (cufftDoubleComplex *)(d_c+phase), (cufftDoubleComplex *)(d_c+phase), CUFFT_INVERSE);
-      assert(fftResult == CUFFT_SUCCESS);
-      // std::cout << "cufftExecZ2Z: "<< fftResult << std::endl;
-    }
-    copyAndNormalizeComplexRealPartToInteger<<< gridDim,blockDim >>>(d_result,d_c,size,1.0f/signal_size);
-    assert(cudaGetLastError() == cudaSuccess);
+  for(int i = 0; i < NPolis; i ++){
+    int phase = N*i;
+    // Apply inverse FFT
+    fftResult = cufftExecZ2Z(plan, (cufftDoubleComplex *)(d_c+phase), (cufftDoubleComplex *)(d_c+phase), CUFFT_INVERSE);
+    assert(fftResult == CUFFT_SUCCESS);
+  }
+  copyAndNormalizeComplexRealPartToInteger<<< gridDim,blockDim,1,stream >>>(d_result,d_c,size,1.0f/signal_size);
+  assert(cudaGetLastError() == cudaSuccess);
 
 
   //Destroy CUFFT context
@@ -635,6 +640,7 @@ __host__ void CUDAFunctions::init(int N){
     cufftResult fftResult;
     fftResult = cufftPlan1d(&CUDAFunctions::plan, N, CUFFT_Z2Z, 1);
     assert(fftResult == CUFFT_SUCCESS);
+    std::cout << "Plan created with signal size " << N << std::endl;
 
   #endif
 }
@@ -670,6 +676,11 @@ void Polynomial::reduce(){
     #ifdef VERBOSE
     std::cout << "Reduce on device." << std::endl;
     #endif
+    
+    #warning "Reduce on device has a bug. Deviating to host."
+    this->icrt();
+    this->reduce();
+    return;
 
     const int half = phi.deg()/2;
     const int N = this->CRTSPACING;

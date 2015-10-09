@@ -25,7 +25,7 @@ Polynomial Polynomial::operator*(Polynomial b){
   return common_multiplication<Polynomial>(this,&b);
 }
 void Polynomial::update_device_data(unsigned int usable_ratio){
-
+  // "usable_ratio" should be used to avoid unnecessary copies
     if(this->get_device_updated())
       return;
     else if(!this->get_crt_computed())
@@ -53,7 +53,8 @@ void Polynomial::update_device_data(unsigned int usable_ratio){
     // aux = (cuyasheint_t*)malloc(this->CRTSPACING*(this->polyCRT.size())*sizeof(cuyasheint_t));
     aux = (cuyasheint_t*)calloc(this->CRTSPACING*(this->polyCRT.size()),sizeof(cuyasheint_t));
     for(unsigned int i=0;i < this->polyCRT.size();i++){
-      memcpy(aux+this->CRTSPACING*i,&(this->polyCRT[i][0]),(this->polyCRT[i].size()/usable_ratio)*sizeof(cuyasheint_t));
+      // memcpy(aux+this->CRTSPACING*i,&(this->polyCRT[i][0]),(this->polyCRT[i].size()/usable_ratio)*sizeof(cuyasheint_t));
+      memcpy(aux+this->CRTSPACING*i,&(this->polyCRT[i][0]),(this->polyCRT[i].size())*sizeof(cuyasheint_t));
     }
 
     result = cudaMemcpy(this->d_polyCRT, aux , this->CRTSPACING*(this->polyCRT.size())*sizeof(cuyasheint_t), cudaMemcpyHostToDevice);
@@ -106,7 +107,9 @@ void Polynomial::update_host_data(){
     for(unsigned int i=0;i < this->polyCRT.size();i++){
       if(this->polyCRT[i].size() != (unsigned int)(this->CRTSPACING))
         this->polyCRT[i].resize(this->CRTSPACING);
-      result = cudaMemcpyAsync(&this->polyCRT[i][0] , this->d_polyCRT + i*this->CRTSPACING, this->CRTSPACING*sizeof(cuyasheint_t), cudaMemcpyDeviceToHost,this->get_stream());
+      result = cudaMemcpy(&this->polyCRT[i][0] , this->d_polyCRT + i*this->CRTSPACING, this->CRTSPACING*sizeof(cuyasheint_t), cudaMemcpyDeviceToHost);
+      if(result != cudaSuccess)
+        std::cout << "Catch!" <<std::endl;
       assert(result == cudaSuccess);
     }
     result = cudaDeviceSynchronize();
@@ -154,6 +157,11 @@ void Polynomial::crt(){
        polyCRT[index] = (rep);
     }
 
+    // std::cout << "Polynomial 0: " << std::endl; 
+    // for(unsigned int i = 0; i < polyCRT[0].size() ;i++)
+      // std::cout << polyCRT[0][i] << " ";
+    // std::cout << std::endl << std::endl;
+
     this->set_host_updated(true);
     this->set_device_updated(false);
     this->set_crt_computed(true);
@@ -200,17 +208,67 @@ void Polynomial::icrt(){
   return;
 }
 
-uint64_t polynomial_get_cycles() {
-  unsigned int hi, lo;
-  asm (
-    "cpuid\n\t"/*serialize*/
-    "rdtsc\n\t"/*read the clock*/
-    "mov %%edx, %0\n\t"
-    "mov %%eax, %1\n\t" 
-    : "=r" (hi), "=r" (lo):: "%rax", "%rbx", "%rcx", "%rdx"
-  );
-  return ((uint64_t) lo) | (((uint64_t) hi) << 32);
-}
+// void Polynomial::icrt(){
+//   // Escapes, if possible
+//   if(this->get_host_updated())
+//     return;
+//   else
+//     this->update_host_data();
+
+//   std::cout << "Polynomial 0: " << std::endl; 
+//   for(unsigned int i = 0; i < polyCRT[0].size();i++)
+//     std::cout << polyCRT[0][i] << " ";
+//   std::cout << std::endl << std::endl;
+
+//   std::vector<cuyasheint_t> P = this->CRTPrimes;
+//   ZZ M = this->CRTProduct;
+
+//   // Polynomial icrt(this->get_mod(),this->get_phi(),this->get_crt_spacing());
+//   this->set_coeffs();//Discards all coeffs
+
+//   // 4M cycles per iteration
+//   for(unsigned int i = 0; i < this->CRTPrimes.size();i++){
+//     // uint64_t start_cycle = get_cycles();
+//     // Convert CRT representations to Polynomial
+//     // Polynomial xi(this->get_mod(),this->get_phi(),this->get_crt_spacing());
+  
+//     Polynomial xi(this->get_mod(),this->get_phi(),this->get_crt_spacing());
+//     xi.set_coeffs(this->polyCRT[i]);
+//     // Asserts that each residue is in the correct field
+//     ZZ pi = ZZ(P[i]);
+//     xi %= pi;
+
+//     ZZ Mpi= M/pi;
+//     //
+//     ZZ InvMpi = NTL::InvMod(Mpi%pi,pi);
+//     //
+
+
+
+//     xi = ((xi*InvMpi)%pi)*Mpi;
+
+//     this->CPUAddition(&xi);
+//     // uint64_t end_cycle = get_cycles();
+//     // std::cout << "Cycles for each icrt iteration: " << (end_cycle-start_cycle) << std::endl;
+//   }
+
+//   (*this) %= M;
+//   this->normalize();
+//   this->set_host_updated(true);
+//   return;
+// }
+
+// uint64_t polynomial_get_cycles() {
+//   unsigned int hi, lo;
+//   asm (
+//     "cpuid\n\t"/*serialize*/
+//     "rdtsc\n\t"/*read the clock*/
+//     "mov %%edx, %0\n\t"
+//     "mov %%eax, %1\n\t" 
+//     : "=r" (hi), "=r" (lo):: "%rax", "%rbx", "%rcx", "%rdx"
+//   );
+//   return ((uint64_t) lo) | (((uint64_t) hi) << 32);
+// }
 
 void Polynomial::DivRem(Polynomial a,Polynomial b,Polynomial &quot,Polynomial &rem){
   // Returns x = a % b

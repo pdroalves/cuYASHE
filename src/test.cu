@@ -729,14 +729,23 @@ BOOST_AUTO_TEST_CASE(randomPolynomialOperations)
       // 1: mul
       if(random_ab == 1){
         // 1: b
+        // std::cout << " random *=b " << std::endl;
+        // std::cout << b.to_string() << std::endl;
+        // std::cout << b_ntl << std::endl;
+
+        // std::cout << b.to_string() << std::endl;
+        // std::cout << b_ntl << std::endl;
+
         c *= b;
         c_ntl *= b_ntl;
       }else if(random_ab == 0){
         // 0: a
+        // std::cout << " random *=a " << std::endl;
         c *= a;
         c_ntl *= a_ntl;
       }else if(random_ab == 2){
         // 2: some integer
+        // std::cout << " random *= %c " << std::endl;
         long value = conv<long>(ZZ(rand()) % c.get_mod());
         c *= value;
         c_ntl *= value;
@@ -745,22 +754,30 @@ BOOST_AUTO_TEST_CASE(randomPolynomialOperations)
       // 0: add
       if(random_ab == 1){
         // 1: b
+        // std::cout << " random += b " << std::endl;
         c += b;
         c_ntl += b_ntl;
       }else if(random_ab == 0){
         // 0: a
+        // std::cout << " random += a " << std::endl;
         c += a;
         c_ntl += a_ntl;
       }else if(random_ab == 2){
         // 2: some integer
+        // std::cout << " random += %c " << std::endl;
         long value = conv<long>(ZZ(rand()) % c.get_mod());
+        
+        // std::cout << c.to_string() << std::endl;
+        // std::cout << c_ntl << std::endl;
+
         c += value;
         c_ntl += value;
       }
 
     }
 
-    c %= phi;
+    // std::cout << c.to_string() << std::endl;
+    c.reduce();
     c %= Polynomial::global_mod;
     c.normalize();
     c_ntl %= conv<ZZ_pEX>(ZZ_pE::modulus());

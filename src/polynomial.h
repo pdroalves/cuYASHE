@@ -14,7 +14,7 @@
 
 NTL_CLIENT
 
-uint64_t polynomial_get_cycles();
+cuyasheint_t polynomial_get_cycles();
 
 // template Polynomial common_addition<Polynomial>(Polynomial *a,Polynomial *b);
 
@@ -176,8 +176,8 @@ class Polynomial{
 
     void copy(Polynomial b){
       #ifdef VERBOSE
-      uint64_t start,stop;
-      start = polynomial_get_cycles();
+      cuyasheint_t start,stop;
+      // start = polynomial_get_cycles();
       #endif
 
 
@@ -205,8 +205,8 @@ class Polynomial{
       this->set_icrt_computed(b.get_icrt_computed());
 
       #ifdef VERBOSE
-      stop = polynomial_get_cycles();
-      std::cout << (stop-start) << " cycles to copy" << std::endl;
+      // stop = polynomial_get_cycles();
+      // std::cout << (stop-start) << " cycles to copy" << std::endl;
       #endif
     }
     // Functions and methods
@@ -282,12 +282,12 @@ class Polynomial{
       return c;
     }
     Polynomial operator-=(Polynomial b){
-      this->set_device_crt_residues( ((*this)-b).get_device_crt_residues());
+      this->copy( ((*this)-b));
       return *this;
     }
     Polynomial operator*(Polynomial b);
     Polynomial operator*=(Polynomial b){
-      this->set_device_crt_residues( ((*this)*b).get_device_crt_residues());
+      this->copy( ((*this)*b));
       return *this;
     }
     Polynomial operator/(Polynomial b){
@@ -312,7 +312,7 @@ class Polynomial{
       return quot;
     }
     Polynomial operator/=(Polynomial b){
-      this->set_device_crt_residues( ((*this)/b).get_device_crt_residues());
+      this->copy( ((*this)/b));
       return *this;
     }
     Polynomial operator%(Polynomial b){
@@ -339,7 +339,7 @@ class Polynomial{
       return rem;
     }
     Polynomial operator%=(Polynomial b){
-      this->set_device_crt_residues( ((*this)%b).get_device_crt_residues());
+      this->copy( ((*this)%b));
       return *this;
     }
 
@@ -398,6 +398,7 @@ class Polynomial{
 
       if(!p.get_host_updated()){
         //
+        p.update_host_data();
         p.icrt();
       }
 
@@ -434,7 +435,7 @@ class Polynomial{
       this->copy(((*this)/b));
       return *this;
     }
-    Polynomial operator+(uint64_t b){
+    Polynomial operator+(cuyasheint_t b){
       Polynomial p(*this);
       if(!this->get_host_updated()){
         CUDAFunctions::callPolynomialOPInteger(ADD,this->stream,p.get_device_crt_residues(),b,p.CRTSPACING,Polynomial::CRTPrimes.size());
@@ -445,11 +446,11 @@ class Polynomial{
         return (*this)+ZZ(b);
       }
     }
-    Polynomial operator+=(uint64_t b){
-      this->set_device_crt_residues( ((*this)+b).get_device_crt_residues());
+    Polynomial operator+=(cuyasheint_t b){
+      this->copy(((*this)+b));
       return *this;
     }
-    Polynomial operator-(uint64_t b){
+    Polynomial operator-(cuyasheint_t b){
       Polynomial p(*this);
       if(!this->get_host_updated()){
         CUDAFunctions::callPolynomialOPInteger(SUB,this->stream,p.get_device_crt_residues(),b,p.CRTSPACING,Polynomial::CRTPrimes.size());
@@ -460,11 +461,11 @@ class Polynomial{
         return (*this)-ZZ(b);
       }
     }
-    Polynomial operator-=(uint64_t b){
-      this->set_device_crt_residues( ((*this)-b).get_device_crt_residues());
+    Polynomial operator-=(cuyasheint_t b){
+      this->copy( ((*this)-b));
       return *this;
     }
-    Polynomial operator*(uint64_t b){
+    Polynomial operator*(cuyasheint_t b){
       Polynomial p(*this);
       if(!this->get_host_updated()){
         CUDAFunctions::callPolynomialOPInteger(MUL,this->stream,p.get_device_crt_residues(),b,p.CRTSPACING,Polynomial::CRTPrimes.size());
@@ -475,11 +476,11 @@ class Polynomial{
         return (*this)*ZZ(b);
       }
     }
-    Polynomial operator*=(uint64_t b){
-      this->set_device_crt_residues( ((*this)*conv<ZZ>(b)).get_device_crt_residues());
+    Polynomial operator*=(cuyasheint_t b){
+      this->copy( ((*this)*conv<ZZ>(b)));
       return *this;
     }
-    Polynomial operator/(uint64_t b){
+    Polynomial operator/(cuyasheint_t b){
       Polynomial p(*this);
       if(!this->get_host_updated()){
         CUDAFunctions::callPolynomialOPInteger(DIV,this->stream,p.get_device_crt_residues(),b,p.CRTSPACING,Polynomial::CRTPrimes.size());
@@ -490,7 +491,7 @@ class Polynomial{
         return (*this)/ZZ(b);
       }
     }
-    Polynomial operator%(uint64_t b){
+    Polynomial operator%(cuyasheint_t b){
       Polynomial p(*this);
       if(!this->get_host_updated()){
         CUDAFunctions::callPolynomialOPInteger(MOD,this->stream,p.get_device_crt_residues(),b,p.CRTSPACING,Polynomial::CRTPrimes.size());
@@ -501,8 +502,8 @@ class Polynomial{
         return (*this)%ZZ(b);
       }
     }
-    Polynomial operator/=(uint64_t b){
-      this->set_device_crt_residues( ((*this)/conv<ZZ>(b)).get_device_crt_residues());
+    Polynomial operator/=(cuyasheint_t b){
+      this->copy( ((*this)/conv<ZZ>(b)));
       return *this;
     }
 
