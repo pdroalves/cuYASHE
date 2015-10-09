@@ -840,18 +840,18 @@ BOOST_AUTO_TEST_CASE(modularInversion)
 
 }
 
-BOOST_AUTO_TEST_CASE(expectedDegree)
-{
+// BOOST_AUTO_TEST_CASE(expectedDegree)
+// {
 
-    Polynomial a;
-    Polynomial::random(&a,rand()%degree);
+//     Polynomial a;
+//     Polynomial::random(&a,rand()%degree);
 
-    BOOST_REQUIRE(a.deg() == a.get_expected_degre());
+//     BOOST_REQUIRE(a.deg() == a.get_expected_degre());
 
-    a.set_coeff(degree+1,1);
-    BOOST_REQUIRE(degree+1 == a.get_expected_degre());
+//     a.set_coeff(degree+1,1);
+//     BOOST_REQUIRE(degree+1 == a.get_expected_degre());
 
-}
+// }
 
 BOOST_AUTO_TEST_SUITE_END()
 
@@ -871,6 +871,8 @@ BOOST_AUTO_TEST_CASE(encryptDecrypt)
     Ciphertext c = cipher.encrypt(a);
     Polynomial a_decrypted = cipher.decrypt(c);
 
+    std::cout << a.to_string() << std::endl;
+    std::cout << a_decrypted.to_string() << std::endl;
     BOOST_REQUIRE( a_decrypted == a);
   }
 }

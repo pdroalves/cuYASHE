@@ -552,20 +552,20 @@ __host__ cuyasheint_t* CUDAFunctions::callPolynomialMul(cudaStream_t stream,cuya
   copyIntegerToComplex<<< gridDim,blockDim,1,stream >>>(d_b,b,size);
   assert(cudaGetLastError() == cudaSuccess);
 
-  cufftHandle plan;
+  // cufftHandle plan;
   cufftResult fftResult;
-  fftResult = cufftPlan1d(&plan, N, CUFFT_Z2Z, 1);
-  assert(fftResult == CUFFT_SUCCESS);
+  // fftResult = cufftPlan1d(&plan, N, CUFFT_Z2Z, 1);
+  // assert(fftResult == CUFFT_SUCCESS);
 
-  cufftSetStream(plan, stream);
+  cufftSetStream(CUDAFunctions::plan, stream);
 
   for(int i = 0; i < NPolis; i ++){
     int phase = N*i;
     // Apply FFT
-    fftResult = cufftExecZ2Z(plan, (cufftDoubleComplex *)(d_a+phase), (cufftDoubleComplex *)(d_a+phase), CUFFT_FORWARD);
+    fftResult = cufftExecZ2Z(CUDAFunctions::plan, (cufftDoubleComplex *)(d_a+phase), (cufftDoubleComplex *)(d_a+phase), CUFFT_FORWARD);
     assert(fftResult == CUFFT_SUCCESS);
 
-    fftResult = cufftExecZ2Z(plan, (cufftDoubleComplex *)(d_b+phase), (cufftDoubleComplex *)(d_b+phase), CUFFT_FORWARD);
+    fftResult = cufftExecZ2Z(CUDAFunctions::plan, (cufftDoubleComplex *)(d_b+phase), (cufftDoubleComplex *)(d_b+phase), CUFFT_FORWARD);
     assert(fftResult == CUFFT_SUCCESS);
   }
 
@@ -576,7 +576,7 @@ __host__ cuyasheint_t* CUDAFunctions::callPolynomialMul(cudaStream_t stream,cuya
   for(int i = 0; i < NPolis; i ++){
     int phase = N*i;
     // Apply inverse FFT
-    fftResult = cufftExecZ2Z(plan, (cufftDoubleComplex *)(d_c+phase), (cufftDoubleComplex *)(d_c+phase), CUFFT_INVERSE);
+    fftResult = cufftExecZ2Z(CUDAFunctions::plan, (cufftDoubleComplex *)(d_c+phase), (cufftDoubleComplex *)(d_c+phase), CUFFT_INVERSE);
     assert(fftResult == CUFFT_SUCCESS);
   }
   copyAndNormalizeComplexRealPartToInteger<<< gridDim,blockDim,1,stream >>>(d_result,d_c,size,1.0f/signal_size);
