@@ -152,19 +152,23 @@ Ciphertext Yashe::encrypt(Polynomial m){
   return c;
 }
 Polynomial Yashe::decrypt(Ciphertext c){
+  // std::cout << f.to_string() << std::endl;
+  // std::cout << c.to_string() << std::endl;
 
   Polynomial g;
   if(c.aftermul){
-    g = f*f*c % phi;
+    g = f*f*c;
   }else{
-    g = f*c % phi;
+    g = f*c;
   }
+  g.reduce();
 
   // Polynomial reduced_g = Polynomial::rem(g,phi);
   // reduced_g.icrt();
   #ifdef DEBUG
   std::cout << "g = f*c % phi: "<< reduced_g <<std::endl;
   #endif
+  // std::cout << g.to_string() << std::endl;
   g *= t; // This operation should not be modular
 
   ZZ coeff = g.get_coeff(0);

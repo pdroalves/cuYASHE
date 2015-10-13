@@ -68,7 +68,7 @@ struct PolySuite
 
 struct YasheSuite
 {
-    uint64_t t;
+    cuyasheint_t t;
     Yashe cipher;
     int degree;
     Polynomial phi;
@@ -874,6 +874,63 @@ BOOST_AUTO_TEST_CASE(encryptDecrypt)
     std::cout << a.to_string() << std::endl;
     std::cout << a_decrypted.to_string() << std::endl;
     BOOST_REQUIRE( a_decrypted == a);
+  }
+}
+
+
+BOOST_AUTO_TEST_CASE(encryptandAdd)
+{
+  Polynomial a;
+
+  for(int i = 0; i < NTESTS;i++){
+    a.set_coeff(0,conv<ZZ>(rand())%t);
+
+    Ciphertext c = cipher.encrypt(a);
+
+    c = c + c;
+    // std::cout << "t: " << t << std::endl;
+
+    // std::cout << "Ciphertext: "<< c <<std::endl;
+    Polynomial a_decrypted = cipher.decrypt(c);
+
+
+    Polynomial value = (a+a);
+    // std::cout << value.to_string() << std::endl;
+    value.to_string();
+    Polynomial value_reduced = value % t;
+    // std::cout << value_reduced.to_string() << std::endl;
+
+    #ifdef VERBOSE
+    std::cout << "Original: " << a.to_string() << std::endl;
+    std::cout << "Original *2: " << ((a+a)%t).to_string() << std::endl;
+    std::cout << "Decrypted: " << a_decrypted.to_string() << std::endl;
+    #endif
+
+    BOOST_REQUIRE( a_decrypted == value_reduced);
+  }
+}
+
+BOOST_AUTO_TEST_CASE(encryptandMul)
+{
+  Polynomial a;
+
+  for(int i = 0; i < NTESTS;i++){
+    a.set_coeff(0,conv<ZZ>(rand())%t);
+    // std::cout << "Value: " << a.to_string() << std::endl;
+
+    Ciphertext c1 = cipher.encrypt(a);
+    Ciphertext c2 = cipher.encrypt(a);
+    Ciphertext c = c1*c2;
+
+
+    // std::cout << "Ciphertext: "<< c <<std::endl;
+    Polynomial a_decrypted = cipher.decrypt(c);
+
+    std::cout << "Original: " << a.to_string() << std::endl;
+    std::cout << "Original *2: " << ((a*a)%t).to_string() << std::endl;
+    std::cout << "Decrypted: " << a_decrypted.to_string() << std::endl;
+
+    BOOST_REQUIRE( a_decrypted == (a*a)%t);
   }
 }
 

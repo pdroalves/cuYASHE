@@ -82,6 +82,7 @@ void Polynomial::update_host_data(){
 
     cudaError_t result;
 
+    assert(Polynomial::CRTPrimes.size() > 0);
     if(this->polyCRT.size() != Polynomial::CRTPrimes.size())
       this->polyCRT.resize(Polynomial::CRTPrimes.size());
 

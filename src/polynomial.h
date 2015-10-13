@@ -438,7 +438,10 @@ class Polynomial{
     Polynomial operator+(cuyasheint_t b){
       Polynomial p(*this);
       if(!this->get_host_updated()){
-        CUDAFunctions::callPolynomialOPInteger(ADD,this->stream,p.get_device_crt_residues(),b,p.CRTSPACING,Polynomial::CRTPrimes.size());
+        Polynomial B;
+        B.set_coeff(0,b);
+        B.update_device_data();
+        CUDAFunctions::callPolynomialOPInteger(ADD,this->stream,p.get_device_crt_residues(),B.get_device_crt_residues(),p.CRTSPACING,Polynomial::CRTPrimes.size());
         p.set_device_updated(true);
         p.set_host_updated(false);
         return p;
@@ -453,7 +456,10 @@ class Polynomial{
     Polynomial operator-(cuyasheint_t b){
       Polynomial p(*this);
       if(!this->get_host_updated()){
-        CUDAFunctions::callPolynomialOPInteger(SUB,this->stream,p.get_device_crt_residues(),b,p.CRTSPACING,Polynomial::CRTPrimes.size());
+        Polynomial B;
+        B.set_coeff(0,b);
+        B.update_device_data();
+        CUDAFunctions::callPolynomialOPInteger(SUB,this->stream,p.get_device_crt_residues(),B.get_device_crt_residues(),p.CRTSPACING,Polynomial::CRTPrimes.size());
         p.set_device_updated(true);
         p.set_host_updated(false);
         return p;
@@ -466,9 +472,17 @@ class Polynomial{
       return *this;
     }
     Polynomial operator*(cuyasheint_t b){
+      #ifdef VERBOSE
+      std::cout << "operator*: cuyasheint_t" << std::endl;
+      #endif
+      #warning "operator * of integers is buggy on device."
+
       Polynomial p(*this);
       if(!this->get_host_updated()){
-        CUDAFunctions::callPolynomialOPInteger(MUL,this->stream,p.get_device_crt_residues(),b,p.CRTSPACING,Polynomial::CRTPrimes.size());
+        Polynomial B;
+        B.set_coeff(0,b);
+        B.update_device_data();
+        CUDAFunctions::callPolynomialOPInteger(MUL,this->stream,p.get_device_crt_residues(),B.get_device_crt_residues(),p.CRTSPACING,Polynomial::CRTPrimes.size());
         p.set_device_updated(true);
         p.set_host_updated(false);
         return p;
@@ -477,13 +491,16 @@ class Polynomial{
       }
     }
     Polynomial operator*=(cuyasheint_t b){
-      this->copy( ((*this)*conv<ZZ>(b)));
+      this->copy( ((*this)*(b)));
       return *this;
     }
     Polynomial operator/(cuyasheint_t b){
       Polynomial p(*this);
       if(!this->get_host_updated()){
-        CUDAFunctions::callPolynomialOPInteger(DIV,this->stream,p.get_device_crt_residues(),b,p.CRTSPACING,Polynomial::CRTPrimes.size());
+        Polynomial B;
+        B.set_coeff(0,b);
+        B.update_device_data();
+        CUDAFunctions::callPolynomialOPInteger(DIV,this->stream,p.get_device_crt_residues(),B.get_device_crt_residues(),p.CRTSPACING,Polynomial::CRTPrimes.size());
         p.set_device_updated(true);
         p.set_host_updated(false);
         return p;
@@ -492,13 +509,28 @@ class Polynomial{
       }
     }
     Polynomial operator%(cuyasheint_t b){
+      #ifdef VERBOSE
+      std::cout << "operator%: cuyasheint_t" << std::endl;
+      #endif
+      #warning "operator % of integers is buggy on device."
+
       Polynomial p(*this);
       if(!this->get_host_updated()){
-        CUDAFunctions::callPolynomialOPInteger(MOD,this->stream,p.get_device_crt_residues(),b,p.CRTSPACING,Polynomial::CRTPrimes.size());
+      // if(0){//Deviate
+        #ifdef VERBOSE
+        std::cout << "Applying on GPU" << std::endl;
+        #endif
+        Polynomial B;
+        B.set_coeff(0,b);
+        B.update_device_data();
+        CUDAFunctions::callPolynomialOPInteger(MOD,this->stream,p.get_device_crt_residues(),B.get_device_crt_residues(),p.CRTSPACING,Polynomial::CRTPrimes.size());
         p.set_device_updated(true);
         p.set_host_updated(false);
         return p;
       }else{
+        #ifdef VERBOSE
+        std::cout << "Applying on CPU" << std::endl;
+        #endif
         return (*this)%ZZ(b);
       }
     }

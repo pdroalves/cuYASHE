@@ -366,10 +366,13 @@ __global__ void polynomialNTTMul(cuyasheint_t *a,const cuyasheint_t *b,const int
 }
 #endif
 
-__global__ void polynomialOPInteger(int opcode,cuyasheint_t *a,cuyasheint_t b,int size){
+__global__ void polynomialOPInteger(int opcode,cuyasheint_t *a,cuyasheint_t *b,const int N,const int NPolis){
   // We have one thread per polynomial coefficient on 32 threads-block.
   // For CRT polynomial adding, all representations should be concatenated aligned
+  const int size = N*NPolis;
   const int tid = threadIdx.x + blockDim.x*blockIdx.x;
+  const int cid = tid % N; // Coefficient id
+  const int rid = tid / N; // Residue id
 
   if(tid < size )
       // Coalesced access to global memory. Doing this way we reduce required bandwich.
@@ -377,31 +380,31 @@ __global__ void polynomialOPInteger(int opcode,cuyasheint_t *a,cuyasheint_t b,in
     switch(opcode)
     {
     case ADD:
-      if(tid == 0)
-        a[tid] += b;
+      if(cid == 0)
+        a[tid] += b[rid*N];
     case SUB:
-      if(tid == 0)
-        a[tid] -= b;
+      if(cid == 0)
+        a[tid] -= b[rid*N];
     case DIV:
-        a[tid] /= b;
+        a[tid] /= b[rid*N];
     case MUL:
-        a[tid] *= b;
+        a[tid] *= b[rid*N];
     case MOD:
-        a[tid] %= b;
+        a[tid] %= b[rid*N];
     }
 
 }
 
-__host__ void CUDAFunctions::callPolynomialOPInteger(int opcode,cudaStream_t stream,cuyasheint_t *a,cuyasheint_t b,int N,int NPolis)
+__host__ void CUDAFunctions::callPolynomialOPInteger(int opcode,cudaStream_t stream,cuyasheint_t *a,cuyasheint_t *b,int N,int NPolis)
 {
-  // This method just multiply all elements of array a and store the result inplace
+  // This method applies a 0-degree operation over all CRT residues
   const int size = N*NPolis;
 
   const int ADDGRIDXDIM = (size%ADDBLOCKXDIM == 0? size/ADDBLOCKXDIM : size/ADDBLOCKXDIM + 1);
   const dim3 gridDim(ADDGRIDXDIM);
   const dim3 blockDim(ADDBLOCKXDIM);
 
-  polynomialOPInteger<<< gridDim,blockDim, 1, stream>>> (opcode,a,b,N*NPolis);
+  polynomialOPInteger<<< gridDim,blockDim, 1, stream>>> (opcode,a,b,N,NPolis);
   assert(cudaGetLastError() == cudaSuccess);
 
 }

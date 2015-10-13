@@ -54,27 +54,29 @@ Ciphertext Ciphertext::operator*(Ciphertext b){
   std::cout << "Yashe::t " << Yashe::t << std::endl;
   #endif
 
-  Polynomial g = common_multiplication<Polynomial>(&c1,&c2)*(Yashe::t);
+  Ciphertext g = common_multiplication<Ciphertext>(&c1,&c2)*(Yashe::t);
   g.reduce();
+
+  Ciphertext p;
   for(int i = 0; i <= g.deg();i++){
     ZZ quot;
     ZZ diff;
     NTL::DivRem(quot,diff,g.get_coeff(i),Yashe::q);
 
     if(2*diff > Yashe::q)
-      this->set_coeff(i,(quot+1) % Yashe::q);
+      p.set_coeff(i,(quot+1) % Yashe::q);
     else
-      this->set_coeff(i,quot % Yashe::q);
+      p.set_coeff(i,quot % Yashe::q);
   }
 
-  this->aftermul = true;
-  this->level = std::max(this->level,b.level)+1;
-  this->set_device_updated(false);
-  this->set_host_updated(true);
+  p.aftermul = true;
+  p.level = std::max(this->level,b.level)+1;
+  p.set_device_updated(false);
+  p.set_host_updated(true);
   // end = cycles();
   // std::cout << "ciphertext mult " << (end-start) << std::endl;
 
-  return *this;
+  return p;
 
 }
 
