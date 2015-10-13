@@ -12,7 +12,7 @@
 #include <cuda_runtime_api.h>
 #include <cuda_runtime.h>
 
-#define NTESTS 100
+#define NTESTS 10
 
 struct CUDASuite
 {
@@ -722,8 +722,16 @@ BOOST_AUTO_TEST_CASE(randomPolynomialOperations)
   ZZ_pEX c_ntl;
 
   for(int count = 0; count < 10*NTESTS; count++){
+    std::cout << "b: " << b.to_string() << std::endl;
+    std::cout << "b_ntl: " << b_ntl << std::endl;
+
+
     int random_op_bit = rand()%2;
     int random_ab = rand()%3;
+    std::cout << "random_op_bit: " << random_op_bit << std::endl;
+    std::cout << "random_ab: " << random_ab << std::endl;
+
+
     // 0: add
     if(random_op_bit){
       // 1: mul
@@ -778,6 +786,9 @@ BOOST_AUTO_TEST_CASE(randomPolynomialOperations)
 
     // std::cout << c.to_string() << std::endl;
     c.reduce();
+  std::cout << "c: " << c.to_string() << " degree: " << c.deg() <<std::endl;
+  std::cout << "c_ntl: " << c_ntl << " degree: " << NTL::deg(c_ntl) << std::endl << std::endl;
+  
     c %= Polynomial::global_mod;
     c.normalize();
     c_ntl %= conv<ZZ_pEX>(ZZ_pE::modulus());
@@ -785,10 +796,13 @@ BOOST_AUTO_TEST_CASE(randomPolynomialOperations)
 
 
   // #ifdef DEBUG
-  // std::cout << "c: " << c.to_string() << " degree: " << c.deg() <<std::endl;
-  // std::cout << "c_ntl: " << c_ntl << " degree: " << NTL::deg(c_ntl) << std::endl << std::endl;
+  std::cout << "c: " << c.to_string() << " degree: " << c.deg() <<std::endl;
+  std::cout << "c_ntl: " << c_ntl << " degree: " << NTL::deg(c_ntl) << std::endl << std::endl;
   // #endif
 
+  if(! (NTL::deg(c_ntl) == c.deg())){
+    std::cout << "Catch! " << NTL::deg(c_ntl) << " != " << c.deg() << std::endl;
+  }
   BOOST_REQUIRE(NTL::deg(c_ntl) == c.deg());
   for(int i = 0;i <= c.deg();i++){
     ZZ ntl_value;
@@ -928,15 +942,15 @@ BOOST_AUTO_TEST_CASE(encryptandAdd)
 
     Polynomial value = (a+a);
     // std::cout << value.to_string() << std::endl;
-    value.to_string();
+    value.icrt();
     Polynomial value_reduced = value % t;
     // std::cout << value_reduced.to_string() << std::endl;
 
-    #ifdef VERBOSE
+    // #ifdef VERBOSE
     std::cout << "Original: " << a.to_string() << std::endl;
     std::cout << "Original *2: " << ((a+a)%t).to_string() << std::endl;
     std::cout << "Decrypted: " << a_decrypted.to_string() << std::endl;
-    #endif
+    // #endif
 
     BOOST_REQUIRE( a_decrypted == value_reduced);
   }
@@ -958,11 +972,19 @@ BOOST_AUTO_TEST_CASE(encryptandMul)
     // std::cout << "Ciphertext: "<< c <<std::endl;
     Polynomial a_decrypted = cipher.decrypt(c);
 
+    Polynomial value = (a*a);
+    // std::cout << value.to_string() << std::endl;
+    value.icrt();
+    Polynomial value_reduced = value % t;
+    // std::cout << value_reduced.to_string() << std::endl;
+
+
     std::cout << "Original: " << a.to_string() << std::endl;
     std::cout << "Original *2: " << ((a*a)%t).to_string() << std::endl;
+    std::cout << "value_reduced: " << value_reduced.to_string() << std::endl;
     std::cout << "Decrypted: " << a_decrypted.to_string() << std::endl;
 
-    BOOST_REQUIRE( a_decrypted == (a*a)%t);
+    BOOST_REQUIRE( a_decrypted == value_reduced);
   }
 }
 

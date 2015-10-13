@@ -699,5 +699,8 @@ void Polynomial::reduce(){
                                                 NPolis);
     cudaError_t result = cudaGetLastError();
     assert(result == cudaSuccess);
+    
+    this->set_host_updated(false);
+    this->set_device_updated(true);
   }
 }

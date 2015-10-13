@@ -478,7 +478,8 @@ class Polynomial{
       #warning "operator * of integers is buggy on device."
 
       Polynomial p(*this);
-      if(!this->get_host_updated()){
+      // if(!this->get_host_updated()){
+      if(0){
         Polynomial B;
         B.set_coeff(0,b);
         B.update_device_data();

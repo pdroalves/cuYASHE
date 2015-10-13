@@ -48,15 +48,20 @@ Ciphertext Ciphertext::operator*(Ciphertext b){
   if(c2.aftermul)
     c2.convert();
 
-  #ifdef DEBUG
-  std::cout << "c1 " << c1 << std::endl;
-  std::cout << "c2 " << c2 << std::endl;
+  // #ifdef DEBUG
+  std::cout << "c1 " << c1.to_string() << std::endl;
+  std::cout << "c2 " << c2.to_string() << std::endl;
   std::cout << "Yashe::t " << Yashe::t << std::endl;
-  #endif
+  // #endif
 
-  Ciphertext g = common_multiplication<Ciphertext>(&c1,&c2)*(Yashe::t);
+  Polynomial g = common_multiplication<Polynomial>(&c1,&c2);
+  g *= (Yashe::t);
   g.reduce();
+  g %= Yashe::q;
+  g.icrt();
 
+  std::cout << "operator* g: " << g.to_string() << std::endl;
+  // Ciphertext p = g / Yashe::q;
   Ciphertext p;
   for(int i = 0; i <= g.deg();i++){
     ZZ quot;
@@ -84,11 +89,9 @@ void Ciphertext::convert(){
     this->keyswitch();
     this->aftermul = false;
     return;
-
 }
 
 void Ciphertext::keyswitch(){
-
 
   std::vector<Polynomial> P(Yashe::lwq);
   this->worddecomp(&P);
@@ -99,7 +102,6 @@ void Ciphertext::keyswitch(){
     *this += p*(Yashe::gamma[i]);
   }
   this->reduce();
-
 
 }
 
