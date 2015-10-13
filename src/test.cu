@@ -853,6 +853,38 @@ BOOST_AUTO_TEST_CASE(modularInversion)
 
 // }
 
+
+BOOST_AUTO_TEST_CASE(phiReduce)
+{
+  for(int count = 0; count < NTESTS; count++){
+
+    Polynomial a;
+    Polynomial::random(&a,2*degree-2);
+
+    ZZ_pEX a_ntl;
+    for(int i = 0;i <= a.deg();i++)
+      NTL::SetCoeff(a_ntl,i,conv<ZZ_p>(a.get_coeff(i)));
+
+    a.reduce();
+    a_ntl %= conv<ZZ_pEX>(ZZ_pE::modulus());
+
+    // std::cout << a.to_string() << std::endl;
+    // std::cout << a_ntl << std::endl;
+    BOOST_REQUIRE(NTL::deg(a_ntl) == a.deg());
+    for(int i = 0;i <= a.deg();i++){
+
+      ZZ ntl_value;
+      if( NTL::IsZero(NTL::coeff(a_ntl,i)) )
+      // Without this, NTL raises an exception when we call rep()
+        ntl_value = 0L;
+      else
+        ntl_value = conv<ZZ>(NTL::rep(NTL::coeff(a_ntl,i))[0]);
+
+      BOOST_REQUIRE(a.get_coeff(i)%Polynomial::global_mod == ntl_value);
+    }
+  }
+}
+
 BOOST_AUTO_TEST_SUITE_END()
 
 BOOST_FIXTURE_TEST_SUITE(CUDAFixture, CUDASuite)
