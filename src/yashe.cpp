@@ -1,3 +1,4 @@
+
 #include "yashe.h"
 #include "settings.h"
 int Yashe::d = 0;
@@ -22,7 +23,7 @@ void Yashe::generate_keys(){
   #endif
 
   Polynomial g = this->xkey.get_sample(phi.deg()-1);
-  g .reduce();
+  g.reduce();
   g %= q;
   // Polynomial g;
   // g.set_coeff(0,1);
@@ -37,7 +38,7 @@ void Yashe::generate_keys(){
   Polynomial fInv;
   while(1==1){
     Polynomial fl = xkey.get_sample(phi.deg()-1);
-    fl .reduce();
+    fl.reduce();
     fl %= q;
     // Polynomial fl;
     // fl.set_coeff(0,1);
@@ -46,7 +47,7 @@ void Yashe::generate_keys(){
     f = fl*t + 1;
 
     // std::cout << "phi " << this->phi << std::endl;
-    f .reduce();
+    f.reduce();
     f %= q;
 
     #ifdef DEBUG
@@ -74,7 +75,7 @@ void Yashe::generate_keys(){
 
   h = fInv*g;
   h *= t;
-  h .reduce();
+  h.reduce();
   h %= q;
   gamma.resize(lwq);
   for(int k = 0 ; k < lwq; k ++){
@@ -82,18 +83,18 @@ void Yashe::generate_keys(){
 
     for(int j = 0; j < k;j ++){
       gamma[k] *= w;
-      gamma[k] .reduce();
+      gamma[k].reduce();
     }
 
     Polynomial e = xerr.get_sample(phi.deg()-1);
-    e .reduce();
+    e.reduce();
     e %= q;
     Polynomial s = xerr.get_sample(phi.deg()-1);
-    s .reduce();
+    s.reduce();
     e %= q;
 
     gamma[k] += e + h*s;
-    gamma[k] .reduce();
+    gamma[k].reduce();
     gamma[k] %= q;
     #ifdef DEBUG
     std::cout << "e = " << e << std::endl;
@@ -123,10 +124,10 @@ Ciphertext Yashe::encrypt(Polynomial m){
   #endif
 
   Polynomial ps = xerr.get_sample(phi.deg()-1);
-  ps .reduce();
+  ps.reduce();
   ps %= q;
   Polynomial e = xerr.get_sample(phi.deg()-1);
-  e .reduce();
+  e.reduce();
   e %= q;
   
   #ifdef DEBUG
@@ -141,7 +142,7 @@ Ciphertext Yashe::encrypt(Polynomial m){
   p = (h*ps);
   p += e;
   p += m*delta;
-  p .reduce();
+  p.reduce();
   p %= q;
 
   #ifdef DEBUG

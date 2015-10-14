@@ -665,6 +665,7 @@ __global__ void polynomialReduction(cuyasheint_t *a,const int half,const int N,c
 void Polynomial::reduce(){
   // Just like DivRem, but here we reduce a with a cyclotomic polynomial
   Polynomial phi = this->get_phi();
+
   if(!this->get_device_updated()){
     #ifdef VERBOSE
     std::cout << "Reduce on host." << std::endl;
@@ -680,10 +681,10 @@ void Polynomial::reduce(){
     std::cout << "Reduce on device." << std::endl;
     #endif
     
-    #warning "Reduce on device has a bug. Deviating to host."
-    this->icrt();
-    this->reduce();
-    return;
+    // #warning "Reduce on device has a bug. Deviating to host."
+    // this->icrt();
+    // this->reduce();
+    // return;
 
     const int half = phi.deg()/2;
     const int N = this->CRTSPACING;
@@ -693,10 +694,10 @@ void Polynomial::reduce(){
     dim3 blockDim(32);
     dim3 gridDim(size/32 + (size % 32 == 0? 0:1));
 
-    polynomialReduction<<<gridDim,blockDim>>>( this->get_device_crt_residues(),
-                                                half,
-                                                N,
-                                                NPolis);
+    polynomialReduction<<< gridDim,blockDim >>>( this->get_device_crt_residues(),
+                                                                      half,
+                                                                      N,
+                                                                      NPolis);
     cudaError_t result = cudaGetLastError();
     assert(result == cudaSuccess);
     

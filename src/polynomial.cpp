@@ -60,9 +60,10 @@ void Polynomial::update_device_data(unsigned int usable_ratio){
     result = cudaMemcpy(this->d_polyCRT, aux , this->CRTSPACING*(this->polyCRT.size())*sizeof(cuyasheint_t), cudaMemcpyHostToDevice);
     assert(result == cudaSuccess);
 
-    // result = cudaDeviceSynchronize();
-    // assert(result == cudaSuccess);
-    free(aux);
+    result = cudaDeviceSynchronize();
+    assert(result == cudaSuccess);
+    // #warning "free(aux) commented"
+    // free(aux);
     this->ON_COPY = false;
     this->set_device_updated(true);
     assert(this->get_device_updated() == true);

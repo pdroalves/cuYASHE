@@ -218,6 +218,9 @@ class Polynomial{
     // }
 
     std::string to_string(){
+      #ifdef VERBOSE
+      std::cout << "Will generate a string" << std::endl;
+      #endif
       if(!this->get_icrt_computed()){
         this->icrt();
       }
