@@ -51,7 +51,7 @@ void Polynomial::update_device_data(unsigned int usable_ratio){
 
     cuyasheint_t *aux;
     // aux = (cuyasheint_t*)malloc(this->CRTSPACING*(this->polyCRT.size())*sizeof(cuyasheint_t));
-    aux = (cuyasheint_t*)calloc(this->CRTSPACING*(this->polyCRT.size()),sizeof(cuyasheint_t));
+    aux = (cuyasheint_t*)calloc(this->CRTSPACING*(1+this->polyCRT.size()),sizeof(cuyasheint_t));
     for(unsigned int i=0;i < this->polyCRT.size();i++){
       // memcpy(aux+this->CRTSPACING*i,&(this->polyCRT[i][0]),(this->polyCRT[i].size()/usable_ratio)*sizeof(cuyasheint_t));
       memcpy(aux+this->CRTSPACING*i,&(this->polyCRT[i][0]),(this->polyCRT[i].size())*sizeof(cuyasheint_t));

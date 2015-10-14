@@ -41,9 +41,7 @@ struct PolySuite
         CUDAFunctions::init(degree);
 
         Polynomial::global_mod = conv<ZZ>("1171313591017775093490277364417L"); // Defines default GF(q)
-        // Polynomial::global_mod = conv<ZZ>("2147483647"); // Defines default GF(q)
         Polynomial::BuildNthCyclotomic(&phi,degree);
-        // std::cout << phi.to_string() << std::endl;
         phi.set_mod(Polynomial::global_mod);
         Polynomial::global_phi = &phi;
 
@@ -902,6 +900,8 @@ BOOST_AUTO_TEST_CASE(phiReduceCPU)
 
 BOOST_AUTO_TEST_CASE(phiReduceGPU)
 {
+  std::cout << "Phi: " << Polynomial::global_phi->to_string() << std::endl;
+
   //GPU
   for(int count = 0; count < NTESTS; count++){
 
@@ -911,16 +911,20 @@ BOOST_AUTO_TEST_CASE(phiReduceGPU)
     ZZ_pEX a_ntl;
     for(int i = 0;i <= a.deg();i++)
       NTL::SetCoeff(a_ntl,i,conv<ZZ_p>(a.get_coeff(i)));
+    
+    std::cout << a.to_string() << std::endl;
+    std::cout << a_ntl << std::endl;
 
-    std::cout << count << std::endl;
     a.update_device_data();
     a.set_host_updated(false);
 
     a.reduce();
+    a %= Polynomial::global_mod;
+
     a_ntl %= conv<ZZ_pEX>(ZZ_pE::modulus());
 
-    // std::cout << a.to_string() << std::endl;
-    // std::cout << a_ntl << std::endl;
+    std::cout << a.to_string() << std::endl;
+    std::cout << a_ntl << std::endl;
     BOOST_REQUIRE(NTL::deg(a_ntl) == a.deg());
     for(int i = 0;i <= a.deg();i++){
 
@@ -935,10 +939,6 @@ BOOST_AUTO_TEST_CASE(phiReduceGPU)
     }
   }
 }
-
-BOOST_AUTO_TEST_SUITE_END()
-
-BOOST_FIXTURE_TEST_SUITE(CUDAFixture, CUDASuite)
 
 BOOST_AUTO_TEST_SUITE_END()
 

@@ -653,9 +653,9 @@ __global__ void polynomialReduction(cuyasheint_t *a,const int half,const int N,c
 
   const int tid = threadIdx.x + blockIdx.x*blockDim.x;
   const int cid = tid & (N/2-1); // We suppose that N = 2^k
-  const int residueID = tid*2 / N; 
+  const int residueID = tid / N; 
 
-  if(2*tid < N*NPolis){
+  if((cid+half) < N){
     a[residueID*N + cid] -= a[residueID*N + cid + half];
     __syncthreads();
     a[residueID*N + cid + half] = 0;
@@ -664,7 +664,7 @@ __global__ void polynomialReduction(cuyasheint_t *a,const int half,const int N,c
 
 void Polynomial::reduce(){
   // Just like DivRem, but here we reduce a with a cyclotomic polynomial
-  Polynomial phi = this->get_phi();
+  Polynomial *phi = (Polynomial::global_phi);
 
   if(!this->get_device_updated()){
     #ifdef VERBOSE
@@ -686,10 +686,10 @@ void Polynomial::reduce(){
     // this->reduce();
     // return;
 
-    const int half = phi.deg()/2;
+    const int half = phi->deg()-1;
     const int N = this->CRTSPACING;
     const int NPolis = this->CRTPrimes.size();
-    const int size = N*NPolis/2;
+    const int size = N*NPolis;
 
     dim3 blockDim(32);
     dim3 gridDim(size/32 + (size % 32 == 0? 0:1));
