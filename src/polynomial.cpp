@@ -40,6 +40,8 @@ void Polynomial::update_device_data(unsigned int usable_ratio){
     cudaError_t result;
     this->ON_COPY = true;
 
+    this->update_crt_spacing(this->deg()+1);
+
     // if(this->d_polyCRT == NULL){
       result = cudaMalloc((void**)&this->d_polyCRT,this->CRTSPACING*(this->polyCRT.size())*sizeof(cuyasheint_t));
       assert(result == cudaSuccess);
@@ -151,29 +153,40 @@ void Polynomial::crt(){
     std::vector<ZZ> array = this->get_coeffs();
 
     // We pick each prime
-    for(std::vector<cuyasheint_t>::iterator iter_prime = P.begin(); iter_prime != P.end(); iter_prime++){
-      int index = iter_prime - P.begin();//Debug
+    for(unsigned int i = 0; i < P.size();i++){
+      this->polyCRT[i].resize(array.size());
 
-      // Apply mod at each coefficient
-      std::vector<cuyasheint_t> rep = this->polyCRT[index];
-      rep.resize(array.size());
-      for(std::vector<ZZ>::iterator iter = array.begin();iter != array.end();iter++){
-        // std::cout << "Prime: " << *iter_prime << std::endl;
-        int array_i = iter-array.begin();//Debug
-        rep[array_i] = conv<cuyasheint_t>(*iter % (*iter_prime));
-        // std::cout << "Original: " << *iter << " % " << *iter_prime << " > rep : " << rep[array_i] << ", " << std::endl;;
+      for(unsigned int j = 0; j < array.size();j++){
+        std::cout << "array[j] % P[i] == " << array[j] << " % " << P[i] << std::endl;
+        this->polyCRT[i][j] = conv<cuyasheint_t>(array[j] % P[i]);
+      std::cout << this->polyCRT[i][j] << std::endl;
       }
 
-       polyCRT[index] = (rep);
     }
 
+    // for(std::vector<cuyasheint_t>::iterator iter_prime = P.begin(); iter_prime != P.end(); iter_prime++){
+    //   int index = iter_prime - P.begin();//Debug
 
-    // for(unsigned int j = 0; j < polyCRT.size();j++){
-    //   std::cout << "Polynomial "<< j << ":" << std::endl; 
-    //   for(unsigned int i = 0; i < polyCRT[0].size() ;i++)
-    //     std::cout << polyCRT[0][i] << " ";
-    //   std::cout << std::endl << std::endl;
+    //   // Apply mod at each coefficient
+    //   std::vector<cuyasheint_t> rep = this->polyCRT[index];
+    //   rep.resize(array.size());
+    //   for(std::vector<ZZ>::iterator iter = array.begin();iter != array.end();iter++){
+    //     // std::cout << "Prime: " << *iter_prime << std::endl;
+    //     int array_i = iter-array.begin();//Debug
+    //     rep[array_i] = conv<cuyasheint_t>(*iter % (*iter_prime));
+    //     // std::cout << "Original: " << *iter << " % " << *iter_prime << " > rep : " << rep[array_i] << ", " << std::endl;;
+    //   }
+
+    //    polyCRT[index] = (rep);
     // }
+
+
+    for(unsigned int j = 0; j < polyCRT.size();j++){
+      std::cout << "Polynomial "<< j << ":" << std::endl; 
+      for(unsigned int i = 0; i < polyCRT[j].size() ;i++)
+        std::cout << polyCRT[j][i] << " ";
+      std::cout << std::endl << std::endl;
+    }
 
     this->set_host_updated(true);
     this->set_device_updated(false);
@@ -190,12 +203,12 @@ void Polynomial::icrt(){
     this->update_host_data();
   }
 
-    // for(unsigned int j = 0; j < polyCRT.size();j++){
-    //   std::cout << "Polynomial "<< j << ":" << std::endl; 
-    //   for(unsigned int i = 0; i < polyCRT[0].size() ;i++)
-    //     std::cout << polyCRT[0][i] << " ";
-    //   std::cout << std::endl << std::endl;
-    // }
+    for(unsigned int j = 0; j < polyCRT.size();j++){
+      std::cout << "Polynomial "<< j << ":" << std::endl; 
+      for(unsigned int i = 0; i < polyCRT[j].size() ;i++)
+        std::cout << polyCRT[j][i] << " ";
+      std::cout << std::endl << std::endl;
+    }
 
   ZZ M = Polynomial::CRTProduct;
   std::vector<cuyasheint_t> primes = Polynomial::CRTPrimes;
@@ -219,10 +232,10 @@ void Polynomial::icrt(){
     }
     // std::cout << std::endl;
     
-    // std::cout << "this: " << std::endl; 
-    // for(unsigned int i = 0; i < this->coefs.size() ;i++)
-    //   std::cout << this->coefs[i] << " ";
-    // std::cout << std::endl << std::endl;
+    std::cout << "this: " << std::endl; 
+    for(unsigned int i = 0; i < this->coefs.size() ;i++)
+      std::cout << this->coefs[i] << " ";
+    std::cout << std::endl << std::endl;
   }
 
   *this %= M;
@@ -232,6 +245,7 @@ void Polynomial::icrt(){
     // std::cout << std::endl << std::endl;
 
   this->normalize();
+  this->update_crt_spacing(this->deg()+1);
   this->set_host_updated(true);
   this->set_icrt_computed(true);
   return;

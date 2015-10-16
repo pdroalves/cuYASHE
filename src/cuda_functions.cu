@@ -17,6 +17,10 @@ cuyasheint_t *CUDAFunctions::d_WInv = NULL;
 cufftHandle CUDAFunctions::plan;
 typedef double2 Complex;
 #endif
+// __constant__ int PrimesL;
+#define MAX_PRIMES_ON_C_MEMORY 4096
+// cuyasheint_t *CRTPrimesGlobal;
+__constant__ cuyasheint_t CRTPrimesConstant[MAX_PRIMES_ON_C_MEMORY];
 
 int CUDAFunctions::N = 0;
 
@@ -652,17 +656,23 @@ __global__ void polynomialReduction(cuyasheint_t *a,const int half,const int N,c
   // This kernel must have N*Npolis/2 threads
 
   const int tid = threadIdx.x + blockIdx.x*blockDim.x;
-  const int cid = tid & (N/2-1); // We suppose that N = 2^k
-  const int residueID = tid / N; 
+  const int residueID = tid / (N-half); 
+  const int cid = tid % (N-half);
+  // const int cid = tid & (N/2-1); // We suppose that N = 2^k
 
-  if((cid+half) < N){
-    a[residueID*N + cid] -= a[residueID*N + cid + half];
+  if((cid+half+1) < N){
+    // uint64_t result = a[residueID*N + cid];
+    // result -= (uint64_t)a[residueID*N + cid + half+1];
+    // // result %= CRTPrimesConstant[residueID];
+
+    // a[residueID*N + cid] = result;
+    a[residueID*N + cid] -= a[residueID*N + cid + half+1];
     __syncthreads();
-    a[residueID*N + cid + half] = 0;
+    a[residueID*N + cid + half+1] = 0;
   }
 }
 
-void Polynomial::reduce(){
+__host__ void Polynomial::reduce(){
   // Just like DivRem, but here we reduce a with a cyclotomic polynomial
   Polynomial *phi = (Polynomial::global_phi);
 
@@ -689,11 +699,12 @@ void Polynomial::reduce(){
     const int half = phi->deg()-1;
     const int N = this->CRTSPACING;
     const int NPolis = this->CRTPrimes.size();
-    const int size = N*NPolis;
+    const int size = (N-half)*NPolis;
 
     dim3 blockDim(32);
     dim3 gridDim(size/32 + (size % 32 == 0? 0:1));
 
+    std::cout << this->polyCRT[0].size() << " == " << this->CRTSPACING << std::endl;
     polynomialReduction<<< gridDim,blockDim >>>( this->get_device_crt_residues(),
                                                                       half,
                                                                       N,
@@ -703,5 +714,23 @@ void Polynomial::reduce(){
     
     this->set_host_updated(false);
     this->set_device_updated(true);
+  }
+}
+
+__host__ void  CUDAFunctions::write_crt_primes(){
+
+  std::cout << "primes: "<< std::endl;
+  for(unsigned int i = 0; i < Polynomial::CRTPrimes.size();i++)
+    std::cout << Polynomial::CRTPrimes[i] << " ";
+  std::cout << std::endl;
+  // Choose what memory will be used to story CRT Primes
+  if(Polynomial::CRTPrimes.size() < MAX_PRIMES_ON_C_MEMORY){
+    #ifdef VERBOSE
+    std::cout << "Writting CRT Primes to GPU's constant memory" << std::endl;
+    #endif
+    cudaError_t result = cudaMemcpyToSymbol (CRTPrimesConstant, &(Polynomial::CRTPrimes[0]), Polynomial::CRTPrimes.size()*sizeof(cuyasheint_t));
+    assert(result == cudaSuccess);
+  }else{
+    throw "Now implemented!";
   }
 }

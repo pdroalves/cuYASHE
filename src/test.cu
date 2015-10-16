@@ -934,7 +934,7 @@ BOOST_AUTO_TEST_CASE(phiReduceGPU)
         ntl_value = 0L;
       else
         ntl_value = conv<ZZ>(NTL::rep(NTL::coeff(a_ntl,i))[0]);
-
+      std::cout << a.get_coeff(i)%Polynomial::global_mod << " == " << ntl_value << std::endl;
       BOOST_REQUIRE(a.get_coeff(i)%Polynomial::global_mod == ntl_value);
     }
   }

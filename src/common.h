@@ -179,7 +179,11 @@ P common_multiplication(P *a, P *b){
       }
   }
 
-  cuyasheint_t *d_result = CUDAFunctions::callPolynomialMul(a->get_stream(),a->get_device_crt_residues(),b->get_device_crt_residues(),a->CRTSPACING,a->CRTPrimes.size());
+  cuyasheint_t *d_result = CUDAFunctions::callPolynomialMul(a->get_stream(),
+															a->get_device_crt_residues(),
+															b->get_device_crt_residues(),
+															a->CRTSPACING,
+															a->CRTPrimes.size());
 
   P c(a->get_mod(),a->get_phi(),a->CRTSPACING);
   c.set_device_crt_residues(d_result);

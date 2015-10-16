@@ -60,4 +60,54 @@ int main(){
 
   std::cout << "CPU: " <<a.to_string() << std::endl;
 
+
+ // GPU
+  a.set_coeff(0,722); 
+  a.set_coeff(1,173); 
+  a.set_coeff(2,735); 
+  a.set_coeff(3,651); 
+  a.set_coeff(4,460); 
+  a.set_coeff(5,161); 
+  a.set_coeff(6, 56); 
+  a.set_coeff(7, 80); 
+  a.set_coeff(8,762); 
+  a.set_coeff(9,  9); 
+  a.set_coeff(10,220); 
+  a.set_coeff(11,281);  
+  a.set_coeff(12, 62);  
+  a.set_coeff(13, 96);  
+  a.set_coeff(14,239);  
+
+  a.update_device_data();
+  a.set_host_updated(false);
+  a.reduce();
+  // a %= Polynomial::global_mod;
+  
+  std::cout << "GPU: " <<a.to_string() << std::endl;
+
+  // CPU
+  a.set_coeff(0,722); 
+  a.set_coeff(1,173); 
+  a.set_coeff(2,735); 
+  a.set_coeff(3,651); 
+  a.set_coeff(4,460); 
+  a.set_coeff(5,161); 
+  a.set_coeff(6, 56); 
+  a.set_coeff(7, 80); 
+  a.set_coeff(8,762); 
+  a.set_coeff(9,  9); 
+  a.set_coeff(10,220); 
+  a.set_coeff(11,281);  
+  a.set_coeff(12, 62);  
+  a.set_coeff(13, 96);  
+  a.set_coeff(14,239);  
+
+  a.set_device_updated(false);
+  a.set_host_updated(true);
+  a.reduce();
+  // a %= Polynomial::global_mod;
+  
+  std::cout << "CPU: " <<a.to_string() << std::endl;
+
+
 }

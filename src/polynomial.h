@@ -766,14 +766,22 @@ class Polynomial{
         cuyasheint_t n;
 
         // Get primes
-        while( (M < (2*degree)*q*q) ){
-            n = NTL::GenPrime_long(primes_size);
-            if( std::find(P.begin(), P.end(), n) == P.end()){
-              // Does not contains
-              P.push_back(n);
-              M *=(n);
-            }
-        }
+        // while( (M < (2*degree)*q*q) ){
+        //     n = NTL::GenPrime_long(primes_size);
+        //     if( std::find(P.begin(), P.end(), n) == P.end()){
+        //       // Does not contains
+        //       P.push_back(n);
+        //       M *=(n);
+        //     }
+        // }
+        P.push_back(751);
+        P.push_back(839);
+        P.push_back(829);
+        P.push_back(661);
+        P.push_back(797);
+        P.push_back(1019);
+        P.push_back(857);
+        M = to_ZZ("240309652370522267791");
 
         // Compute M/pi and it's inverse
         for(unsigned int i = 0; i < P.size();i++){
@@ -788,8 +796,8 @@ class Polynomial{
         Polynomial::CRTInvMpi = InvMpi;
 
         std::cout << P.size() << " primes generated." << std::endl;
-        #ifdef DEBUG
         std::cout << "Primes set - M:" << Polynomial::CRTProduct << std::endl;
+        #ifdef DEBUG
         // std::cout << "Primes: "<< Polynomial::CRTPrimes << std::endl;
         #endif
 

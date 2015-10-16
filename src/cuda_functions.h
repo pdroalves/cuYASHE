@@ -28,6 +28,7 @@ class CUDAFunctions{
     static void callPolynomialOPInteger(int opcode,cudaStream_t stream,cuyasheint_t *a,cuyasheint_t *b,int N,int NPolis);
     static cuyasheint_t* callRealignCRTResidues(cudaStream_t stream,int oldSpacing,int newSpacing, cuyasheint_t *array,int residuesSize,int residuesQty);
     static void init(int N);
+    static void write_crt_primes();
   private:
 };
 #ifdef NTTMUL
