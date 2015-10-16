@@ -6,6 +6,8 @@
 
 ZZ Polynomial::CRTProduct = ZZ(1);
 std::vector<cuyasheint_t> Polynomial::CRTPrimes(0);
+std::vector<ZZ> Polynomial::CRTMpi;
+std::vector<ZZ> Polynomial::CRTInvMpi;
 ZZ Polynomial::global_mod = ZZ(0);
 Polynomial *(Polynomial::global_phi) = NULL;
 bool Polynomial::phi_set = false;
@@ -136,8 +138,14 @@ void Polynomial::crt(){
     else if(!this->get_host_updated())
       this->update_host_data();
     
+    // Set the quantity of expected residues
     std::vector<cuyasheint_t> P = this->CRTPrimes;
     this->polyCRT.resize(P.size());
+
+    // Updated CRTSPACINg
+    if(this->CRTSPACING <= this->deg())
+      this->update_crt_spacing(this->deg());
+
 
     // Extract the coefficients to a array of ZZs
     std::vector<ZZ> array = this->get_coeffs();
@@ -159,10 +167,13 @@ void Polynomial::crt(){
        polyCRT[index] = (rep);
     }
 
-    // std::cout << "Polynomial 0: " << std::endl; 
-    // for(unsigned int i = 0; i < polyCRT[0].size() ;i++)
-      // std::cout << polyCRT[0][i] << " ";
-    // std::cout << std::endl << std::endl;
+
+    // for(unsigned int j = 0; j < polyCRT.size();j++){
+    //   std::cout << "Polynomial "<< j << ":" << std::endl; 
+    //   for(unsigned int i = 0; i < polyCRT[0].size() ;i++)
+    //     std::cout << polyCRT[0][i] << " ";
+    //   std::cout << std::endl << std::endl;
+    // }
 
     this->set_host_updated(true);
     this->set_device_updated(false);
@@ -179,8 +190,17 @@ void Polynomial::icrt(){
     this->update_host_data();
   }
 
+    // for(unsigned int j = 0; j < polyCRT.size();j++){
+    //   std::cout << "Polynomial "<< j << ":" << std::endl; 
+    //   for(unsigned int i = 0; i < polyCRT[0].size() ;i++)
+    //     std::cout << polyCRT[0][i] << " ";
+    //   std::cout << std::endl << std::endl;
+    // }
+
   ZZ M = Polynomial::CRTProduct;
   std::vector<cuyasheint_t> primes = Polynomial::CRTPrimes;
+  std::vector<ZZ> Mpis = Polynomial::CRTMpi;
+  std::vector<ZZ> invMpis = Polynomial::CRTInvMpi;
 
   // Discards all coefficients and prepare to receive new this->CRTSPACING coefficients
   this->set_coeffs(this->CRTSPACING);
@@ -188,21 +208,28 @@ void Polynomial::icrt(){
   // Iteration over all primes
   for(unsigned int i = 0; i < primes.size();i++){
     // Get a prime
-    ZZ pi = ZZ(primes[i]);
-
-    ZZ Mpi = M/pi;
-    ZZ invMpi = NTL::InvMod(Mpi%pi,pi);
+    ZZ pi = to_ZZ(primes[i]);
+    ZZ Mpi = Mpis[i];
+    ZZ invMpi = invMpis[i];
 
     // Iteration over coefficients
     for(unsigned int j = 0; j < this->polyCRT[i].size();j++){
-      // std::cout << this->polyCRT[i][j] << " ";
       this->coefs[j] += Mpi*( invMpi*(this->polyCRT[i][j]) % pi);  
+      // std::cout << this->polyCRT[i][j] << " => "<< this->coefs[j] << std::endl;
     }
     // std::cout << std::endl;
     
+    // std::cout << "this: " << std::endl; 
+    // for(unsigned int i = 0; i < this->coefs.size() ;i++)
+    //   std::cout << this->coefs[i] << " ";
+    // std::cout << std::endl << std::endl;
   }
 
   *this %= M;
+    //   std::cout << "this: " << std::endl; 
+    // for(unsigned int i = 0; i < this->coefs.size() ;i++)
+    //   std::cout << this->coefs[i] << " ";
+    // std::cout << std::endl << std::endl;
 
   this->normalize();
   this->set_host_updated(true);

@@ -24,6 +24,8 @@ class Polynomial{
     int CRTSPACING =-1;// Stores the distance between the zero-coeff of two consecutive residues in d_polyCRT
     static ZZ CRTProduct;
     static std::vector<cuyasheint_t> CRTPrimes;
+    static std::vector<ZZ> CRTMpi;
+    static std::vector<ZZ> CRTInvMpi;
     static Polynomial *global_phi;
     static ZZ global_mod;
     static bool phi_set;
@@ -756,11 +758,14 @@ class Polynomial{
         // We will use 63bit primes to fit cuyasheint_t data type (64 bits raises "GenPrime: length too large")
         ZZ M = ZZ(1);
         std::vector<cuyasheint_t> P;
+        std::vector<ZZ> Mpi;
+        std::vector<ZZ> InvMpi;
 
         int primes_size = CRTPRIMESIZE;
         std::cout << "Primes size: " << primes_size << std::endl;
         cuyasheint_t n;
 
+        // Get primes
         while( (M < (2*degree)*q*q) ){
             n = NTL::GenPrime_long(primes_size);
             if( std::find(P.begin(), P.end(), n) == P.end()){
@@ -770,14 +775,26 @@ class Polynomial{
             }
         }
 
+        // Compute M/pi and it's inverse
+        for(unsigned int i = 0; i < P.size();i++){
+          ZZ pi = to_ZZ(P[i]);
+          Mpi.push_back(M/pi);
+          InvMpi.push_back(NTL::InvMod(Mpi[i]%pi,pi));
+        }
+
         Polynomial::CRTProduct = M;
         Polynomial::CRTPrimes = P;
+        Polynomial::CRTMpi = Mpi;
+        Polynomial::CRTInvMpi = InvMpi;
 
         std::cout << P.size() << " primes generated." << std::endl;
         #ifdef DEBUG
         std::cout << "Primes set - M:" << Polynomial::CRTProduct << std::endl;
         // std::cout << "Primes: "<< Polynomial::CRTPrimes << std::endl;
         #endif
+
+        // Send primes to GPU
+        CUDAFunctions::write_crt_primes();
     }
 
     void update_device_data(unsigned int usable_ratio=1);
