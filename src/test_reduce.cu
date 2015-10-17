@@ -20,7 +20,31 @@ int main(){
 
   srand (36251);
 
-  Polynomial::gen_crt_primes(Polynomial::global_mod,degree);
+  // Polynomial::gen_crt_primes(Polynomial::global_mod,degree);
+
+  Polynomial::CRTPrimes.clear();
+  Polynomial::CRTMpi.clear();
+  Polynomial::CRTInvMpi.clear();
+
+  Polynomial::CRTPrimes.push_back(751);
+  Polynomial::CRTPrimes.push_back(839);
+  Polynomial::CRTPrimes.push_back(829);
+  Polynomial::CRTPrimes.push_back(661);
+  Polynomial::CRTPrimes.push_back(797);
+  Polynomial::CRTPrimes.push_back(1019);
+  Polynomial::CRTPrimes.push_back(857);
+  Polynomial::CRTProduct = to_ZZ("240309652370522267791");
+
+  // Compute M/pi and it's inverse
+  for(unsigned int i = 0; i < Polynomial::CRTPrimes.size();i++){
+    ZZ pi = to_ZZ(Polynomial::CRTPrimes[i]);
+    Polynomial::CRTMpi.push_back(Polynomial::CRTProduct/pi);
+    Polynomial::CRTInvMpi.push_back(NTL::InvMod(Polynomial::CRTMpi[i]%pi,pi));
+  }
+  
+  CUDAFunctions::write_crt_primes();
+
+
   ZZ_p::init(Polynomial::global_mod);
 
   std::cout << "Phi: " << phi.to_string() << std::endl;
@@ -82,7 +106,7 @@ int main(){
   a.set_host_updated(false);
   a.reduce();
   // a %= Polynomial::global_mod;
-  
+
   std::cout << "GPU: " <<a.to_string() << std::endl;
 
   // CPU
@@ -106,7 +130,7 @@ int main(){
   a.set_host_updated(true);
   a.reduce();
   // a %= Polynomial::global_mod;
-  
+
   std::cout << "CPU: " <<a.to_string() << std::endl;
 
 

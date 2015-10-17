@@ -661,9 +661,9 @@ __global__ void polynomialReduction(cuyasheint_t *a,const int half,const int N,c
   // const int cid = tid & (N/2-1); // We suppose that N = 2^k
 
   if((cid+half+1) < N){
-    // uint64_t result = a[residueID*N + cid];
-    // result -= (uint64_t)a[residueID*N + cid + half+1];
-    // // result %= CRTPrimesConstant[residueID];
+    // int64_t result = a[residueID*N + cid];
+    // result -= (int64_t)a[residueID*N + cid + half+1];
+    // result %= CRTPrimesConstant[residueID];
 
     // a[residueID*N + cid] = result;
     a[residueID*N + cid] -= a[residueID*N + cid + half+1];
@@ -691,10 +691,10 @@ __host__ void Polynomial::reduce(){
     std::cout << "Reduce on device." << std::endl;
     #endif
     
-    // #warning "Reduce on device has a bug. Deviating to host."
-    // this->icrt();
-    // this->reduce();
-    // return;
+    #warning "Reduce on device has a bug. Deviating to host."
+    this->icrt();
+    this->reduce();
+    return;
 
     const int half = phi->deg()-1;
     const int N = this->CRTSPACING;

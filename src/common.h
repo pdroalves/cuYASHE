@@ -44,7 +44,6 @@ P common_addition(P *a,P *b){
 			    {
 
 			        if(!a->get_device_updated()){
-			          a->crt();
 			          a->update_device_data();
 			        }
 
@@ -52,12 +51,10 @@ P common_addition(P *a,P *b){
 			    // #pragma omp section
 			    {
 			        if(!b->get_device_updated()){
-			            b->crt();
 			            b->update_device_data();
 			        }
 			    }
 			}
-
 
 			cuyasheint_t *d_result = CUDAFunctions::callPolynomialAddSub(a->get_stream(),a->get_device_crt_residues(),b->get_device_crt_residues(),(int)(a->CRTSPACING*P::CRTPrimes.size()),ADD);
 
@@ -111,7 +108,6 @@ void common_addition_inplace(P *a,P *b){
 		{
 
 			if(!a->get_device_updated()){
-				a->crt();
 				a->update_device_data();
 			}
 
@@ -119,7 +115,6 @@ void common_addition_inplace(P *a,P *b){
 		#pragma omp section
 		{
 			if(!b->get_device_updated()){
-				b->crt();
 				b->update_device_data();
 			}
 		}
@@ -165,7 +160,6 @@ P common_multiplication(P *a, P *b){
       {
 
           if(!a->get_device_updated()){
-            a->crt();
             a->update_device_data(2);
           }
 
@@ -173,7 +167,6 @@ P common_multiplication(P *a, P *b){
       #pragma omp section
       {
           if(!b->get_device_updated()){
-              b->crt();
               b->update_device_data(2);
           }
       }
