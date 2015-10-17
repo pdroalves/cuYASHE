@@ -153,31 +153,51 @@ Ciphertext Yashe::encrypt(Polynomial m){
   return c;
 }
 Polynomial Yashe::decrypt(Ciphertext c){
+  #ifdef VERBOSE
+  std::cout << "Yashe decrypt" << std::endl;
+  #endif
   std::cout << "f " << f.to_string() << std::endl;
   std::cout << "c " << c.to_string() << std::endl;
 
   Polynomial g;
   if(c.aftermul){
-    g = f*f*c;
+    #ifdef VERBOSE
+    std::cout << "aftermul" << std::endl;
+    #endif
+    g = f*f;
+    std::cout << "f*f:" << g.to_string() << std::endl;
+
+    Polynomial p;
+    p.copy(c);
+    g *=p;
+
+    std::cout << "f*f*c:" << g.to_string() << std::endl;
+
   }else{
+    #ifdef VERBOSE
+    std::cout << "not  aftermul" << std::endl;
+    #endif
     g = f*c;
   }
   g.reduce();
+  g.icrt();
+  g %= Yashe::q;
 
-  // Polynomial reduced_g = Polynomial::rem(g,phi);
-  // reduced_g.icrt();
   #ifdef DEBUG
   std::cout << "g = f*c % phi: "<< reduced_g <<std::endl;
   #endif
-  // std::cout << g.to_string() << std::endl;
+  std::cout << "g after reduce:" << g.to_string() << std::endl;
   g *= t; // This operation should not be modular
+  std::cout << "g after *t:" << g.to_string() << std::endl;
 
   ZZ coeff = g.get_coeff(0);
   ZZ quot;
   ZZ rem;
   NTL::DivRem(quot,rem,coeff,q);
 
-  #ifdef DEBUG
+  quot %= q;
+  rem %= q;
+  #ifdef VERBOSE
   std::cout << "quot: " << quot << std::endl;
   std::cout << "rem: " << rem << std::endl;
   std::cout << "coeff: " << coeff << std::endl;

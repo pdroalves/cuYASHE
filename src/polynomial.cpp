@@ -92,25 +92,6 @@ void Polynomial::update_host_data(){
     if(this->polyCRT.size() != Polynomial::CRTPrimes.size())
       this->polyCRT.resize(Polynomial::CRTPrimes.size());
 
-    // Copy all data to host
-    // cuyasheint_t *aux;
-    // // aux = (cuyasheint_t*) calloc (this->polyCRT.size()*this->CRTSPACING,sizeof(cuyasheint_t));
-    // aux = (cuyasheint_t*) malloc (this->polyCRT.size()*this->CRTSPACING*sizeof(cuyasheint_t));
-    // result = cudaMemcpy(aux , this->d_polyCRT, this->polyCRT.size()*this->CRTSPACING*sizeof(cuyasheint_t), cudaMemcpyDeviceToHost);
-    // assert(result == cudaSuccess);
-    // // result = cudaDeviceSynchronize();
-    // // assert(result == cudaSuccess);
-    // //
-    // for(unsigned int i=0;i < this->polyCRT.size();i++){
-    //   // if(this->polyCRT[i].size() != (unsigned int)(this->CRTSPACING))
-    //     // this->polyCRT[i].resize(this->CRTSPACING);
-    //     // for(unsigned int j=0; j < (unsigned int)(this->CRTSPACING);j++){
-    //       // this->polyCRT[i][j] = aux[j+i*this->CRTSPACING];
-    //     // }
-
-    //   this->polyCRT[i][0] = aux[i*this->CRTSPACING];
-    // }
-
     for(unsigned int i=0;i < this->polyCRT.size();i++){
       if(this->polyCRT[i].size() != (unsigned int)(this->CRTSPACING))
         this->polyCRT[i].resize(this->CRTSPACING);
@@ -162,12 +143,12 @@ void Polynomial::crt(){
       
     }
 
-    for(unsigned int j = 0; j < polyCRT.size();j++){
-      std::cout << "Polynomial residue "<< j << ":" << std::endl; 
-      for(unsigned int i = 0; i < polyCRT[j].size() ;i++)
-        std::cout << polyCRT[j][i] << " ";
-      std::cout << std::endl << std::endl;
-    }
+    // for(unsigned int j = 0; j < polyCRT.size();j++){
+    //   std::cout << "Polynomial residue "<< j << ":" << std::endl; 
+    //   for(unsigned int i = 0; i < polyCRT[j].size() ;i++)
+    //     std::cout << polyCRT[j][i] << " ";
+    //   std::cout << std::endl << std::endl;
+    // }
 
     this->set_host_updated(true);
     this->set_device_updated(false);
@@ -184,12 +165,12 @@ void Polynomial::icrt(){
     this->update_host_data();
   }
 
-    for(unsigned int j = 0; j < polyCRT.size();j++){
-      std::cout << "Polynomial residue"<< j << ":" << std::endl; 
-      for(unsigned int i = 0; i < polyCRT[j].size() ;i++)
-        std::cout << polyCRT[j][i] << " ";
-      std::cout << std::endl << std::endl;
-    }
+    // for(unsigned int j = 0; j < polyCRT.size();j++){
+    //   std::cout << "Polynomial residue"<< j << ":" << std::endl; 
+    //   for(unsigned int i = 0; i < polyCRT[j].size() ;i++)
+    //     std::cout << polyCRT[j][i] << " ";
+    //   std::cout << std::endl << std::endl;
+    // }
 
   ZZ M = Polynomial::CRTProduct;
   std::vector<cuyasheint_t> primes = Polynomial::CRTPrimes;

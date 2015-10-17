@@ -48,19 +48,16 @@ Ciphertext Ciphertext::operator*(Ciphertext b){
   if(c2.aftermul)
     c2.convert();
 
-  // #ifdef DEBUG
-  std::cout << "c1 " << c1.to_string() << std::endl;
-  std::cout << "c2 " << c2.to_string() << std::endl;
-  std::cout << "Yashe::t " << Yashe::t << std::endl;
-  // #endif
+  #ifdef VERBOSE
+  // std::cout << "c1 " << c1.to_string() << std::endl;
+  // std::cout << "c2 " << c2.to_string() << std::endl;
+  // std::cout << "Yashe::t " << Yashe::t << std::endl;
+  #endif
 
   Polynomial g = common_multiplication<Polynomial>(&c1,&c2);
+  g.icrt();
   g *= (Yashe::t);
   g.reduce();
-  g %= Yashe::q;
-  g.icrt();
-
-  std::cout << "operator* g: " << g.to_string() << std::endl;
   // Ciphertext p = g / Yashe::q;
   Ciphertext p;
   for(int i = 0; i <= g.deg();i++){
@@ -68,11 +65,14 @@ Ciphertext Ciphertext::operator*(Ciphertext b){
     ZZ diff;
     NTL::DivRem(quot,diff,g.get_coeff(i),Yashe::q);
 
+    quot %= Yashe::q;
+    diff %= Yashe::q;
+
     if(2*diff > Yashe::q)
-      p.set_coeff(i,(quot+1) % Yashe::q);
+      p.set_coeff(i,(quot+1));
     else
-      p.set_coeff(i,quot % Yashe::q);
-  }
+      p.set_coeff(i,quot);
+  } 
 
   p.aftermul = true;
   p.level = std::max(this->level,b.level)+1;
