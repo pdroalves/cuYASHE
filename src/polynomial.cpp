@@ -1,5 +1,6 @@
 #include "polynomial.h"
 #include "settings.h"
+#include "common.h"
 #include <omp.h>
 #include <assert.h>
 #include <string.h>
@@ -154,6 +155,16 @@ void Polynomial::crt(){
 }
 
 void Polynomial::icrt(){
+
+  #ifdef CYCLECOUNTING
+  uint64_t start,end;
+  uint64_t start_total,end_total;
+  start_total = get_cycles();
+  #endif
+
+  #ifdef CYCLECOUNTING
+  start = get_cycles();
+  #endif
   // Escapes, if possible
   if(this->get_icrt_computed())
     return;
@@ -161,41 +172,90 @@ void Polynomial::icrt(){
     this->set_icrt_computed(true);//If we do not set this, we get a infinite loop
     this->update_host_data();
   }
-
+  #ifdef CYCLECOUNTING
+  end = get_cycles();
+  std::cout << "Cycles for host update: " << (end-start) << std::endl;
+  #endif
     // for(unsigned int j = 0; j < polyCRT.size();j++){
     //   std::cout << "Polynomial residue"<< j << ":" << std::endl; 
     //   for(unsigned int i = 0; i < polyCRT[j].size() ;i++)
     //     std::cout << polyCRT[j][i] << " ";
     //   std::cout << std::endl << std::endl;
     // }
-
+  #ifdef CYCLECOUNTING
+  start = get_cycles();
+  #endif
   ZZ M = Polynomial::CRTProduct;
   std::vector<cuyasheint_t> primes = Polynomial::CRTPrimes;
   std::vector<ZZ> Mpis = Polynomial::CRTMpi;
   std::vector<ZZ> invMpis = Polynomial::CRTInvMpi;
+ #ifdef CYCLECOUNTING
+  end = get_cycles();
+  std::cout << "Cycles to load CRT variables: " << (end-start) << std::endl;
+  std::cout << "#Primes: " << primes.size() << std::endl;
+  #endif
 
   // Discards all coefficients and prepare to receive new this->CRTSPACING coefficients
-  this->set_coeffs(this->CRTSPACING);
+  #ifdef CYCLECOUNTING
+  start = get_cycles();
+  #endif
 
+  this->set_coeffs(this->CRTSPACING);
+  
+  #ifdef CYCLECOUNTING
+  end = get_cycles();
+  std::cout << "Cycles to clean coeffs: " << (end-start) << std::endl;
+  #endif
+
+  #ifdef CYCLECOUNTING
+  uint64_t start_iteration,end_iteration;
+
+  start = get_cycles();
+  #endif
   // Iteration over all primes
   for(unsigned int i = 0; i < primes.size();i++){
     // Get a prime
+    #ifdef CYCLECOUNTING
+    start_iteration = get_cycles();
+    #endif
     ZZ pi = to_ZZ(primes[i]);
     ZZ Mpi = Mpis[i];
     ZZ invMpi = invMpis[i];
+    #ifdef CYCLECOUNTING
+    end_iteration = get_cycles();
+    std::cout << "Cycles to load iteration variables: " << (end_iteration-start_iteration) << std::endl;
+    #endif
 
     // Iteration over coefficients
-    for(unsigned int j = 0; j < this->polyCRT[i].size();j++){
+    #ifdef CYCLECOUNTING
+    start_iteration = get_cycles();
+    #endif
+    #pragma omp parallel for
+    for(unsigned int j = 0; j < this->polyCRT[i].size();j++)
       this->coefs[j] += Mpi*( invMpi*(this->polyCRT[i][j]) % pi);  
-    }
+    #ifdef CYCLECOUNTING
+    end_iteration = get_cycles();
+    std::cout << "Cycles in the inner loop: " << (end_iteration-start_iteration) << std::endl;
+    #endif
     
     // std::cout << "this: " << std::endl; 
     // for(unsigned int i = 0; i < this->coefs.size() ;i++)
     //   std::cout << this->coefs[i] << " ";
     // std::cout << std::endl << std::endl;
   }
+  #ifdef CYCLECOUNTING
+  end = get_cycles();
+  std::cout << "Cycles in iterations: " << (end-start) << std::endl;
+  #endif
 
+  #ifdef CYCLECOUNTING
+  start = get_cycles();
+  #endif
   *this %= M;
+  #ifdef CYCLECOUNTING
+  end = get_cycles();
+  std::cout << "Cycles to compute mod M: " << (end-start) << std::endl;
+  #endif
     //   std::cout << "this: " << std::endl; 
     // for(unsigned int i = 0; i < this->coefs.size() ;i++)
     //   std::cout << this->coefs[i] << " ";
@@ -205,6 +265,11 @@ void Polynomial::icrt(){
   // this->update_crt_spacing(this->deg()+1);
   this->set_host_updated(true);
   this->set_icrt_computed(true);
+  
+  #ifdef CYCLECOUNTING
+  end_total = get_cycles();
+  std::cout << "Cycles for icrt: " << (end_total-start_total) << std::endl<< std::endl;
+  #endif
   return;
 }
 

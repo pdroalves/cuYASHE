@@ -2,10 +2,13 @@
 #define COMMON_H
 
 #include <algorithm>
+#include "cuda_functions.h"
 #include "settings.h"
 #include <NTL/ZZ.h>
 #include <NTL/ZZ_pEX.h>
 #include <NTL/ZZ_pXFactoring.h>
+
+uint64_t get_cycles();
 
 template <class P>
 P common_addition(P *a,P *b){

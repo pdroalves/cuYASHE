@@ -12,6 +12,7 @@
 #else
 #define CRTPRIMESIZE 31
 #endif
+// #define CYCLECOUNTING
 // #define VERBOSE
 // #define MAYADDONCPU
 // typedef uint32_t cuyasheint_t;
