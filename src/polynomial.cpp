@@ -134,6 +134,7 @@ void Polynomial::crt(){
     std::vector<ZZ> array = this->get_coeffs();
 
     // We pick each prime
+    #pragma omp parallel for  
     for(unsigned int i = 0; i < P.size();i++){
       this->polyCRT[i].resize(array.size());
 
