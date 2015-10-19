@@ -51,7 +51,9 @@ int main(){
 
   Polynomial ff;
   ff = f*f;
-  std::cout << "f*c: " <<ff.to_string() << std::endl;
+  ff.reduce();
+  ff %= Polynomial::global_mod;
+  std::cout << "f*f: " <<ff.to_string() << std::endl;
   ff.set_device_updated(false);
   
   Polynomial ffc;

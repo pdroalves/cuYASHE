@@ -96,8 +96,6 @@ void Polynomial::update_host_data(){
       if(this->polyCRT[i].size() != (unsigned int)(this->CRTSPACING))
         this->polyCRT[i].resize(this->CRTSPACING);
       result = cudaMemcpy(&this->polyCRT[i][0] , this->d_polyCRT + i*this->CRTSPACING, this->CRTSPACING*sizeof(cuyasheint_t), cudaMemcpyDeviceToHost);
-      if(result != cudaSuccess)
-        std::cout << "Catch!" <<std::endl;
       assert(result == cudaSuccess);
     }
     result = cudaDeviceSynchronize();
@@ -153,7 +151,6 @@ void Polynomial::crt(){
     this->set_host_updated(true);
     this->set_device_updated(false);
     this->set_crt_computed(true);
-    this->set_icrt_computed(true);
 }
 
 void Polynomial::icrt(){

@@ -647,8 +647,9 @@ __host__ void CUDAFunctions::init(int N){
     cufftResult fftResult;
     fftResult = cufftPlan1d(&CUDAFunctions::plan, N, CUFFT_Z2Z, 1);
     assert(fftResult == CUFFT_SUCCESS);
+    #ifdef VERBOSE
     std::cout << "Plan created with signal size " << N << std::endl;
-
+    #endif
   #endif
 }
 
@@ -719,10 +720,13 @@ __host__ void Polynomial::reduce(){
 
 __host__ void  CUDAFunctions::write_crt_primes(){
 
+  #ifdef VERBOSE
   std::cout << "primes: "<< std::endl;
   for(unsigned int i = 0; i < Polynomial::CRTPrimes.size();i++)
     std::cout << Polynomial::CRTPrimes[i] << " ";
   std::cout << std::endl;
+  #endif
+  
   // Choose what memory will be used to story CRT Primes
   if(Polynomial::CRTPrimes.size() < MAX_PRIMES_ON_C_MEMORY){
     #ifdef VERBOSE
@@ -731,6 +735,6 @@ __host__ void  CUDAFunctions::write_crt_primes(){
     cudaError_t result = cudaMemcpyToSymbol (CRTPrimesConstant, &(Polynomial::CRTPrimes[0]), Polynomial::CRTPrimes.size()*sizeof(cuyasheint_t));
     assert(result == cudaSuccess);
   }else{
-    throw "Now implemented!";
+    throw "Not implemented!";
   }
 }

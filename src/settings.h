@@ -12,7 +12,7 @@
 #else
 #define CRTPRIMESIZE 31
 #endif
-#define VERBOSE
+// #define VERBOSE
 // #define MAYADDONCPU
 // typedef uint32_t cuyasheint_t;
 typedef uint64_t cuyasheint_t;

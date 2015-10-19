@@ -674,10 +674,7 @@ BOOST_AUTO_TEST_CASE(addAndMultiplyByPolynomial)
       std::cout << "c: " << c << " degree: " << NTL::deg(c) <<std::endl;
       std::cout << "c_ntl: " << c_ntl << " degree: " << NTL::deg(c_ntl) << std::endl << std::endl;
     }
-    std::cout << "count: " << count << std::endl;
     #endif
-      // std::cout << "c: " << c.to_string() << " degree: " << c.deg() <<std::endl;
-      // std::cout << "c_ntl: " << c_ntl << " degree: " << NTL::deg(c_ntl) << std::endl << std::endl;
 
     BOOST_REQUIRE(NTL::deg(c_ntl) == c.deg());
     for(int i = 0;i <= c.deg();i++){
@@ -720,15 +717,8 @@ BOOST_AUTO_TEST_CASE(randomPolynomialOperations)
   ZZ_pEX c_ntl;
 
   for(int count = 0; count < 10*NTESTS; count++){
-    std::cout << "b: " << b.to_string() << std::endl;
-    std::cout << "b_ntl: " << b_ntl << std::endl;
-
-
     int random_op_bit = rand()%2;
     int random_ab = rand()%3;
-    std::cout << "random_op_bit: " << random_op_bit << std::endl;
-    std::cout << "random_ab: " << random_ab << std::endl;
-
 
     // 0: add
     if(random_op_bit){
@@ -782,42 +772,29 @@ BOOST_AUTO_TEST_CASE(randomPolynomialOperations)
 
     }
 
-    // std::cout << c.to_string() << std::endl;
     c.reduce();
-  std::cout << "c: " << c.to_string() << " degree: " << c.deg() <<std::endl;
-  std::cout << "c_ntl: " << c_ntl << " degree: " << NTL::deg(c_ntl) << std::endl << std::endl;
-  
+    
     c %= Polynomial::global_mod;
     c.normalize();
     c_ntl %= conv<ZZ_pEX>(ZZ_pE::modulus());
 
+    #ifdef DEBUG
+    std::cout << "c: " << c.to_string() << " degree: " << c.deg() <<std::endl;
+    std::cout << "c_ntl: " << c_ntl << " degree: " << NTL::deg(c_ntl) << std::endl << std::endl;
+    #endif
 
+    BOOST_REQUIRE(NTL::deg(c_ntl) == c.deg());
+    for(int i = 0;i <= c.deg();i++){
+      ZZ ntl_value;
+      if( NTL::IsZero(NTL::coeff(c_ntl,i)) )
+      // Without this, NTL raises an exception when we call rep()
+        ntl_value = 0L;
+      else
+        ntl_value = conv<ZZ>(NTL::rep(NTL::coeff(c_ntl,i))[0]);
 
-  // #ifdef DEBUG
-  std::cout << "c: " << c.to_string() << " degree: " << c.deg() <<std::endl;
-  std::cout << "c_ntl: " << c_ntl << " degree: " << NTL::deg(c_ntl) << std::endl << std::endl;
-  // #endif
-
-  if(! (NTL::deg(c_ntl) == c.deg())){
-    std::cout << "Catch! " << NTL::deg(c_ntl) << " != " << c.deg() << std::endl;
+      BOOST_REQUIRE(c.get_coeff(i) == ntl_value);
+    }
   }
-  BOOST_REQUIRE(NTL::deg(c_ntl) == c.deg());
-  for(int i = 0;i <= c.deg();i++){
-    ZZ ntl_value;
-    if( NTL::IsZero(NTL::coeff(c_ntl,i)) )
-    // Without this, NTL raises an exception when we call rep()
-      ntl_value = 0L;
-    else
-      ntl_value = conv<ZZ>(NTL::rep(NTL::coeff(c_ntl,i))[0]);
-
-    BOOST_REQUIRE(c.get_coeff(i) == ntl_value);
-  }
-  }
-
-    // std::cout << "c: " << c.to_string() << " degree: " << c.deg() <<std::endl;
-    // std::cout << "c_ntl: " << c_ntl << " degree: " << NTL::deg(c_ntl) << std::endl << std::endl;
-
-
 }
 
 BOOST_AUTO_TEST_CASE(modularInversion)
@@ -826,21 +803,12 @@ BOOST_AUTO_TEST_CASE(modularInversion)
   Polynomial a;
   Polynomial::random(&a,Polynomial::global_phi->deg()-1);
 
-  std::cout << "Phi: " << Polynomial::global_phi->to_string() << std::endl;
-  
   Polynomial aInv = Polynomial::InvMod(a,Polynomial::global_phi);
-  
-  std::cout << "a: " << a.to_string() << std::endl;
-  std::cout << "aInv: " << aInv.to_string() << std::endl;
   
   Polynomial result = a*aInv;
   result %= Polynomial::global_mod;
   
-  std::cout << "a*aInv = " <<result.to_string() << std::endl;
   result.reduce();
-
-  std::cout << "a*aInv % Phi = " <<result.to_string() << std::endl;
-  
   result %= a.get_mod();
 
   Polynomial one = Polynomial();
@@ -900,8 +868,6 @@ BOOST_AUTO_TEST_CASE(phiReduceCPU)
 
 BOOST_AUTO_TEST_CASE(phiReduceGPU)
 {
-  std::cout << "Phi: " << Polynomial::global_phi->to_string() << std::endl;
-
   //GPU
   for(int count = 0; count < NTESTS; count++){
 
@@ -911,9 +877,6 @@ BOOST_AUTO_TEST_CASE(phiReduceGPU)
     ZZ_pEX a_ntl;
     for(int i = 0;i <= a.deg();i++)
       NTL::SetCoeff(a_ntl,i,conv<ZZ_p>(a.get_coeff(i)));
-    
-    std::cout << a.to_string() << std::endl;
-    std::cout << a_ntl << std::endl;
 
     a.update_device_data();
     a.set_host_updated(false);
@@ -922,9 +885,6 @@ BOOST_AUTO_TEST_CASE(phiReduceGPU)
     a %= Polynomial::global_mod;
 
     a_ntl %= conv<ZZ_pEX>(ZZ_pE::modulus());
-
-    std::cout << a.to_string() << std::endl;
-    std::cout << a_ntl << std::endl;
     BOOST_REQUIRE(NTL::deg(a_ntl) == a.deg());
     for(int i = 0;i <= a.deg();i++){
 
@@ -934,7 +894,6 @@ BOOST_AUTO_TEST_CASE(phiReduceGPU)
         ntl_value = 0L;
       else
         ntl_value = conv<ZZ>(NTL::rep(NTL::coeff(a_ntl,i))[0]);
-      std::cout << a.get_coeff(i)%Polynomial::global_mod << " == " << ntl_value << std::endl;
       BOOST_REQUIRE(a.get_coeff(i)%Polynomial::global_mod == ntl_value);
     }
   }
@@ -954,8 +913,8 @@ BOOST_AUTO_TEST_CASE(encryptDecrypt)
     Ciphertext c = cipher.encrypt(a);
     Polynomial a_decrypted = cipher.decrypt(c);
 
-    std::cout << a.to_string() << std::endl;
-    std::cout << a_decrypted.to_string() << std::endl;
+    // std::cout << a.to_string() << std::endl;
+    // std::cout << a_decrypted.to_string() << std::endl;
     BOOST_REQUIRE( a_decrypted == a);
   }
 }
@@ -971,23 +930,18 @@ BOOST_AUTO_TEST_CASE(encryptandAdd)
     Ciphertext c = cipher.encrypt(a);
 
     c = c + c;
-    // std::cout << "t: " << t << std::endl;
 
-    // std::cout << "Ciphertext: "<< c <<std::endl;
     Polynomial a_decrypted = cipher.decrypt(c);
 
-
     Polynomial value = (a+a);
-    // std::cout << value.to_string() << std::endl;
     value.icrt();
     Polynomial value_reduced = value % t;
-    // std::cout << value_reduced.to_string() << std::endl;
 
-    // #ifdef VERBOSE
+    #ifdef VERBOSE
     std::cout << "Original: " << a.to_string() << std::endl;
     std::cout << "Original *2: " << ((a+a)%t).to_string() << std::endl;
     std::cout << "Decrypted: " << a_decrypted.to_string() << std::endl;
-    // #endif
+    #endif
 
     BOOST_REQUIRE( a_decrypted == value_reduced);
   }
@@ -1005,21 +959,18 @@ BOOST_AUTO_TEST_CASE(encryptandMul)
     Ciphertext c2 = cipher.encrypt(a);
     Ciphertext c = c1*c2;
 
-
-    // std::cout << "Ciphertext: "<< c <<std::endl;
     Polynomial a_decrypted = cipher.decrypt(c);
 
     Polynomial value = (a*a);
-    // std::cout << value.to_string() << std::endl;
     value.icrt();
     Polynomial value_reduced = value % t;
-    // std::cout << value_reduced.to_string() << std::endl;
 
-
+    #ifdef VERBOSE
     std::cout << "Original: " << a.to_string() << std::endl;
     std::cout << "Original *2: " << ((a*a)%t).to_string() << std::endl;
     std::cout << "value_reduced: " << value_reduced.to_string() << std::endl;
     std::cout << "Decrypted: " << a_decrypted.to_string() << std::endl;
+    #endif
 
     BOOST_REQUIRE( a_decrypted == value_reduced);
   }

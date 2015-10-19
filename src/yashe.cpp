@@ -110,9 +110,6 @@ void Yashe::generate_keys(){
   #ifdef VERBOSE
   std::cout << "Keys generated." << std::endl;
   #endif
-  #ifdef DEBUG
-  std::cout << "Keys generated." << std::endl;
-  #endif
 }
 
 Ciphertext Yashe::encrypt(Polynomial m){
@@ -156,8 +153,8 @@ Polynomial Yashe::decrypt(Ciphertext c){
   #ifdef VERBOSE
   std::cout << "Yashe decrypt" << std::endl;
   #endif
-  std::cout << "f " << f.to_string() << std::endl;
-  std::cout << "c " << c.to_string() << std::endl;
+  // std::cout << "f " << f.to_string() << std::endl;
+  // std::cout << "c " << c.to_string() << std::endl;
 
   Polynomial g;
   if(c.aftermul){
@@ -165,13 +162,12 @@ Polynomial Yashe::decrypt(Ciphertext c){
     std::cout << "aftermul" << std::endl;
     #endif
     g = f*f;
-    std::cout << "f*f:" << g.to_string() << std::endl;
-
-    Polynomial p;
-    p.copy(c);
-    g *=p;
-
-    std::cout << "f*f*c:" << g.to_string() << std::endl;
+    g.reduce();
+    g %= Yashe::q;
+    g *= c;
+    
+    // std::cout << "f*f:" << g.to_string() << std::endl;
+    // std::cout << "f*f*c:" << g.to_string() << std::endl;
 
   }else{
     #ifdef VERBOSE
@@ -180,17 +176,12 @@ Polynomial Yashe::decrypt(Ciphertext c){
     g = f*c;
   }
   g.reduce();
-  g.icrt();
   g %= Yashe::q;
 
   #ifdef DEBUG
   std::cout << "g = f*c % phi: "<< reduced_g <<std::endl;
   #endif
-  std::cout << "g after reduce:" << g.to_string() << std::endl;
-  g *= t; // This operation should not be modular
-  std::cout << "g after *t:" << g.to_string() << std::endl;
-
-  ZZ coeff = g.get_coeff(0);
+  ZZ coeff = g.get_coeff(0)*t;
   ZZ quot;
   ZZ rem;
   NTL::DivRem(quot,rem,coeff,q);

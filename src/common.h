@@ -32,7 +32,7 @@ P common_addition(P *a,P *b){
 			}
 
 			#ifdef VERBOSE
-			std::cout << "Adding:" << std::endl;
+			std::cout << "Add with CRTSPACING" << a->get_crt_spacing() << std::endl;
 			// std::cout << "this: " << a->to_string() << std::endl;
 			// std::cout << "other " << b->to_string() << std::endl;
 			#endif
@@ -96,7 +96,7 @@ void common_addition_inplace(P *a,P *b){
 	}
 
 	#ifdef VERBOSE
-	std::cout << "Adding:" << std::endl;
+	std::cout << "Add with CRTSPACING" << a->get_crt_spacing() << std::endl;
 	// std::cout << "this: " << a->to_string() << std::endl;
 	// std::cout << "other " << b->to_string() << std::endl;
 	#endif
@@ -148,7 +148,7 @@ P common_multiplication(P *a, P *b){
   b->update_crt_spacing(new_spacing);
 
   #ifdef VERBOSE
-  std::cout << "Mul:" << std::endl;
+  std::cout << "Mul with CRTSPACING" << new_spacing << std::endl;
   // std::cout << "this: " << a->to_string() << std::endl;
   // std::cout << "other " << b->to_string() << std::endl;
   #endif

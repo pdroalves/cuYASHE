@@ -32,6 +32,9 @@ class Polynomial{
 
     // Constructors
     Polynomial(){
+      #ifdef VERBOSE
+      std::cout << "Building a polynomial" << std::endl;
+      #endif
       cudaStreamCreate(&this->stream);
       this->expected_degree = -1;
       this->set_host_updated(true);
@@ -62,6 +65,9 @@ class Polynomial{
       #endif
     }
     Polynomial(ZZ p){
+      #ifdef VERBOSE
+      std::cout << "Building a polynomial" << std::endl;
+      #endif
       cudaStreamCreate(&this->stream);
       this->expected_degree = -1;
       this->set_host_updated(true);
@@ -84,6 +90,9 @@ class Polynomial{
       #endif
     }
     Polynomial(ZZ p,Polynomial P){
+      #ifdef VERBOSE
+      std::cout << "Building a polynomial" << std::endl;
+      #endif
       cudaStreamCreate(&this->stream);
       this->expected_degree = -1;
       this->set_host_updated(true);
@@ -105,6 +114,9 @@ class Polynomial{
       #endif
     }
     Polynomial(int spacing){
+      #ifdef VERBOSE
+      std::cout << "Building a polynomial" << std::endl;
+      #endif
       cudaStreamCreate(&this->stream);
       this->expected_degree = -1;
       this->set_host_updated(true);
@@ -130,6 +142,9 @@ class Polynomial{
       #endif
     }
     Polynomial(ZZ p,Polynomial P,int spacing){
+      #ifdef VERBOSE
+      std::cout << "Building a polynomial" << std::endl;
+      #endif
       cudaStreamCreate(&this->stream);
       this->expected_degree = -1;
       this->set_host_updated(true);
@@ -152,6 +167,9 @@ class Polynomial{
       #endif
     }
     Polynomial(ZZ p,int spacing){
+      #ifdef VERBOSE
+      std::cout << "Building a polynomial" << std::endl;
+      #endif
       cudaStreamCreate(&this->stream);
       this->expected_degree = -1;
       this->set_host_updated(true);
@@ -171,6 +189,9 @@ class Polynomial{
       #endif
     }
     Polynomial(Polynomial *b){
+      #ifdef VERBOSE
+      std::cout << "Building a polynomial" << std::endl;
+      #endif
       // Copy
       this->copy(*b);
     }
@@ -693,11 +714,10 @@ class Polynomial{
         std::vector<ZZ> InvMpi;
 
         int primes_size = CRTPRIMESIZE;
-        std::cout << "Primes size: " << primes_size << std::endl;
         cuyasheint_t n;
 
         // Get primes
-        while( (M < (2*degree)*q*q) ){
+        while( (M < (2*degree)*q*q*q) ){
             n = NTL::GenPrime_long(primes_size);
             if( std::find(P.begin(), P.end(), n) == P.end()){
               // Does not contains
@@ -717,10 +737,10 @@ class Polynomial{
         Polynomial::CRTMpi = Mpi;
         Polynomial::CRTInvMpi = InvMpi;
 
-        std::cout << P.size() << " primes generated." << std::endl;
+        #ifdef VERBOSE
+        std::cout << "Primes size: " << primes_size << std::endl;
         std::cout << "Primes set - M:" << Polynomial::CRTProduct << std::endl;
-        #ifdef DEBUG
-        // std::cout << "Primes: "<< Polynomial::CRTPrimes << std::endl;
+        std::cout << P.size() << " primes generated." << std::endl;
         #endif
 
         // Send primes to GPU
@@ -730,8 +750,17 @@ class Polynomial{
     void update_device_data(unsigned int usable_ratio=1);
     void set_device_updated(bool b){
       this->DEVICE_IS_UPDATE = b;
-      if(!b)
+      if(b){
+        #ifdef VERBOSE
+        std::cout << "Device data is updated" << std::endl;
+        #endif
+      }
+      if(!b){
+        #ifdef VERBOSE
+        std::cout << "Device data is NOT updated" << std::endl;
+        #endif
         this->set_crt_computed(false);
+      }
     }
     bool get_device_updated(){
       return this->DEVICE_IS_UPDATE;
@@ -739,20 +768,47 @@ class Polynomial{
     void update_host_data();
     void set_host_updated(bool b){
       this->HOST_IS_UPDATED = b;
-      if(!b)
+      if(b){        
+        #ifdef VERBOSE
+        std::cout << "Host data is updated" << std::endl;
+        #endif
+      }else{        
         this->set_icrt_computed(false);
+        #ifdef VERBOSE
+        std::cout << "Host data is NOT updated" << std::endl;
+        #endif
+      }
     }
     bool get_host_updated(){
       return this->HOST_IS_UPDATED;
     }
     void set_crt_computed(bool b){
       this->CRT_COMPUTED = b;
+      if(b){        
+        #ifdef VERBOSE
+        std::cout << "CRT residues computed" << std::endl;
+        #endif
+      }else{        
+        #ifdef VERBOSE
+        std::cout << "CRT residues NOT computed" << std::endl;
+        #endif
+      }
     }
     bool get_crt_computed(){
       return this->CRT_COMPUTED;
     }
     void set_icrt_computed(bool b){
       this->ICRT_COMPUTED = b;
+
+      if(b){        
+        #ifdef VERBOSE
+        std::cout << "ICRT residues computed" << std::endl;
+        #endif
+      }else{        
+        #ifdef VERBOSE
+        std::cout << "ICRT residues NOT computed" << std::endl;
+        #endif
+      }
     }
     bool get_icrt_computed(){
       return this->ICRT_COMPUTED;
@@ -789,8 +845,18 @@ class Polynomial{
     }
     void update_crt_spacing(int new_spacing){
       
-      if(this->CRTSPACING == new_spacing)
+      #ifdef VERBOSE
+      std::cout << "update_crt_spacing" << std::endl;
+      #endif
+
+      if(this->CRTSPACING == new_spacing){
+
+        #ifdef VERBOSE
+        std::cout << "No need to update crt spacing." << std::endl;
+        #endif
         return;
+      }
+
 
       // If updated data lies in gpu's global memory, realign it
       if(this->get_device_updated()){
@@ -804,6 +870,10 @@ class Polynomial{
         }
       }
       this->CRTSPACING = new_spacing;
+      
+      #ifdef VERBOSE
+      std::cout << "crt spacing updated to " << this->CRTSPACING << std::endl;
+      #endif
 
     }
     void update_crt_spacing(){
