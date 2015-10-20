@@ -5,14 +5,14 @@
 
 class Ciphertext: public Polynomial{
   public:
-    Ciphertext operator+(Ciphertext b);
-    Ciphertext operator+(Polynomial b);
-    Ciphertext operator+=(Ciphertext b);
+    Ciphertext operator+(Ciphertext &b);
+    Ciphertext operator+(Polynomial &b);
+    Ciphertext operator+=(Ciphertext &b);
     //   this->set_device_crt_residues( ((*this)+b).get_device_crt_residues());
     //   return *this;
     // }
-    Ciphertext operator+=(Polynomial b);
-    Ciphertext operator*(Ciphertext b);
+    Ciphertext operator+=(Polynomial &b);
+    Ciphertext operator*(Ciphertext &b);
     void convert();
     Ciphertext operator=(Polynomial p){
       level = 0;

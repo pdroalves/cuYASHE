@@ -64,10 +64,11 @@ __host__ cuyasheint_t* CUDAFunctions::callRealignCRTResidues(cudaStream_t stream
 
 ///////////////////////////////////////
 /// ADD
-__global__ void polynomialAddSub(const int OP,const cuyasheint_t *a,const cuyasheint_t *b,cuyasheint_t *c,const int size){
+__global__ void polynomialAddSub(const int OP,const cuyasheint_t *a,const cuyasheint_t *b,cuyasheint_t *c,const int size,const int N){
   // We have one thread per polynomial coefficient on 32 threads-block.
   // For CRT polynomial adding, all representations should be concatenated aligned
   const int tid = threadIdx.x + blockDim.x*blockIdx.x;
+  const int rid = tid / N; // Residue id
   cuyasheint_t a_value;
   cuyasheint_t b_value;
 
@@ -82,6 +83,7 @@ __global__ void polynomialAddSub(const int OP,const cuyasheint_t *a,const cuyash
         a_value -= b_value;
 
       c[tid] = a_value;
+      // c[tid] = a_value %= CRTPrimesConstant[rid*N];
   }
 }
 
@@ -95,7 +97,7 @@ __host__ cuyasheint_t* CUDAFunctions::callPolynomialAddSub(cudaStream_t stream,c
   cudaError_t result = cudaMalloc((void**)&d_new_array,size*sizeof(cuyasheint_t));
   assert(result == cudaSuccess);
 
-  polynomialAddSub <<< gridDim,blockDim,1,stream >>> (OP,a,b,d_new_array,size);
+  polynomialAddSub <<< gridDim,blockDim,1,stream >>> (OP,a,b,d_new_array,size,N);
   #ifdef VERBOSE
   std::cout << gridDim.x << " " << blockDim.x << std::endl;
   std::cout << "polynomialAdd kernel:" << cudaGetErrorString(cudaGetLastError()) << std::endl;
@@ -111,7 +113,7 @@ __host__ void CUDAFunctions::callPolynomialAddSubInPlace(cudaStream_t stream,cuy
   dim3 gridDim(ADDGRIDXDIM);
   dim3 blockDim(ADDBLOCKXDIM);
 
-  polynomialAddSub <<< gridDim,blockDim,1,stream >>> (OP,a,b,a,size);
+  polynomialAddSub <<< gridDim,blockDim,1,stream >>> (OP,a,b,a,size,N);
   #ifdef VERBOSE
   std::cout << gridDim.x << " " << blockDim.x << std::endl;
   std::cout << "polynomialAdd kernel:" << cudaGetErrorString(cudaGetLastError()) << std::endl;
@@ -175,23 +177,17 @@ __global__ void copyIntegerToComplex(Complex *a,cuyasheint_t *b,int size){
   }
 }
 
-__global__ void copyAndNormalizeComplexRealPartToInteger(cuyasheint_t *b,Complex *a,int size,double scale){
+__global__ void copyAndNormalizeComplexRealPartToInteger(cuyasheint_t *b,const Complex *a,const int size,const double scale,const int N){
   const int tid = threadIdx.x + blockDim.x*blockIdx.x;
+  const int rid = tid / N; // Residue id
   int value;
   double fvalue;
   // double frac;
   if(tid < size ){
       fvalue = a[tid].x * scale;
       value = rint(fvalue);
-      // frac = fmodf(fvalue,1);
-      // if( frac >= 0.5f)
-      //   value += 1;
 
-      // value =  (a[tid].x * scale);
       b[tid] = value;
-      // printf("%f) %f  => %ld\n\n",a[tid].x, a[tid].x * scale,value);
-
-      // b[tid] =  __ddouble2ull_rd(a[tid].x/scale);
   }
 }
 ////////////////////////////////////////////////////////////////////////////////
@@ -384,17 +380,27 @@ __global__ void polynomialOPInteger(int opcode,cuyasheint_t *a,cuyasheint_t *b,c
     switch(opcode)
     {
     case ADD:
-      if(cid == 0)
+      if(cid == 0){
         a[tid] += b[rid*N];
+        // a[tid] %= CRTPrimesConstant[rid*N];
+      }
+      break;
     case SUB:
-      if(cid == 0)
+      if(cid == 0){
         a[tid] -= b[rid*N];
+        // a[tid] %= CRTPrimesConstant[rid*N];
+      }
+      break;
     case DIV:
         a[tid] /= b[rid*N];
+      break;
     case MUL:
         a[tid] *= b[rid*N];
+        // a[tid] %= CRTPrimesConstant[rid*N];
+      break;
     case MOD:
         a[tid] %= b[rid*N];
+      break;
     }
 
 }
@@ -586,7 +592,7 @@ __host__ cuyasheint_t* CUDAFunctions::callPolynomialMul(cudaStream_t stream,cuya
     fftResult = cufftExecZ2Z(CUDAFunctions::plan, (cufftDoubleComplex *)(d_c+phase), (cufftDoubleComplex *)(d_c+phase), CUFFT_INVERSE);
     assert(fftResult == CUFFT_SUCCESS);
   }
-  copyAndNormalizeComplexRealPartToInteger<<< gridDim,blockDim,1,stream >>>(d_result,d_c,size,1.0f/signal_size);
+  copyAndNormalizeComplexRealPartToInteger<<< gridDim,blockDim,1,stream >>>(d_result,d_c,size,1.0f/signal_size,N);
   assert(cudaGetLastError() == cudaSuccess);
 
 
@@ -705,7 +711,7 @@ __host__ void Polynomial::reduce(){
     dim3 blockDim(32);
     dim3 gridDim(size/32 + (size % 32 == 0? 0:1));
 
-    std::cout << this->polyCRT[0].size() << " == " << this->CRTSPACING << std::endl;
+    // std::cout << this->polyCRT[0].size() << " == " << this->CRTSPACING << std::endl;
     polynomialReduction<<< gridDim,blockDim >>>( this->get_device_crt_residues(),
                                                                       half,
                                                                       N,

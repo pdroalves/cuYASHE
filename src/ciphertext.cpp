@@ -1,23 +1,23 @@
 #include "ciphertext.h"
 #include "yashe.h"
 
-Ciphertext Ciphertext::operator+(Ciphertext b){
+Ciphertext Ciphertext::operator+(Ciphertext &b){
   Ciphertext c = common_addition<Ciphertext>(this,&b);
   c.level = std::max(this->level,b.level);
 
   return c;
 }
 
-Ciphertext Ciphertext::operator+(Polynomial b){
+Ciphertext Ciphertext::operator+(Polynomial &b){
   Polynomial p = common_addition<Polynomial>(this,&b);
   Ciphertext c(p);
   return c;
 }
-Ciphertext Ciphertext::operator+=(Ciphertext b){
+Ciphertext Ciphertext::operator+=(Ciphertext &b){
   common_addition_inplace<Ciphertext>(this,&b);
   return *this;
 }
-Ciphertext Ciphertext::operator+=(Polynomial b){
+Ciphertext Ciphertext::operator+=(Polynomial &b){
   common_addition_inplace<Polynomial>(this,&b);
   return *this;
 }
@@ -35,11 +35,11 @@ uint64_t cycles() {
 }
 
 
-Ciphertext Ciphertext::operator*(Ciphertext b){
-  // uint64_t start,end;
+Ciphertext Ciphertext::operator*(Ciphertext &b){
+  uint64_t start,end;
+  uint64_t start_total,end_total;
 
-  // start = cycles();
-
+  start_total = get_cycles();
   Ciphertext c1(*this);
   Ciphertext c2(b);
 
@@ -50,14 +50,16 @@ Ciphertext Ciphertext::operator*(Ciphertext b){
 
   #ifdef VERBOSE
   // std::cout << "c1 " << c1.to_string() << std::endl;
-  // std::cout << "c2 " << c2.to_string() << std::endl;
+  // std::cout << "htopc2 " << c2.to_string() << std::endl;
   // std::cout << "Yashe::t " << Yashe::t << std::endl;
   #endif
 
+  start = cycles();
   Polynomial g = common_multiplication<Polynomial>(&c1,&c2);
-  g.icrt();
   g *= (Yashe::t);
   g.reduce();
+  end = cycles();
+  std::cout << "ciphertext * " << (end-start) << std::endl;
   // Ciphertext p = g / Yashe::q;
   Ciphertext p;
   for(int i = 0; i <= g.deg();i++){
@@ -78,8 +80,9 @@ Ciphertext Ciphertext::operator*(Ciphertext b){
   p.level = std::max(this->level,b.level)+1;
   p.set_device_updated(false);
   p.set_host_updated(true);
-  // end = cycles();
-  // std::cout << "ciphertext mult " << (end-start) << std::endl;
+
+  end_total = get_cycles();
+  std::cout << "ciphertext mult " << (end_total-start_total) << std::endl;
 
   return p;
 
@@ -92,21 +95,27 @@ void Ciphertext::convert(){
 }
 
 void Ciphertext::keyswitch(){
+  uint64_t start,end;
+  start = get_cycles();
 
   std::vector<Polynomial> P(Yashe::lwq);
   this->worddecomp(&P);
   this->set_coeffs();//Discards all coefficients
 
   for(int i = 0; i < Yashe::lwq; i ++){
-    Polynomial p = (P[i]);
-    *this += p*(Yashe::gamma[i]);
+    Polynomial p = (P[i])*(Yashe::gamma[i]);
+    *this += p;
   }
   this->reduce();
 
+  end = get_cycles();
+  std::cout << (end-start) << " cycles to keyswitch" << std::endl;
 }
 
 void Ciphertext::worddecomp(std::vector<Polynomial> *P){
+  uint64_t start,end;
 
+  start = get_cycles();
   for(int i = 0; i <= this->deg(); i++){
     ZZ c = this->get_coeff(i);
     int j = 0;
@@ -117,4 +126,6 @@ void Ciphertext::worddecomp(std::vector<Polynomial> *P){
       j++;
     }
   }
+  end = get_cycles();
+  std::cout << (end-start) << " cycles to worddecomp" << std::endl;
 }

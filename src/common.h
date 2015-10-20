@@ -165,19 +165,23 @@ P common_multiplication(P *a, P *b){
   #pragma omp sections
   {
       #pragma omp section
-      {
-      	  std::cout << "a: " << std::endl;
-          if(!a->get_device_updated()){
-            a->update_device_data(2);
-          }
+      {	
+		#ifdef VERBOSE
+		std::cout << "a: " << std::endl;
+		#endif
+		if(!a->get_device_updated()){
+			a->update_device_data(2);
+		}
 
       }
       #pragma omp section
       {
-      	  std::cout << "b: " << std::endl;
-          if(!b->get_device_updated()){
-              b->update_device_data(2);
-          }
+		#ifdef VERBOSE
+		std::cout << "b: " << std::endl;
+		#endif
+		if(!b->get_device_updated()){
+			b->update_device_data(2);
+		}
       }
   }
 

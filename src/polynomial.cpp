@@ -143,12 +143,12 @@ void Polynomial::crt(){
       
     }
 
-    // for(unsigned int j = 0; j < polyCRT.size();j++){
-    //   std::cout << "Polynomial residue "<< j << ":" << std::endl; 
-    //   for(unsigned int i = 0; i < polyCRT[j].size() ;i++)
-    //     std::cout << polyCRT[j][i] << " ";
-    //   std::cout << std::endl << std::endl;
-    // }
+    for(unsigned int j = 0; j < polyCRT.size();j++){
+      std::cout << "Polynomial residue "<< j << ":" << std::endl; 
+      for(unsigned int i = 0; i < polyCRT[j].size() ;i++)
+        std::cout << polyCRT[j][i] << " ";
+      std::cout << std::endl << std::endl;
+    }
 
     this->set_host_updated(true);
     this->set_device_updated(false);
@@ -178,12 +178,12 @@ void Polynomial::icrt(){
   end = get_cycles();
   std::cout << "Cycles for host update: " << (end-start) << std::endl;
   #endif
-    // for(unsigned int j = 0; j < polyCRT.size();j++){
-    //   std::cout << "Polynomial residue"<< j << ":" << std::endl; 
-    //   for(unsigned int i = 0; i < polyCRT[j].size() ;i++)
-    //     std::cout << polyCRT[j][i] << " ";
-    //   std::cout << std::endl << std::endl;
-    // }
+    for(unsigned int j = 0; j < polyCRT.size();j++){
+      std::cout << "Polynomial residue"<< j << ":" << std::endl; 
+      for(unsigned int i = 0; i < polyCRT[j].size() ;i++)
+        std::cout << polyCRT[j][i] << " ";
+      std::cout << std::endl << std::endl;
+    }
   #ifdef CYCLECOUNTING
   start = get_cycles();
   #endif
@@ -255,12 +255,19 @@ void Polynomial::icrt(){
   end = get_cycles();
   std::cout << "Cycles to compute mod M: " << (end-start) << std::endl;
   #endif
+
     //   std::cout << "this: " << std::endl; 
     // for(unsigned int i = 0; i < this->coefs.size() ;i++)
     //   std::cout << this->coefs[i] << " ";
     // std::cout << std::endl << std::endl;
 
   this->normalize();
+  // Correction on negative values
+  // for(unsigned int i = 0; i < this->coefs.size(); i++){
+  //   std::cout << this->coefs[i] << " > " << this->get_mod() << "?" << std::endl;
+  //   this->coefs[i] = (this->coefs[i] > this->get_mod())? (this->coefs[i]-M) % this->get_mod() : this->coefs[i]; 
+  //   std::cout << this->coefs[i] << std::endl;
+  // }
   // this->update_crt_spacing(this->deg()+1);
   this->set_host_updated(true);
   this->set_icrt_computed(true);
