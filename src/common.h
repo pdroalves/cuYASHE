@@ -45,23 +45,28 @@ P common_addition(P *a,P *b){
 			{
 			    // #pragma omp section
 			    {
-
-			        if(!a->get_device_updated()){
-			          a->update_device_data();
-			        }
+			      #ifdef VERBOSE
+		      	  std::cout << "a: " << std::endl;
+		      	  #endif
+			      if(!a->get_device_updated()){
+			        a->update_device_data();
+			      }
 
 			    }
 			    // #pragma omp section
 			    {
-			        if(!b->get_device_updated()){
-			            b->update_device_data();
-			        }
+			      #ifdef VERBOSE
+		       	  std::cout << "b: " << std::endl;
+		      	  #endif
+		       	  if(!b->get_device_updated()){
+			        b->update_device_data();
+			      }
 			    }
 			}
 
 			cuyasheint_t *d_result = CUDAFunctions::callPolynomialAddSub(a->get_stream(),a->get_device_crt_residues(),b->get_device_crt_residues(),(int)(a->CRTSPACING*P::CRTPrimes.size()),ADD);
 
-			P c(a->get_mod(),a->get_phi(),a->CRTSPACING);
+			P c = P(a->get_mod(),a->get_phi(),a->CRTSPACING);
 			c.set_device_crt_residues(d_result);
 			c.set_host_updated(false);
 			c.set_device_updated(true);
@@ -161,7 +166,7 @@ P common_multiplication(P *a, P *b){
   {
       #pragma omp section
       {
-
+      	  std::cout << "a: " << std::endl;
           if(!a->get_device_updated()){
             a->update_device_data(2);
           }
@@ -169,6 +174,7 @@ P common_multiplication(P *a, P *b){
       }
       #pragma omp section
       {
+      	  std::cout << "b: " << std::endl;
           if(!b->get_device_updated()){
               b->update_device_data(2);
           }
@@ -181,7 +187,7 @@ P common_multiplication(P *a, P *b){
 															a->CRTSPACING,
 															a->CRTPrimes.size());
 
-  P c(a->get_mod(),a->get_phi(),a->CRTSPACING);
+  P c = P(a->get_mod(),a->get_phi(),a->CRTSPACING);
   c.set_device_crt_residues(d_result);
   c.set_host_updated(false);
   c.set_device_updated(true);

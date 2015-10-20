@@ -95,7 +95,7 @@ void Ciphertext::keyswitch(){
 
   std::vector<Polynomial> P(Yashe::lwq);
   this->worddecomp(&P);
-  this->set_coeffs(std::vector<cuyasheint_t>());//Discards all coefficients
+  this->set_coeffs();//Discards all coefficients
 
   for(int i = 0; i < Yashe::lwq; i ++){
     Polynomial p = (P[i]);

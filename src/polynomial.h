@@ -255,9 +255,9 @@ class Polynomial{
         #endif
         return *this;
     }
-    Polynomial operator+(Polynomial b);
-    Polynomial operator+=(Polynomial b);
-    Polynomial operator-(Polynomial b){
+    Polynomial operator+(Polynomial &b);
+    Polynomial operator+=(Polynomial &b);
+    Polynomial operator-(Polynomial &b){
       // Check align
       if(this->CRTSPACING != b.CRTSPACING){
         int new_spacing = std::max(this->CRTSPACING,b.CRTSPACING);
@@ -294,25 +294,26 @@ class Polynomial{
 
       cuyasheint_t *d_result = CUDAFunctions::callPolynomialAddSub(this->stream,this->get_device_crt_residues(),b.get_device_crt_residues(),(int)(this->CRTSPACING*this->polyCRT.size()),SUB);
 
-      Polynomial c(this->get_mod(),this->get_phi(),this->CRTSPACING);
-      c.set_device_crt_residues(d_result);
-      c.set_host_updated(false);
-      c.set_device_updated(true);
+      Polynomial *c;
+      c = new Polynomial(this->get_mod(),this->get_phi(),this->CRTSPACING);
+      c->set_device_crt_residues(d_result);
+      c->set_host_updated(false);
+      c->set_device_updated(true);
       cudaDeviceSynchronize();
       return c;
     }
-    Polynomial operator-=(Polynomial b){
+    Polynomial operator-=(Polynomial &b){
       this->copy( ((*this)-b));
-      return *this;
+      return this;
     }
-    Polynomial operator*(Polynomial b);
-    Polynomial operator*=(Polynomial b){
+    Polynomial operator*(Polynomial &b);
+    Polynomial operator*=(Polynomial &b){
       this->copy( ((*this)*b));
       return *this;
     }
-    Polynomial operator/(Polynomial b){
-      Polynomial quot;
-      Polynomial rem;
+    Polynomial operator/(Polynomial &b){
+      Polynomial *quot = new Polynomial();
+      Polynomial *rem = new Polynomial();
 
       // #pragma omp parallel sections
       // {
@@ -328,16 +329,16 @@ class Polynomial{
       //     }
       // }
 
-      Polynomial::DivRem((*this),b,quot, rem);
+      Polynomial::DivRem((*this),b,(*quot), (*rem));
       return quot;
     }
-    Polynomial operator/=(Polynomial b){
+    Polynomial operator/=(Polynomial &b){
       this->copy( ((*this)/b));
-      return *this;
+      return this;
     }
-    Polynomial operator%(Polynomial b){
-      Polynomial quot;
-      Polynomial rem;
+    Polynomial operator%(Polynomial &b){
+      Polynomial *quot = new Polynomial();
+      Polynomial *rem = new Polynomial();
 
       // #pragma omp parallel sections
       // {
@@ -353,14 +354,14 @@ class Polynomial{
       //     }
       // }
 
-      Polynomial::DivRem((*this),b,quot, rem);
+      Polynomial::DivRem((*this),b,(*quot), (*rem));
       // rem.icrt();
       // std::cout << rem.to_string() << std::endl;
       return rem;
     }
-    Polynomial operator%=(Polynomial b){
+    Polynomial operator%=(Polynomial &b){
       this->copy( ((*this)%b));
-      return *this;
+      return this;
     }
 
     Polynomial operator+(ZZ b){
@@ -532,7 +533,7 @@ class Polynomial{
     void CPUAddition(Polynomial *b){
       // Forces the addition to be executed by CPU
       // This method supposes that there is no need to apply CRT/ICRT on operands
-      for( unsigned int i = 0; i <= std::max(this->deg(),b->deg()); i++){
+      for( int i = 0; i <= std::max(this->deg(),b->deg()); i++){
         this->set_coeff(i,this->get_coeff(i) + b->get_coeff(i));
       }
     }
@@ -541,7 +542,7 @@ class Polynomial{
       // This method supposes that there is no need to apply CRT/ICRT on operands
 
       // #pragma omp parallel for
-      for( unsigned int i = 0; i <= std::max(this->deg(),b->deg()); i++){
+      for( int i = 0; i <= std::max(this->deg(),b->deg()); i++){
         this->set_coeff(i,NTL::AddMod(this->get_coeff(i),b->get_coeff(i),M));
       }
     }
@@ -763,7 +764,19 @@ class Polynomial{
       }
     }
     bool get_device_updated(){
-      return this->DEVICE_IS_UPDATE;
+      bool b = this->DEVICE_IS_UPDATE;
+      if(b){        
+        #ifdef VERBOSE
+        std::cout << "Device data is updated" << std::endl;
+        #endif
+      }else{        
+        this->set_icrt_computed(false);
+        #ifdef VERBOSE
+        std::cout << "Device data is NOT updated" << std::endl;
+        #endif
+      }
+
+      return b;
     }
     void update_host_data();
     void set_host_updated(bool b){
@@ -780,7 +793,20 @@ class Polynomial{
       }
     }
     bool get_host_updated(){
-      return this->HOST_IS_UPDATED;
+
+      bool b = this->HOST_IS_UPDATED;
+      if(b){        
+        #ifdef VERBOSE
+        std::cout << "Host data is updated" << std::endl;
+        #endif
+      }else{        
+        this->set_icrt_computed(false);
+        #ifdef VERBOSE
+        std::cout << "Host data is NOT updated" << std::endl;
+        #endif
+      }
+
+      return b;
     }
     void set_crt_computed(bool b){
       this->CRT_COMPUTED = b;

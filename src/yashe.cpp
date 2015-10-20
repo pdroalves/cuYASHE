@@ -93,9 +93,12 @@ void Yashe::generate_keys(){
     s.reduce();
     e %= q;
 
-    gamma[k] += e + h*s;
+    Polynomial hs = h*s;
+    gamma[k] += e;
+    gamma[k] += hs;
     gamma[k].reduce();
     gamma[k] %= q;
+    gamma[k].update_device_data();
     #ifdef DEBUG
     std::cout << "e = " << e << std::endl;
     std::cout << "s = " << s << std::endl;
@@ -138,7 +141,8 @@ Ciphertext Yashe::encrypt(Polynomial m){
 
   p = (h*ps);
   p += e;
-  p += m*delta;
+  Polynomial mdelta = m*delta;
+  p += mdelta;
   p.reduce();
   p %= q;
 
