@@ -56,6 +56,7 @@ Ciphertext Ciphertext::operator*(Ciphertext &b){
 
   start = cycles();
   Polynomial g = common_multiplication<Polynomial>(&c1,&c2);
+  g.icrt();
   g *= (Yashe::t);
   g.reduce();
   end = cycles();

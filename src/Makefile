@@ -80,4 +80,4 @@ test.o:test.cu
 	$(CUDA_CC) -c test.cu -o test.o  -lboost_unit_test_framework $(NTL)
 
 clean:
-	rm -f $(BIN) $(TESTBIN) $(BENCHMARKPOLYBIN) $(BENCHMARKYASHEBIN) main.o benchmark_polynomial.o benchmark_yashe.o polynomial.o tests.o test_reduce.o ciphertext.o cuda_functions.o kernels.o distribution.o yashe.o test.o
+	rm -f $(BIN) $(TESTBIN) $(BENCHMARKPOLYBIN) $(BENCHMARKYASHEBIN)  test_crt.o  test_ct_mul.o  test_ctpt.o  test_mul.o common.o benchmark_polynomial.o benchmark_yashe.o polynomial.o tests.o test_reduce.o ciphertext.o cuda_functions.o kernels.o distribution.o yashe.o test.o
