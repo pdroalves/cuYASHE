@@ -602,9 +602,8 @@ class Polynomial{
     }
 
     void normalize(){
-      if(!this->get_host_updated()){
-        this->icrt();
-      }
+      if(!this->get_host_updated())
+        this->update_host_data();
 
       // Remove last 0-coefficients
       while(this->deg() >= 0 &&

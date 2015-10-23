@@ -429,47 +429,45 @@ BOOST_AUTO_TEST_CASE(multiplyByZZOnCPU)
   }
 }
 
-// BOOST_AUTO_TEST_CASE(multiplyByZZOnGPU)
-// {
-//   Polynomial a;
-//   ZZ b;
+BOOST_AUTO_TEST_CASE(multiplyByZZOnGPU)
+{
+  Polynomial a;
+  ZZ b;
 
-//   for(int count = 0; count < NTESTS; count++){
+  for(int count = 0; count < NTESTS; count++){
 
-//     a.set_device_updated(false);
-//     Polynomial::random(&a,degree-1);
-//     a.set_host_updated(true);
+    a.set_device_updated(false);
+    Polynomial::random(&a,degree-1);
+    a.set_host_updated(true);
 
-//     ZZ_pEX a_ntl;
-//     for(int i = 0;i <= a.deg();i++)
-//       NTL::SetCoeff(a_ntl,i,conv<ZZ_p>(a.get_coeff(i)));
-//     NTL::RandomBnd(b,ZZ(42));
-//     // b = ZZ(0);
+    ZZ_pEX a_ntl;
+    for(int i = 0;i <= a.deg();i++)
+      NTL::SetCoeff(a_ntl,i,conv<ZZ_p>(a.get_coeff(i)));
+    NTL::RandomBnd(b,ZZ(42));
+    // b = ZZ(0);
 
-//     // This will force the execution on GPU
-//     a.crt();
-//     a.update_device_data();
-//     a.set_host_updated(false);
+    // This will force the execution on GPU
+    a.update_device_data();
+    a.set_host_updated(false);
 
-//     Polynomial c = a*b % Polynomial::global_mod;
-//     c.icrt();
-//     c.normalize();
+    Polynomial c = a*b % Polynomial::global_mod;
+    c.normalize();
 
-//     ZZ_pEX c_ntl = a_ntl*conv<ZZ_p>(b);
+    ZZ_pEX c_ntl = a_ntl*conv<ZZ_p>(b);
 
-//     #ifdef VERBOSE
-//     std::cout << "a: " << a.to_string() << " degree: " << a.deg() <<std::endl;
-//     std::cout << "b: " << b <<std::endl;
-//     std::cout << "c: " << c.to_string() << " degree: " << c.deg() <<std::endl;
-//     std::cout << ": " << c_ntl << " degree: " << NTL::deg(c_ntl) << std::endl << std::endl;
-//     std::cout << "c_ntl: " << c_ntl << " degree: " << NTL::deg(c_ntl) << std::endl << std::endl;
-//     std::cout << "count: " << count << std::endl;
-//     #endif
-//     BOOST_REQUIRE(NTL::deg(c_ntl) == c.deg());
-//     for(int i = 0;i <= c.deg();i++)
-//       BOOST_REQUIRE(conv<ZZ>(NTL::rep(c_ntl[i])[0]) == c.get_coeff(i));
-//   }
-// }
+    #ifdef VERBOSE
+    std::cout << "a: " << a.to_string() << " degree: " << a.deg() <<std::endl;
+    std::cout << "b: " << b <<std::endl;
+    std::cout << "c: " << c.to_string() << " degree: " << c.deg() <<std::endl;
+    std::cout << ": " << c_ntl << " degree: " << NTL::deg(c_ntl) << std::endl << std::endl;
+    std::cout << "c_ntl: " << c_ntl << " degree: " << NTL::deg(c_ntl) << std::endl << std::endl;
+    std::cout << "count: " << count << std::endl;
+    #endif
+    BOOST_REQUIRE(NTL::deg(c_ntl) == c.deg());
+    for(int i = 0;i <= c.deg();i++)
+      BOOST_REQUIRE(conv<ZZ>(NTL::rep(c_ntl[i])[0]) == c.get_coeff(i));
+  }
+}
 
 BOOST_AUTO_TEST_CASE(simpleMultiplyByPolynomial)
 {
