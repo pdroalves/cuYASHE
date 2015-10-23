@@ -6,11 +6,12 @@
 #include <NTL/ZZ.h>
 #include <NTL/ZZ_pEX.h>
 #include <NTL/ZZ_pXFactoring.h>
+#include <algorithm>
 #include <cuda_runtime.h>
 #include "cuda_functions.h"
 #include "settings.h"
 #include "common.h"
-#include <algorithm>
+// #include "integer.h"
 
 NTL_CLIENT
 
@@ -363,7 +364,53 @@ class Polynomial{
       this->copy( ((*this)%b));
       return this;
     }
-
+    // Polynomial operator+(Integer b){
+    //   Polynomial p(*this);
+    //   if(!this->get_host_updated()){
+    //     // Convert to polynomial and send to device        
+    //     return b+p;
+    //   }else{
+    //     p.set_coeff(0,p.get_coeff(0)+b.get_value());
+    //     p.set_device_updated(false);
+    //     return p;
+    //   }
+    // }
+    // Polynomial operator+=(Integer b){
+    //   this->copy(((*this)+b));
+    //   return *this;
+    // }
+    // Polynomial operator-(Integer b){
+    //   Polynomial p(*this);
+    //   if(!this->get_host_updated()){
+    //     // Convert to polynomial and send to device        
+    //     return b-p;
+    //   }else{
+    //     p.set_coeff(0,p.get_coeff(0)-b.get_value());
+    //     p.set_device_updated(false);
+    //     return p;
+    //   }
+    // }
+    // Polynomial operator-=(Integer b){
+    //   this->copy(((*this)-b));
+    //   return *this;
+    // }
+    // Polynomial operator*(Integer b){
+    //   Polynomial p(*this);
+    //   if(!p.get_host_updated()){
+    //     // Operate on device        
+    //     return b*p;
+    //   }else{
+    //     //#pragma omp parallel for
+    //     for(int i = 0; i <= p.deg();i++)
+    //       p.set_coeff(i,p.get_coeff(i)*b.get_value());
+    //     p.set_device_updated(false);
+    //   }
+    //   return p;
+    // }
+    // Polynomial operator*=(Integer b){
+    //   this->copy(((*this)*b));
+    //   return *this;
+    // }
     Polynomial operator+(ZZ b){
       Polynomial p(*this);
       if(!this->get_host_updated()){
@@ -589,9 +636,9 @@ class Polynomial{
 
     ZZ get_coeff(const int index){
 
-      if(!this->get_host_updated()){
-        this->icrt();
-      }
+      if(!this->get_host_updated())
+        this->update_host_data();
+      
 
       // Returns a copy of coefficient at this index
       if(index > this->deg())

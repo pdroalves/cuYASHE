@@ -55,9 +55,8 @@ Ciphertext Ciphertext::operator*(Ciphertext &b){
   #endif
 
   start = cycles();
-  Polynomial g = common_multiplication<Polynomial>(&c1,&c2);
-  g.icrt();
-  g *= (Yashe::t);
+  Polynomial tc1 = (Yashe::t)*c1;
+  Polynomial g = common_multiplication<Polynomial>(&tc1,&c2);
   g.reduce();
   end = cycles();
   std::cout << "ciphertext * " << (end-start) << std::endl;

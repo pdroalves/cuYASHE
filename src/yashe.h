@@ -5,6 +5,7 @@
 #include "polynomial.h"
 #include "ciphertext.h"
 #include "distribution.h"
+#include "integer.h"
 
 class Yashe{
   private:
@@ -15,7 +16,8 @@ class Yashe{
     static int d;
     static Polynomial phi;
     static ZZ q;
-    static uint64_t t;
+    static Integer t;
+    static Integer delta;
     static ZZ w;
     static std::vector<Polynomial> gamma;
     static Polynomial h;

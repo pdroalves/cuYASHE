@@ -792,6 +792,7 @@ BOOST_AUTO_TEST_CASE(randomPolynomialOperations)
       else
         ntl_value = conv<ZZ>(NTL::rep(NTL::coeff(c_ntl,i))[0]);
 
+      // std::cout << c.get_coeff(i) << " == " << ntl_value << std::endl;
       BOOST_REQUIRE(c.get_coeff(i) == ntl_value);
     }
   }
@@ -913,8 +914,8 @@ BOOST_AUTO_TEST_CASE(encryptDecrypt)
     Ciphertext c = cipher.encrypt(a);
     Polynomial a_decrypted = cipher.decrypt(c);
 
-    // std::cout << a.to_string() << std::endl;
-    // std::cout << a_decrypted.to_string() << std::endl;
+    std::cout << "a: " << a.to_string() << std::endl;
+    std::cout << "a_decrypted: " << a_decrypted.to_string() << std::endl;
     BOOST_REQUIRE( a_decrypted == a);
   }
 }

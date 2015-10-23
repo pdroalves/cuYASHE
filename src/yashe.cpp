@@ -4,7 +4,8 @@
 int Yashe::d = 0;
 Polynomial Yashe::phi = Polynomial();
 ZZ Yashe::q = ZZ(0);
-uint64_t Yashe::t = 0;
+Integer Yashe::t = 0;
+Integer Yashe::delta = 0;
 ZZ Yashe::w = ZZ(0);
 int Yashe::lwq = 0;
 Polynomial Yashe::h = Polynomial();
@@ -21,6 +22,8 @@ void Yashe::generate_keys(){
   std::cout << "w: " << w << std::endl;
   std::cout << "R: " << Polynomial::global_mod << std::endl;
   #endif
+
+  delta = (q/t.get_value()); // q/t
 
   Polynomial g = this->xkey.get_sample(phi.deg()-1);
   g.reduce();
@@ -44,7 +47,7 @@ void Yashe::generate_keys(){
     // fl.set_coeff(0,1);
     // fl.set_coeff(3,1);
 
-    f = fl*t + 1;
+    f = t*fl + 1;
 
     // std::cout << "phi " << this->phi << std::endl;
     f.reduce();
@@ -73,8 +76,8 @@ void Yashe::generate_keys(){
     }
   }
 
-  h = fInv*g;
-  h *= t;
+  h = t*fInv;
+  h *= g;
   h.reduce();
   h %= q;
   gamma.resize(lwq);
@@ -118,7 +121,6 @@ void Yashe::generate_keys(){
 Ciphertext Yashe::encrypt(Polynomial m){
 
   // ZZ delta;
-  ZZ delta = (q/t); // q/t
   #ifdef DEBUG
   std::cout << "delta: "<< delta <<std::endl;
   #endif
@@ -141,7 +143,7 @@ Ciphertext Yashe::encrypt(Polynomial m){
 
   p = (h*ps);
   p += e;
-  Polynomial mdelta = m*delta;
+  Polynomial mdelta = delta*m;
   p += mdelta;
   p.reduce();
   p %= q;
@@ -182,18 +184,15 @@ Polynomial Yashe::decrypt(Ciphertext c){
   g.reduce();
   g %= Yashe::q;
 
-  #ifdef DEBUG
-  std::cout << "g = f*c % phi: "<< reduced_g <<std::endl;
-  #endif
-  ZZ coeff = g.get_coeff(0)*t;
+  ZZ coeff = g.get_coeff(0)*t.get_value();
   ZZ quot;
   ZZ rem;
   NTL::DivRem(quot,rem,coeff,q);
 
   quot %= q;
   rem %= q;
-  #ifdef VERBOSE
   std::cout << "quot: " << quot << std::endl;
+  #ifdef VERBOSE
   std::cout << "rem: " << rem << std::endl;
   std::cout << "coeff: " << coeff << std::endl;
   std::cout << "q: " << q << std::endl;
@@ -202,13 +201,14 @@ Polynomial Yashe::decrypt(Ciphertext c){
   
   Polynomial m;
   if(2*rem > q){
-    if(coeff == t-1){
+    std::cout << "t-1: " << (t.get_value()-1) << std::endl;
+    if(coeff == t.get_value()-1){
       m.set_coeff(0,0);
     }else{
-      m.set_coeff(0,(quot+1)%t);
+      m.set_coeff(0,(quot+1)%t.get_value());
     }
   }else{
-    m.set_coeff(0,(quot)%t);
+    m.set_coeff(0,(quot)%t.get_value());
   }
 
   return m;

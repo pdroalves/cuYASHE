@@ -102,6 +102,7 @@ void Polynomial::update_host_data(){
     result = cudaDeviceSynchronize();
     assert(result == cudaSuccess);
     this->set_host_updated(true);
+    this->icrt();
   // uint64_t end = cycles();
   // std::cout << "update host " << (end-start) << std::endl;
 }
