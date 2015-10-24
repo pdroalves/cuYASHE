@@ -207,6 +207,8 @@ class Integer{
 		}
 		void icrt();
 		cuyasheint_t* get_device_crt_residues(){
+			if(!this->get_device_updated())
+				this->update_device_data();
 			return this->d_crt_values;
 		}
 		void update_device_data();

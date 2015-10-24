@@ -1,9 +1,10 @@
-#include "polynomial.h"
-#include "settings.h"
-#include "common.h"
 #include <omp.h>
 #include <assert.h>
 #include <string.h>
+#include "polynomial.h"
+#include "integer.h"
+#include "settings.h"
+#include "common.h"
 
 ZZ Polynomial::CRTProduct = ZZ(1);
 std::vector<cuyasheint_t> Polynomial::CRTPrimes(0);
@@ -27,7 +28,78 @@ Polynomial Polynomial::operator+=(Polynomial &b){
 Polynomial Polynomial::operator*(Polynomial &b){
   return common_multiplication<Polynomial>(this,&b);
 }
+
+Polynomial Polynomial::operator*(ZZ b){
+      Polynomial p(*this);
+      if(!p.get_host_updated()){
+        // Operate on device
+        Integer I = b;
+        CUDAFunctions::callPolynomialOPInteger(MUL,
+                                                p.get_stream(),
+                                                p.get_device_crt_residues(),
+                                                I.get_device_crt_residues(),
+                                                p.CRTSPACING,Polynomial::CRTPrimes.size());
+      }else{
+        //#pragma omp parallel for
+        for(int i = 0; i <= p.deg();i++)
+          p.set_coeff(i,p.get_coeff(i)*b);
+        p.set_device_updated(false);
+      }
+      return p;
+    }
+
+void Polynomial::operator delete(void *ptr){
+      Polynomial *p = (Polynomial*)ptr;
+
+      if(p->get_device_crt_residues() != 0x0){
+        cudaError_t result = cudaFree(p->get_device_crt_residues());
+        assert(result == cudaSuccess);
+      }
+
+      free(ptr);
+    }
+
+void Polynomial::copy_device_crt_residues(Polynomial &b){
+      uint64_t start,end;
+
+      start = get_cycles();
+      if(!b.get_device_updated())
+        return;
+
+      // std::cout << "Will copy residues on device memory" << std::endl;
+      // Discards the existing values
+      cudaError_t result;
+      if(d_polyCRT != 0x0){
+        result = cudaFree(d_polyCRT);
+        assert(result == cudaSuccess);
+      }
+
+      // Adjusts CRTSPACING
+      // Here we don't use update_crt_spacing(). The reason
+      // is: speed and context.
+      // update_crt_spacing() won't just update the spacing, but
+      // also update device data. And in this context, we know
+      // that there is no relevant data to update.
+      this->CRTSPACING = b.get_crt_spacing();
+
+      result = cudaMalloc((void**)&d_polyCRT,
+                          this->get_crt_spacing()*(Polynomial::CRTPrimes.size())*sizeof(cuyasheint_t));
+      assert(result == cudaSuccess);
+      result = cudaMemcpy(d_polyCRT,
+                          b.get_device_crt_residues(),
+                          this->get_crt_spacing()*(Polynomial::CRTPrimes.size())*sizeof(cuyasheint_t),
+                          cudaMemcpyDeviceToDevice);      
+      assert(result == cudaSuccess);
+      end = get_cycles();
+      std::cout << (end-start) << " cycles" << std::endl;
+    }
+
 void Polynomial::update_device_data(unsigned int usable_ratio){
+  #ifdef VERBOSEMEMORYCOPY
+  std::cout << "Copying data to the GPU..."<<std::endl;
+  uint64_t start = get_cycles();
+  #endif
+
   // "usable_ratio" should be used to avoid unnecessary copies
     if(this->get_device_updated())
       return;
@@ -38,50 +110,49 @@ void Polynomial::update_device_data(unsigned int usable_ratio){
     std::cout << "Copying data to GPU." << std::endl;
     #endif
 
-    cudaError_t result;
     this->ON_COPY = true;
 
-    if(this->CRTSPACING <= this->deg())
+    // Verifica se o espaçamento é válido. Se não for, ajusta.
+    if(this->get_crt_spacing() <= this->deg())
       this->update_crt_spacing(this->deg()+1);
 
-    // if(this->d_polyCRT == NULL){
-      result = cudaMalloc((void**)&this->d_polyCRT,this->CRTSPACING*(this->polyCRT.size())*sizeof(cuyasheint_t));
-      assert(result == cudaSuccess);
-    // }
-
-    // result = cudaMemset((void*)this->d_polyCRT,0,this->CRTSPACING*(this->polyCRT.size())*sizeof(cuyasheint_t));
-    // #ifdef VERBOSE
-    // std::cout << "cudaMemset:" << cudaGetErrorString(result) << std::endl;
-    // #endif
-    // assert(result == cudaSuccess);
+    cuyasheint_t *d_data;
+    cudaError_t result = cudaMalloc((void**)&d_data,this->get_crt_spacing()*(this->polyCRT.size())*sizeof(cuyasheint_t));
+    assert(result == cudaSuccess);
 
     cuyasheint_t *aux;
     // aux = (cuyasheint_t*)malloc(this->CRTSPACING*(this->polyCRT.size())*sizeof(cuyasheint_t));
-    aux = (cuyasheint_t*)calloc(this->CRTSPACING*(1+this->polyCRT.size()),sizeof(cuyasheint_t));
-    for(unsigned int i=0;i < this->polyCRT.size();i++){
-      // memcpy(aux+this->CRTSPACING*i,&(this->polyCRT[i][0]),(this->polyCRT[i].size()/usable_ratio)*sizeof(cuyasheint_t));
-      memcpy(aux+this->CRTSPACING*i,&(this->polyCRT[i][0]),(this->polyCRT[i].size())*sizeof(cuyasheint_t));
-    }
+    aux = (cuyasheint_t*)calloc(this->get_crt_spacing()*(1+this->polyCRT.size()),sizeof(cuyasheint_t));
+    for(unsigned int i=0;i < this->polyCRT.size();i++)
+      // memcpy(aux+this->get_crt_spacing()*i,&(this->polyCRT[i][0]),(this->polyCRT[i].size()/usable_ratio)*sizeof(cuyasheint_t));
+      memcpy(aux+this->get_crt_spacing()*i,&(this->polyCRT[i][0]),(this->polyCRT[i].size())*sizeof(cuyasheint_t));
+    
 
-    result = cudaMemcpy(this->d_polyCRT, aux , this->CRTSPACING*(this->polyCRT.size())*sizeof(cuyasheint_t), cudaMemcpyHostToDevice);
+    result = cudaMemcpy(d_data, aux , this->get_crt_spacing()*(this->polyCRT.size())*sizeof(cuyasheint_t), cudaMemcpyHostToDevice);
     assert(result == cudaSuccess);
 
     result = cudaDeviceSynchronize();
     assert(result == cudaSuccess);
     // #warning "free(aux) commented"
-    // free(aux);
+    free(aux);
+    this->set_device_crt_residues(d_data);
     this->ON_COPY = false;
     this->set_device_updated(true);
-    assert(this->get_device_updated() == true);
+
+  #ifdef VERBOSEMEMORYCOPY
+  uint64_t end = get_cycles();
+  std::cout << "Cycles needed: " << (end-start) <<std::endl;
+  #endif
 }
 
 void Polynomial::update_host_data(){
-    // uint64_t start = cycles();
+    #ifdef VERBOSEMEMORYCOPY
+    std::cout << "Copying data to the CPU..."<<std::endl;
+    uint64_t start = get_cycles();
+    #endif
 
     if(this->get_host_updated())
       return;
-    // else if(!this->get_icrt_computed())
-      // this->icrt();
 
     #ifdef VERBOSE
     std::cout << "Copying data to CPU." << std::endl;
@@ -94,17 +165,25 @@ void Polynomial::update_host_data(){
       this->polyCRT.resize(Polynomial::CRTPrimes.size());
 
     for(unsigned int i=0;i < this->polyCRT.size();i++){
-      if(this->polyCRT[i].size() != (unsigned int)(this->CRTSPACING))
-        this->polyCRT[i].resize(this->CRTSPACING);
-      result = cudaMemcpy(&this->polyCRT[i][0] , this->d_polyCRT + i*this->CRTSPACING, this->CRTSPACING*sizeof(cuyasheint_t), cudaMemcpyDeviceToHost);
+      if(this->polyCRT[i].size() != (unsigned int)(this->get_crt_spacing)())
+        this->polyCRT[i].resize(this->get_crt_spacing());
+      result = cudaMemcpy(&this->polyCRT[i][0] ,
+                                this->d_polyCRT + i*this->get_crt_spacing(),
+                                this->get_crt_spacing()*sizeof(cuyasheint_t),
+                                cudaMemcpyDeviceToHost);
+      if(result != cudaSuccess)
+        std::cout << this->get_crt_spacing() << std::endl;
       assert(result == cudaSuccess);
     }
     result = cudaDeviceSynchronize();
     assert(result == cudaSuccess);
     this->set_host_updated(true);
     this->icrt();
-  // uint64_t end = cycles();
-  // std::cout << "update host " << (end-start) << std::endl;
+    
+    #ifdef VERBOSEMEMORYCOPY
+    uint64_t end = get_cycles();
+    std::cout << "Cycles needed: " << (end-start) <<std::endl;
+    #endif
 }
 
 void Polynomial::crt(){

@@ -54,8 +54,9 @@ __host__ cuyasheint_t* CUDAFunctions::callRealignCRTResidues(cudaStream_t stream
   cudaError_t result = cudaMalloc((void**)&d_new_array,newSpacing*residuesQty*sizeof(cuyasheint_t));
   assert(result == cudaSuccess);
 
-  realignCRTResidues <<< gridDim,blockDim,1,stream >>> (oldSpacing,newSpacing,array,d_new_array,residuesSize,residuesQty);
-  assert(cudaGetLastError() == cudaSuccess);
+  realignCRTResidues <<< gridDim,blockDim >>> (oldSpacing,newSpacing,array,d_new_array,residuesSize,residuesQty);
+  result = cudaGetLastError();
+  assert(result == cudaSuccess);
 
   return d_new_array;
 }
@@ -97,13 +98,36 @@ __host__ cuyasheint_t* CUDAFunctions::callPolynomialAddSub(cudaStream_t stream,c
   cudaError_t result = cudaMalloc((void**)&d_new_array,size*sizeof(cuyasheint_t));
   assert(result == cudaSuccess);
 
-  polynomialAddSub <<< gridDim,blockDim,1,stream >>> (OP,a,b,d_new_array,size,N);
+  polynomialAddSub <<< gridDim,blockDim,1,stream  >>> (OP,a,b,d_new_array,size,N);
   #ifdef VERBOSE
   std::cout << gridDim.x << " " << blockDim.x << std::endl;
   std::cout << "polynomialAdd kernel:" << cudaGetErrorString(cudaGetLastError()) << std::endl;
   #endif
 
   return d_new_array;
+}
+
+__global__ void polynomialAddSubInPlace(const int OP, cuyasheint_t *a,const cuyasheint_t *b,const int size,const int N){
+  // We have one thread per polynomial coefficient on 32 threads-block.
+  // For CRT polynomial adding, all representations should be concatenated aligned
+  const int tid = threadIdx.x + blockDim.x*blockIdx.x;
+  const int rid = tid / N; // Residue id
+  cuyasheint_t a_value;
+  cuyasheint_t b_value;
+
+  if(tid < size ){
+      // Coalesced access to global memory. Doing this way we reduce required bandwich.
+      a_value = a[tid];
+      b_value = b[tid];
+
+      if(OP == ADD)
+        a_value += b_value;
+      else
+        a_value -= b_value;
+
+      a[tid] = a_value;
+      // c[tid] = a_value %= CRTPrimesConstant[rid*N];
+  }
 }
 
 __host__ void CUDAFunctions::callPolynomialAddSubInPlace(cudaStream_t stream,cuyasheint_t *a,cuyasheint_t *b,int size,int OP){
@@ -113,7 +137,7 @@ __host__ void CUDAFunctions::callPolynomialAddSubInPlace(cudaStream_t stream,cuy
   dim3 gridDim(ADDGRIDXDIM);
   dim3 blockDim(ADDBLOCKXDIM);
 
-  polynomialAddSub <<< gridDim,blockDim,1,stream >>> (OP,a,b,a,size,N);
+  polynomialAddSubInPlace <<< gridDim,blockDim,1,stream >>> (OP,a,b,size,N);
   #ifdef VERBOSE
   std::cout << gridDim.x << " " << blockDim.x << std::endl;
   std::cout << "polynomialAdd kernel:" << cudaGetErrorString(cudaGetLastError()) << std::endl;
@@ -381,25 +405,25 @@ __global__ void polynomialOPInteger(int opcode,cuyasheint_t *a,cuyasheint_t *b,c
     {
     case ADD:
       if(cid == 0){
-        a[tid] += b[rid*N];
-        // a[tid] %= CRTPrimesConstant[rid*N];
+        a[tid] += b[rid];
+        // a[tid] %= CRTPrimesConstant[rid];
       }
       break;
     case SUB:
       if(cid == 0){
-        a[tid] -= b[rid*N];
-        // a[tid] %= CRTPrimesConstant[rid*N];
+        a[tid] -= b[rid];
+        // a[tid] %= CRTPrimesConstant[rid];
       }
       break;
     case DIV:
-        a[tid] /= b[rid*N];
+        a[tid] /= b[rid];
       break;
     case MUL:
-        a[tid] *= b[rid*N];
-        // a[tid] %= CRTPrimesConstant[rid*N];
+        a[tid] *= b[rid];
+        // a[tid] %= CRTPrimesConstant[rid];
       break;
     case MOD:
-        a[tid] %= b[rid*N];
+        a[tid] %= b[rid];
       break;
     }
 

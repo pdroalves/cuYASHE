@@ -28,7 +28,6 @@ class Ciphertext: public Polynomial{
     }
     Ciphertext(){
       this->set_stream();
-      this->expected_degree = -1;
       this->set_host_updated(true);
       this->set_device_updated(false);
       this->set_crt_computed(false);
@@ -58,7 +57,6 @@ class Ciphertext: public Polynomial{
     }
     Ciphertext(ZZ p){
       this->set_stream();
-      this->expected_degree = -1;
       this->set_host_updated(true);
       this->set_device_updated(false);
       this->set_crt_computed(false);
@@ -81,7 +79,6 @@ class Ciphertext: public Polynomial{
     }
     Ciphertext(ZZ p,Polynomial P){
       this->set_stream();
-      this->expected_degree = -1;
       this->set_host_updated(true);
       this->set_device_updated(false);
       this->set_crt_computed(false);
@@ -102,7 +99,6 @@ class Ciphertext: public Polynomial{
     }
     Ciphertext(int spacing){
       this->set_stream();
-      this->expected_degree = -1;
       this->set_host_updated(true);
       this->set_device_updated(false);
       this->set_crt_computed(false);
@@ -127,7 +123,6 @@ class Ciphertext: public Polynomial{
     }
     Ciphertext(ZZ p,Polynomial P,int spacing){
       this->set_stream();
-      this->expected_degree = -1;
       this->set_host_updated(true);
       this->set_device_updated(false);
       this->set_crt_computed(false);
@@ -149,7 +144,6 @@ class Ciphertext: public Polynomial{
     }
     Ciphertext(ZZ p,int spacing){
       this->set_stream();
-      this->expected_degree = -1;
       this->set_host_updated(true);
       this->set_device_updated(false);
       this->set_crt_computed(false);

@@ -37,7 +37,6 @@ class Polynomial{
       std::cout << "Building a polynomial" << std::endl;
       #endif
       cudaStreamCreate(&this->stream);
-      this->expected_degree = -1;
       this->set_host_updated(true);
       this->set_device_updated(false);
       this->set_crt_computed(false);
@@ -51,10 +50,9 @@ class Polynomial{
         this->phi = Polynomial::global_phi; // Doesn't copy. Uses the reference.
 
         // If the irreductible polynomial have degree N, this polynomial's degree will be limited to N-1
-        this->update_crt_spacing(Polynomial::global_phi->deg());
-      }else
-        // CRT Spacing not set
-        this->CRTSPACING = -1;
+        if(Polynomial::global_phi->deg() >= 0)
+          this->update_crt_spacing(Polynomial::global_phi->deg()+1);
+      }
       
 
       if(Polynomial::phi_set)
@@ -70,7 +68,6 @@ class Polynomial{
       std::cout << "Building a polynomial" << std::endl;
       #endif
       cudaStreamCreate(&this->stream);
-      this->expected_degree = -1;
       this->set_host_updated(true);
       this->set_device_updated(false);
       this->set_crt_computed(false);
@@ -81,7 +78,7 @@ class Polynomial{
       //   // If a global phi is defined, use it
         this->phi = Polynomial::global_phi; // Doesn't copy. Uses the reference.
       }
-      this->update_crt_spacing(Polynomial::global_phi->deg());
+      this->update_crt_spacing(Polynomial::global_phi->deg()+1);
 
       if(Polynomial::phi_set){
         this->coefs.resize(this->get_phi().deg()+1);
@@ -95,17 +92,16 @@ class Polynomial{
       std::cout << "Building a polynomial" << std::endl;
       #endif
       cudaStreamCreate(&this->stream);
-      this->expected_degree = -1;
       this->set_host_updated(true);
       this->set_device_updated(false);
       this->set_crt_computed(false);
       this->set_icrt_computed(true);
       this->mod = ZZ(p);// Copy
-      *(this->phi) = Polynomial(P);// Copy
+      this->phi = &P;// Copy
 
       // CRT Spacing should store the expected number of coefficients
       // If the irreductible polynomial have degree N, this polynomial's degree will be limited to N-1
-      this->update_crt_spacing(this->phi->deg());
+      this->update_crt_spacing(this->phi->deg()+1);
 
       if(Polynomial::phi_set){
         this->coefs.resize(this->get_phi().deg()+1);
@@ -119,7 +115,6 @@ class Polynomial{
       std::cout << "Building a polynomial" << std::endl;
       #endif
       cudaStreamCreate(&this->stream);
-      this->expected_degree = -1;
       this->set_host_updated(true);
       this->set_device_updated(false);
       this->set_crt_computed(false);
@@ -147,7 +142,6 @@ class Polynomial{
       std::cout << "Building a polynomial" << std::endl;
       #endif
       cudaStreamCreate(&this->stream);
-      this->expected_degree = -1;
       this->set_host_updated(true);
       this->set_device_updated(false);
       this->set_crt_computed(false);
@@ -172,7 +166,6 @@ class Polynomial{
       std::cout << "Building a polynomial" << std::endl;
       #endif
       cudaStreamCreate(&this->stream);
-      this->expected_degree = -1;
       this->set_host_updated(true);
       this->set_device_updated(false);
       this->set_crt_computed(false);
@@ -196,24 +189,24 @@ class Polynomial{
       // Copy
       this->copy(*b);
     }
-
     void copy(Polynomial b){
       #ifdef VERBOSE
       cuyasheint_t start,stop;
       // start = polynomial_get_cycles();
-      #endif
-
-
-      this->update_crt_spacing(b.CRTSPACING);
-      this->set_host_updated(b.get_host_updated());
-      this->set_device_updated(b.get_device_updated());
-
-      this->polyCRT = b.get_crt_residues();
+      #endif 
 
       if(b.get_host_updated())
         this->set_coeffs(b.get_coeffs());
-
-      this->d_polyCRT = b.get_device_crt_residues();
+      if(b.get_crt_computed())
+        this->polyCRT = b.get_crt_residues();
+      
+      if(b.get_device_updated())
+        this->copy_device_crt_residues(b);
+      if(b.get_icrt_computed())
+        this->update_crt_spacing(b.get_crt_spacing());
+      
+      this->set_host_updated(b.get_host_updated());
+      this->set_device_updated(b.get_device_updated());
 
       // The line below takes 66k cycles to return. We will comment it for now.
       // this->set_mod(b.get_mod());
@@ -223,7 +216,6 @@ class Polynomial{
         // this->set_phi(b.get_phi());
       // }
 
-      this->expected_degree = b.get_expected_degre();
       this->set_crt_computed(b.get_crt_computed());
       this->set_icrt_computed(b.get_icrt_computed());
 
@@ -233,6 +225,8 @@ class Polynomial{
       #endif
     }
     // Functions and methods
+
+    void copy_device_crt_residues(Polynomial &b);
 
     std::string to_string(){
       #ifdef VERBOSE
@@ -249,7 +243,7 @@ class Polynomial{
     }
     // Operators
     Polynomial operator=(Polynomial b){//Copy
-        this->copy(&b);
+        this->copy(b);
 
         #ifdef VERBOSE
           std::cout << "Polynomial copied. " << std::endl;
@@ -296,7 +290,7 @@ class Polynomial{
       cuyasheint_t *d_result = CUDAFunctions::callPolynomialAddSub(this->stream,this->get_device_crt_residues(),b.get_device_crt_residues(),(int)(this->CRTSPACING*this->polyCRT.size()),SUB);
 
       Polynomial *c;
-      c = new Polynomial(this->get_mod(),this->get_phi(),this->CRTSPACING);
+      c = new Polynomial(this->get_mod(),this->get_phi(),this->get_crt_spacing());
       c->set_device_crt_residues(d_result);
       c->set_host_updated(false);
       c->set_device_updated(true);
@@ -445,48 +439,45 @@ class Polynomial{
       this->copy(((*this)-b));
       return *this;
     }
-    Polynomial operator*(ZZ b){
-      Polynomial p(*this);
-      if(!p.get_host_updated()){
-        // Operate on device
-        Polynomial B(this->get_mod(),this->get_phi(),this->get_crt_spacing());
-        B.set_coeff(0,b);
-        B.update_device_data();
-        CUDAFunctions::callPolynomialOPInteger(MUL,p.get_stream(),p.get_device_crt_residues(),B.get_device_crt_residues(),p.CRTSPACING,Polynomial::CRTPrimes.size());
-      }else{
-        //#pragma omp parallel for
-        for(int i = 0; i <= p.deg();i++)
-          p.set_coeff(i,p.get_coeff(i)*b);
-        p.set_device_updated(false);
-      }
-      return p;
-    }
+    Polynomial operator*(ZZ b);
     Polynomial operator*=(ZZ b){
       this->copy(((*this)*b));
       return *this;
     }
     Polynomial operator%(ZZ b){
-      Polynomial p(*this);
 
-      if(!p.get_host_updated()){
+      if(this->get_host_updated()){
         #warning "Polynomial mod on device not implemented!";
        
-        p.icrt();
+        this->update_host_data();
       }
 
+      // Doing this, we reduce needless cycles to copy device data
+      this->set_device_updated(false);
+      Polynomial p(*this);
+      this->set_device_updated(true);
+
       // #pragma omp parallel for
-      for(int i = 0; i <= p.deg();i++){
-        // ZZ value = p.get_coeff(i)%b;
-        // std::cout << "value: " << value << std::endl << "b: " << b<< std::endl;
-        // p.set_coeff(i,value);
+      for(int i = 0; i <= p.deg();i++)
         p.set_coeff(i,p.get_coeff(i)%b);
-      }
+      
       p.set_device_updated(false);
 
       return p;
     }
     Polynomial operator%=(ZZ b){
-      this->copy(((*this)%b));
+      if(this->get_host_updated()){
+        #warning "Polynomial mod on device not implemented!";
+       
+        this->update_host_data();
+      }
+
+      // #pragma omp parallel for
+      for(int i = 0; i <= this->deg();i++)
+        this->set_coeff(i,this->get_coeff(i)%b);
+      
+      this->set_device_updated(false);
+
       return *this;
     }
     Polynomial operator/(ZZ b){
@@ -660,7 +651,6 @@ class Polynomial{
         this->coefs.resize(index+1);
       }
       this->coefs[index] = value;
-      this->expected_degree = this->deg();
       #ifdef DEBUG
         std::cout << "Polynomial coeff " << index << " set to " << this->coefs[index] << std::endl;
       #endif
@@ -689,7 +679,6 @@ class Polynomial{
       for(std::vector<cuyasheint_t>::iterator iter = values.begin();iter != values.end();iter++){
         this->coefs[iter-values.begin()] = conv<ZZ>(*iter);
       }
-      this->expected_degree = this->deg();
       this->set_device_updated(false);
       this->set_host_updated(true);
     }
@@ -697,7 +686,6 @@ class Polynomial{
 
       // Replaces all coefficients
       this->coefs = values;
-      this->expected_degree = this->deg();
 
       this->set_device_updated(false);
       this->set_host_updated(true);
@@ -709,7 +697,6 @@ class Polynomial{
       if(Polynomial::phi_set){
         this->coefs.resize(this->get_phi().deg()+1);
       }
-      this->expected_degree = this->coefs.size()-1;
       
       #ifdef DEBUGVERBOSE
         std::cout << "Polynomial coeff cleaned and resized to " << this->coefs.size() << std::endl;
@@ -722,7 +709,6 @@ class Polynomial{
       // Prepare this polynomial to receive size coefficientes
       this->coefs.clear();
       this->coefs.resize(size);
-      this->expected_degree = this->coefs.size()-1;
       
       #ifdef VERBOSE
         std::cout << "Polynomial coeff cleaned and resized to " << this->coefs.size() << std::endl;
@@ -745,13 +731,23 @@ class Polynomial{
       return this->d_polyCRT;
     }
     void set_device_crt_residues(cuyasheint_t *residues){
-      this->d_polyCRT = residues;
+      if(d_polyCRT != 0x0){
+        cudaError_t result = cudaFree(d_polyCRT);
+        if(result != cudaSuccess)
+          std::cout << "Peguei! " << std::endl;
+        assert(result == cudaSuccess);
+      }
+      d_polyCRT = residues;
     }
 
     void crt();
     void icrt();
     int get_crt_spacing(){
       return this->CRTSPACING;
+    }
+    void set_crt_spacing(const int spacing){
+      // This function doesn't update CRTSPACING completely. Just set the variable.      
+      this->CRTSPACING = spacing;
     }
     static void gen_crt_primes(ZZ q,cuyasheint_t degree){
         // We will use 63bit primes to fit cuyasheint_t data type (64 bits raises "GenPrime: length too large")
@@ -816,7 +812,6 @@ class Polynomial{
         std::cout << "Device data is updated" << std::endl;
         #endif
       }else{        
-        this->set_icrt_computed(false);
         #ifdef VERBOSE
         std::cout << "Device data is NOT updated" << std::endl;
         #endif
@@ -867,7 +862,19 @@ class Polynomial{
       }
     }
     bool get_crt_computed(){
-      return this->CRT_COMPUTED;
+      bool b = this->CRT_COMPUTED;
+
+      if(b){        
+        #ifdef VERBOSE
+        std::cout << "CRT residues computed" << std::endl;
+        #endif
+      }else{        
+        #ifdef VERBOSE
+        std::cout << "CRT residues NOT computed" << std::endl;
+        #endif
+      }
+
+      return b;
     }
     void set_icrt_computed(bool b){
       this->ICRT_COMPUTED = b;
@@ -883,7 +890,19 @@ class Polynomial{
       }
     }
     bool get_icrt_computed(){
-      return this->ICRT_COMPUTED;
+      bool b = this->ICRT_COMPUTED;
+
+      if(b){        
+        #ifdef VERBOSE
+        std::cout << "ICRT residues computed" << std::endl;
+        #endif
+      }else{        
+        #ifdef VERBOSE
+        std::cout << "ICRT residues NOT computed" << std::endl;
+        #endif
+      }
+
+      return b;
     }
 
     int deg(){
@@ -915,24 +934,52 @@ class Polynomial{
       }
       return true;
     }
-    void update_crt_spacing(int new_spacing){
+    void update_crt_spacing(const int new_spacing){
       
       #ifdef VERBOSE
       std::cout << "update_crt_spacing" << std::endl;
       #endif
 
-      if(this->CRTSPACING == new_spacing){
+      if(new_spacing <= 0)
+        // Do nothing
+        return;
 
+      if(this->get_crt_spacing() == new_spacing && get_device_updated()){
+        // Data lies in GPU's global memory and has the correct alignment
         #ifdef VERBOSE
         std::cout << "No need to update crt spacing." << std::endl;
         #endif
         return;
-      }
+      }else if(!get_device_updated()){
+        // Data isn't updated on GPU's global memory
+        // Just set the spacing and update gpu
+        this->set_crt_spacing(new_spacing);
 
+        // if(this->deg() >= 0)
+          // update_device_data();
+        cuyasheint_t *d_pointer;
+        cudaError_t result = cudaMalloc((void**)&d_pointer,get_crt_spacing()*(CRTPrimes.size())*sizeof(cuyasheint_t));
+        if(result != cudaSuccess){
+          std::cout << "CRTSPACING: " << CRTSPACING << std::endl;
+          std::cout << "CRTPrimes.size(): " << CRTPrimes.size() << std::endl;
+          std::cout << "result: " << cudaGetErrorString(result) << std::endl;
+        }
+        
+        assert(result == cudaSuccess);
 
-      // If updated data lies in gpu's global memory, realign it
-      if(this->get_device_updated()){
-        cuyasheint_t * d_pointer = CUDAFunctions::callRealignCRTResidues(this->stream, this->CRTSPACING,new_spacing,this->get_device_crt_residues(),this->deg()+1,Polynomial::CRTPrimes.size());
+        set_device_crt_residues(d_pointer);
+        return; 
+      }else{
+        // GPU has the updated data, but with wrong spacing
+        // If updated data lies in gpu's global memory, realign it
+
+        const int old_spacing = this->get_crt_spacing();
+        cuyasheint_t * d_pointer = CUDAFunctions::callRealignCRTResidues(this->stream,
+                                                                        this->get_crt_spacing(),
+                                                                        new_spacing,
+                                                                        this->get_device_crt_residues(),
+                                                                        old_spacing,
+                                                                        Polynomial::CRTPrimes.size());
         if(d_pointer != NULL){
           this->set_device_crt_residues(d_pointer);
         }else{
@@ -940,13 +987,13 @@ class Polynomial{
           std::cout << "Old spacing is equal new spacing." << std::endl;
           #endif
         }
-      }
-      this->CRTSPACING = new_spacing;
-      
-      #ifdef VERBOSE
-      std::cout << "crt spacing updated to " << this->CRTSPACING << std::endl;
-      #endif
 
+        this->set_crt_spacing(new_spacing);
+        
+        #ifdef VERBOSE
+        std::cout << "crt spacing updated to " << this->get_crt_spacing() << std::endl;
+        #endif
+      }
     }
     void update_crt_spacing(){
       int new_spacing = this->deg();
@@ -966,9 +1013,6 @@ class Polynomial{
       }
       this->CRTSPACING = new_spacing;
 
-    }
-    int get_expected_degre(){
-      return expected_degree;
     }
     bool is_zero(){
       this->normalize();
@@ -1018,7 +1062,7 @@ class Polynomial{
     }
     // static void XGCD(Polynomial &d, Polynomial &s,Polynomial &t, Polynomial &a,  Polynomial &b);
     static void BuildNthCyclotomic(Polynomial *phi, unsigned int n);
-    static void random(Polynomial *a,int degree){
+    static void random(Polynomial *a,const int degree){
       a->set_coeffs(degree+1);
 
       if(a->get_mod() > 0)
@@ -1027,6 +1071,8 @@ class Polynomial{
       else
         for(int i = 0;i <= degree;i++)
           a->set_coeff(i,ZZ(rand()) % a->global_mod);
+      a->set_device_updated(false);
+      a->set_host_updated(true);
     }
     cudaStream_t get_stream(){
       return this->stream;
@@ -1034,6 +1080,7 @@ class Polynomial{
     void set_stream(){
       cudaStreamCreate(&this->stream);
     }
+    static void operator delete(void *ptr);
   private:
     // Attributes
     bool ON_COPY;
@@ -1045,12 +1092,11 @@ class Polynomial{
   protected:
     std::vector<ZZ> coefs;
     std::vector<std::vector<cuyasheint_t> > polyCRT; // Must be initialized by crt()
-    cuyasheint_t *d_polyCRT; // Must be initialized on CRTSPACING definition and updated by crt(), if needed
+    cuyasheint_t *d_polyCRT = 0x0; // Must be initialized on CRTSPACING definition and updated by crt(), if needed
 
     ZZ mod;
     Polynomial *phi;
     cudaStream_t stream;
-    int expected_degree; // This variable stores the expected degree for this polinomial
 
 };
 #endif

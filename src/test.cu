@@ -139,8 +139,8 @@ BOOST_AUTO_TEST_CASE(justCRT)
   for(int count = 0; count < NTESTS;count ++){
     Polynomial::random(&a,degree-1);
 
-    Polynomial b(a);//Copy
-    b.crt();
+    Polynomial b;
+    b.copy(a);//Copy
     b.update_device_data();
     b.set_host_updated(false);
 
@@ -718,10 +718,21 @@ BOOST_AUTO_TEST_CASE(randomPolynomialOperations)
     int random_op_bit = rand()%2;
     int random_ab = rand()%3;
 
+    // std::cout << "random_op: " << random_op_bit << std::endl;
+    // std::cout << "random_ab: " << random_ab << std::endl;
+
     // 0: add
-    if(random_op_bit){
+    switch(random_op_bit){
+      case 1:
       // 1: mul
-      if(random_ab == 1){
+      switch(random_ab){
+        case 0:
+          // 0: a
+          // std::cout << " random *=a " << std::endl;
+          c *= a;
+          c_ntl *= a_ntl;
+        break;
+        case 1:
         // 1: b
         // std::cout << " random *=b " << std::endl;
         // std::cout << b.to_string() << std::endl;
@@ -732,31 +743,31 @@ BOOST_AUTO_TEST_CASE(randomPolynomialOperations)
 
         c *= b;
         c_ntl *= b_ntl;
-      }else if(random_ab == 0){
-        // 0: a
-        // std::cout << " random *=a " << std::endl;
-        c *= a;
-        c_ntl *= a_ntl;
-      }else if(random_ab == 2){
+        break;
+        case 2:
         // 2: some integer
         // std::cout << " random *= %c " << std::endl;
         long value = conv<long>(ZZ(rand()) % c.get_mod());
         c *= value;
         c_ntl *= value;
+        break;
       }
-    }else{
-      // 0: add
-      if(random_ab == 1){
-        // 1: b
-        // std::cout << " random += b " << std::endl;
-        c += b;
-        c_ntl += b_ntl;
-      }else if(random_ab == 0){
+      break;
+      case 0:
+      switch(random_ab){
+        case 0:
         // 0: a
         // std::cout << " random += a " << std::endl;
         c += a;
         c_ntl += a_ntl;
-      }else if(random_ab == 2){
+        break;
+        case 1:
+        // 1: b
+        // std::cout << " random += b " << std::endl;
+        c += b;
+        c_ntl += b_ntl;
+        break;
+        case 2:
         // 2: some integer
         // std::cout << " random += %c " << std::endl;
         long value = conv<long>(ZZ(rand()) % c.get_mod());
@@ -766,7 +777,9 @@ BOOST_AUTO_TEST_CASE(randomPolynomialOperations)
 
         c += value;
         c_ntl += value;
+        break;
       }
+      break;
 
     }
 

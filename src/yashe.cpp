@@ -61,8 +61,8 @@ void Yashe::generate_keys(){
       #ifdef VERBOSE
       std::cout << "Computing invmod of f "<< std::endl;
       #endif
-      fInv = Polynomial::InvMod(f,phi);
-      // fInv = f;
+      // fInv = Polynomial::InvMod(f,phi);
+      fInv = f;
       #ifdef VERBOSE
       std::cout << "Done." << std::endl;
       #endif

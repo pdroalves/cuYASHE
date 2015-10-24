@@ -3,7 +3,6 @@ OPT = -O0
 CUDA_CC = nvcc $(OPT) -G -g -std=c++11
 CC = g++ -std=c++11 -g -Wall -Wfatal-errors -m64 $(OPT)
 
-# OpenMP isn't useful here
 OPENMP = -fopenmp
 # OPENMP = 
 
