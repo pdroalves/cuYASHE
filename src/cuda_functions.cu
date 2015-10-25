@@ -707,6 +707,10 @@ __host__ void Polynomial::reduce(){
   // Just like DivRem, but here we reduce a with a cyclotomic polynomial
   Polynomial *phi = (Polynomial::global_phi);
 
+  #warning "Reduce on device has a bug. Deviating to host."
+  this->update_host_data();
+  this->set_device_updated(false);
+
   if(!this->get_device_updated()){
     #ifdef VERBOSE
     std::cout << "Reduce on host." << std::endl;
@@ -722,11 +726,6 @@ __host__ void Polynomial::reduce(){
     std::cout << "Reduce on device." << std::endl;
     #endif
     
-    #warning "Reduce on device has a bug. Deviating to host."
-    this->icrt();
-    this->reduce();
-    return;
-
     const int half = phi->deg()-1;
     const int N = this->CRTSPACING;
     const int NPolis = this->CRTPrimes.size();

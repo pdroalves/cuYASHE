@@ -186,6 +186,8 @@ class Polynomial{
       #ifdef VERBOSE
       std::cout << "Building a polynomial" << std::endl;
       #endif
+      cudaStreamCreate(&this->stream);
+      
       // Copy
       this->copy(*b);
     }
@@ -201,7 +203,8 @@ class Polynomial{
         this->polyCRT = b.get_crt_residues();
       
       if(b.get_device_updated())
-        this->copy_device_crt_residues(b);
+        // this->copy_device_crt_residues(b);
+        this->d_polyCRT = b.d_polyCRT;
       if(b.get_icrt_computed())
         this->update_crt_spacing(b.get_crt_spacing());
       
@@ -243,6 +246,7 @@ class Polynomial{
     }
     // Operators
     Polynomial operator=(Polynomial b){//Copy
+
         this->copy(b);
 
         #ifdef VERBOSE
@@ -732,10 +736,10 @@ class Polynomial{
     }
     void set_device_crt_residues(cuyasheint_t *residues){
       if(d_polyCRT != 0x0){
-        cudaError_t result = cudaFree(d_polyCRT);
-        if(result != cudaSuccess)
-          std::cout << "Peguei! " << std::endl;
-        assert(result == cudaSuccess);
+        // cudaError_t result = cudaFree(d_polyCRT);
+        // if(result != cudaSuccess)
+          // std::cout << "Peguei! " << std::endl;
+        // assert(result == cudaSuccess);
       }
       d_polyCRT = residues;
     }
