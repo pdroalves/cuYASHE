@@ -81,24 +81,14 @@ template <class P>
 void common_addition_inplace(P *a,P *b){
 	// P should be Polynomial or Ciphertext
 	// Store result in polynomial a
-	#ifdef MAYADDONCPU
-		if(!a->get_device_updated() && !b->get_device_updated()){
-		// CPU add
-		#ifdef VERBOSE
-		std::cout << "Operator+= on CPU" << std::endl;
-		#endif
-		a->CPUAddition(&b);
-		return;
-		}else{
-	#endif
-
+	
 	#ifdef VERBOSE
 	std::cout << "Operator+= on GPU" << std::endl;
 	#endif
 
 	// Check align
-	if(a->CRTSPACING != b->CRTSPACING){
-		int new_spacing = std::max(a->CRTSPACING,b->CRTSPACING);
+	if(a->get_crt_spacing() != b->get_crt_spacing()){
+		int new_spacing = std::max(a->get_crt_spacing(),b->get_crt_spacing());
 		a->update_crt_spacing(new_spacing);
 		b->update_crt_spacing(new_spacing);
 	}
@@ -129,14 +119,16 @@ void common_addition_inplace(P *a,P *b){
 	}
 
 
-	CUDAFunctions::callPolynomialAddSubInPlace(a->get_stream(),a->get_device_crt_residues(),b->get_device_crt_residues(),(int)(a->CRTSPACING*P::CRTPrimes.size()),ADD);
+	CUDAFunctions::callPolynomialAddSubInPlace( a->get_stream(),
+												a->get_device_crt_residues(),
+												b->get_device_crt_residues(),
+												(int)(a->get_crt_spacing()*P::CRTPrimes.size()),
+												ADD);
 
 	a->set_host_updated(false);
 	a->set_device_updated(true);
 	cudaDeviceSynchronize();
-	#ifdef MAYADDONCPU
-	}
-	#endif
+
 }
 
 template <class P>

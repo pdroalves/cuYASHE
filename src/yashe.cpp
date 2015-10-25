@@ -61,8 +61,8 @@ void Yashe::generate_keys(){
       #ifdef VERBOSE
       std::cout << "Computing invmod of f "<< std::endl;
       #endif
-      // fInv = Polynomial::InvMod(f,phi);
-      fInv = f;
+      fInv = Polynomial::InvMod(f,phi);
+      // fInv = f;
       #ifdef VERBOSE
       std::cout << "Done." << std::endl;
       #endif
@@ -122,7 +122,7 @@ Ciphertext Yashe::encrypt(Polynomial m){
 
   // ZZ delta;
   #ifdef DEBUG
-  std::cout << "delta: "<< delta <<std::endl;
+  std::cout << "delta: "<< delta.get_value() <<std::endl;
   #endif
 
   Polynomial ps = xerr.get_sample(phi.deg()-1);
@@ -144,6 +144,9 @@ Ciphertext Yashe::encrypt(Polynomial m){
   p = (h*ps);
   p += e;
   Polynomial mdelta = delta*m;
+  // std::cout << "mdelta: " << mdelta.to_string() << std::endl;
+  #warning Need to debug this
+  mdelta.update_host_data();
   p += mdelta;
   p.reduce();
   p %= q;
@@ -151,7 +154,6 @@ Ciphertext Yashe::encrypt(Polynomial m){
   #ifdef DEBUG
   std::cout << "ciphertext: "<< p <<std::endl;
   #endif
-
   Ciphertext c(p);
   return c;
 }

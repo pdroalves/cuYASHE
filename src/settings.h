@@ -14,7 +14,7 @@
 #endif
 // #define CYCLECOUNTING
 // #define VERBOSE
-#define VERBOSEMEMORYCOPY
+// #define VERBOSEMEMORYCOPY
 // #define MAYADDONCPU
 // typedef uint32_t cuyasheint_t;
 typedef uint64_t cuyasheint_t;

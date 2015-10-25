@@ -140,5 +140,7 @@ Polynomial Integer::operator*(Polynomial &a){
                                             this->get_device_crt_residues(),
                                             p->get_crt_spacing(),
                                             Polynomial::CRTPrimes.size());
+    p->set_host_updated(false);
+    p->set_device_updated(true);
     return p;
 }

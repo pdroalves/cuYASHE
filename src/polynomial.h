@@ -187,7 +187,7 @@ class Polynomial{
       std::cout << "Building a polynomial" << std::endl;
       #endif
       cudaStreamCreate(&this->stream);
-      
+
       // Copy
       this->copy(*b);
     }
@@ -197,6 +197,7 @@ class Polynomial{
       // start = polynomial_get_cycles();
       #endif 
 
+      this->CRTSPACING = b.CRTSPACING;
       if(b.get_host_updated())
         this->set_coeffs(b.get_coeffs());
       if(b.get_crt_computed())
@@ -205,8 +206,6 @@ class Polynomial{
       if(b.get_device_updated())
         // this->copy_device_crt_residues(b);
         this->d_polyCRT = b.d_polyCRT;
-      if(b.get_icrt_computed())
-        this->update_crt_spacing(b.get_crt_spacing());
       
       this->set_host_updated(b.get_host_updated());
       this->set_device_updated(b.get_device_updated());

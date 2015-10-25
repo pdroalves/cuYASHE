@@ -164,7 +164,7 @@ void Polynomial::update_host_data(){
     if(this->polyCRT.size() != Polynomial::CRTPrimes.size())
       this->polyCRT.resize(Polynomial::CRTPrimes.size());
 
-    for(unsigned int i=0;i < this->polyCRT.size();i++){
+    for(unsigned int i=0;i < Polynomial::CRTPrimes.size();i++){
       if(this->polyCRT[i].size() != (unsigned int)(this->get_crt_spacing)())
         this->polyCRT[i].resize(this->get_crt_spacing());
       result = cudaMemcpy(&this->polyCRT[i][0] ,
@@ -224,7 +224,7 @@ void Polynomial::crt(){
     }
 
     // for(unsigned int j = 0; j < polyCRT.size();j++){
-    //   std::cout << "Polynomial residue "<< j << ":" << std::endl; 
+    //   std::cout << "CRT Polynomial residue "<< j << ":" << std::endl; 
     //   for(unsigned int i = 0; i < polyCRT[j].size() ;i++)
     //     std::cout << polyCRT[j][i] << " ";
     //   std::cout << std::endl << std::endl;
@@ -250,16 +250,13 @@ void Polynomial::icrt(){
   else if(!this->get_host_updated()){
     this->set_icrt_computed(true);//If we do not set this, we get a infinite loop
     this->update_host_data();
-  }else{
-    this->set_icrt_computed(true);
-    return;
-  } 
+  }
   #ifdef CYCLECOUNTING
   end = get_cycles();
   std::cout << "Cycles for host update: " << (end-start) << std::endl;
   #endif
     // for(unsigned int j = 0; j < polyCRT.size();j++){
-    //   std::cout << "Polynomial residue"<< j << ":" << std::endl; 
+    //   std::cout << "ICRT Polynomial residue"<< j << ":" << std::endl; 
     //   for(unsigned int i = 0; i < polyCRT[j].size() ;i++)
     //     std::cout << polyCRT[j][i] << " ";
     //   std::cout << std::endl << std::endl;
@@ -439,7 +436,9 @@ void Polynomial::DivRem(Polynomial a,Polynomial b,Polynomial &quot,Polynomial &r
         b.update_host_data();
         b.icrt();
     }
-
+    // No need to reduce
+    if(a.deg() <= 0)
+      return;
     if(check_special_rem_format(b)){
       #ifdef VERBOSE
       std::cout << "Rem in special mode."<<std::endl;
