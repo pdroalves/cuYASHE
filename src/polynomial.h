@@ -198,8 +198,10 @@ class Polynomial{
       #endif 
 
       this->CRTSPACING = b.CRTSPACING;
-      if(b.get_host_updated())
+      if(b.get_host_updated()){
         this->set_coeffs(b.get_coeffs());
+        this->aux_polyCRT = b.aux_polyCRT;
+      }
       if(b.get_crt_computed())
         this->polyCRT = b.get_crt_residues();
       
@@ -469,7 +471,7 @@ class Polynomial{
       return p;
     }
     Polynomial operator%=(ZZ b){
-      if(this->get_host_updated()){
+      if(!this->get_host_updated()){
         #warning "Polynomial mod on device not implemented!";
        
         this->update_host_data();
@@ -797,28 +799,28 @@ class Polynomial{
     void set_device_updated(bool b){
       this->DEVICE_IS_UPDATE = b;
       if(b){
-        #ifdef VERBOSE
-        std::cout << "Device data is updated" << std::endl;
-        #endif
+        // #ifdef VERBOSE
+        // std::cout << "Device data is updated" << std::endl;
+        // #endif
       }
       if(!b){
-        #ifdef VERBOSE
-        std::cout << "Device data is NOT updated" << std::endl;
-        #endif
+        // #ifdef VERBOSE
+        // std::cout << "Device data is NOT updated" << std::endl;
+        // #endif
         this->set_crt_computed(false);
       }
     }
     bool get_device_updated(){
       bool b = this->DEVICE_IS_UPDATE;
-      if(b){        
-        #ifdef VERBOSE
-        std::cout << "Device data is updated" << std::endl;
-        #endif
-      }else{        
-        #ifdef VERBOSE
-        std::cout << "Device data is NOT updated" << std::endl;
-        #endif
-      }
+      // if(b){        
+      //   #ifdef VERBOSE
+      //   std::cout << "Device data is updated" << std::endl;
+      //   #endif
+      // }else{        
+      //   #ifdef VERBOSE
+      //   std::cout << "Device data is NOT updated" << std::endl;
+      //   #endif
+      // }
 
       return b;
     }
@@ -826,56 +828,56 @@ class Polynomial{
     void set_host_updated(bool b){
       this->HOST_IS_UPDATED = b;
       if(b){        
-        #ifdef VERBOSE
-        std::cout << "Host data is updated" << std::endl;
-        #endif
+        // #ifdef VERBOSE
+        // std::cout << "Host data is updated" << std::endl;
+        // #endif
       }else{        
         this->set_icrt_computed(false);
-        #ifdef VERBOSE
-        std::cout << "Host data is NOT updated" << std::endl;
-        #endif
+        // #ifdef VERBOSE
+        // std::cout << "Host data is NOT updated" << std::endl;
+        // #endif
       }
     }
     bool get_host_updated(){
 
       bool b = this->HOST_IS_UPDATED;
-      if(b){        
-        #ifdef VERBOSE
-        std::cout << "Host data is updated" << std::endl;
-        #endif
-      }else{        
-        this->set_icrt_computed(false);
-        #ifdef VERBOSE
-        std::cout << "Host data is NOT updated" << std::endl;
-        #endif
-      }
+      // if(b){        
+      //   #ifdef VERBOSE
+      //   std::cout << "Host data is updated" << std::endl;
+      //   #endif
+      // }else{        
+      //   this->set_icrt_computed(false);
+      //   #ifdef VERBOSE
+      //   std::cout << "Host data is NOT updated" << std::endl;
+      //   #endif
+      // }
 
       return b;
     }
     void set_crt_computed(bool b){
       this->CRT_COMPUTED = b;
       if(b){        
-        #ifdef VERBOSE
-        std::cout << "CRT residues computed" << std::endl;
-        #endif
+        // #ifdef VERBOSE
+        // std::cout << "CRT residues computed" << std::endl;
+        // #endif
       }else{        
-        #ifdef VERBOSE
-        std::cout << "CRT residues NOT computed" << std::endl;
-        #endif
+        // #ifdef VERBOSE
+        // std::cout << "CRT residues NOT computed" << std::endl;
+        // #endif
       }
     }
     bool get_crt_computed(){
       bool b = this->CRT_COMPUTED;
 
-      if(b){        
-        #ifdef VERBOSE
-        std::cout << "CRT residues computed" << std::endl;
-        #endif
-      }else{        
-        #ifdef VERBOSE
-        std::cout << "CRT residues NOT computed" << std::endl;
-        #endif
-      }
+      // if(b){        
+      //   #ifdef VERBOSE
+      //   std::cout << "CRT residues computed" << std::endl;
+      //   #endif
+      // }else{        
+      //   #ifdef VERBOSE
+      //   std::cout << "CRT residues NOT computed" << std::endl;
+      //   #endif
+      // }
 
       return b;
     }
@@ -883,27 +885,27 @@ class Polynomial{
       this->ICRT_COMPUTED = b;
 
       if(b){        
-        #ifdef VERBOSE
-        std::cout << "ICRT residues computed" << std::endl;
-        #endif
+        // #ifdef VERBOSE
+        // std::cout << "ICRT residues computed" << std::endl;
+        // #endif
       }else{        
-        #ifdef VERBOSE
-        std::cout << "ICRT residues NOT computed" << std::endl;
-        #endif
+        // #ifdef VERBOSE
+        // std::cout << "ICRT residues NOT computed" << std::endl;
+        // #endif
       }
     }
     bool get_icrt_computed(){
       bool b = this->ICRT_COMPUTED;
 
-      if(b){        
-        #ifdef VERBOSE
-        std::cout << "ICRT residues computed" << std::endl;
-        #endif
-      }else{        
-        #ifdef VERBOSE
-        std::cout << "ICRT residues NOT computed" << std::endl;
-        #endif
-      }
+      // if(b){        
+      //   #ifdef VERBOSE
+      //   std::cout << "ICRT residues computed" << std::endl;
+      //   #endif
+      // }else{        
+      //   #ifdef VERBOSE
+      //   std::cout << "ICRT residues NOT computed" << std::endl;
+      //   #endif
+      // }
 
       return b;
     }
@@ -961,13 +963,7 @@ class Polynomial{
         // if(this->deg() >= 0)
           // update_device_data();
         cuyasheint_t *d_pointer;
-        cudaError_t result = cudaMalloc((void**)&d_pointer,get_crt_spacing()*(CRTPrimes.size())*sizeof(cuyasheint_t));
-        if(result != cudaSuccess){
-          std::cout << "CRTSPACING: " << CRTSPACING << std::endl;
-          std::cout << "CRTPrimes.size(): " << CRTPrimes.size() << std::endl;
-          std::cout << "result: " << cudaGetErrorString(result) << std::endl;
-        }
-        
+        cudaError_t result = cudaMalloc((void**)&d_pointer,get_crt_spacing()*(CRTPrimes.size())*sizeof(cuyasheint_t));        
         assert(result == cudaSuccess);
 
         set_device_crt_residues(d_pointer);
@@ -1095,6 +1091,8 @@ class Polynomial{
   protected:
     std::vector<ZZ> coefs;
     std::vector<std::vector<cuyasheint_t> > polyCRT; // Must be initialized by crt()
+    cuyasheint_t *aux_polyCRT = 0x0; // Must be initialized on CRTSPACING definition and updated by crt(), if needed
+    
     cuyasheint_t *d_polyCRT = 0x0; // Must be initialized on CRTSPACING definition and updated by crt(), if needed
 
     ZZ mod;

@@ -113,9 +113,11 @@ void Ciphertext::keyswitch(){
 }
 
 void Ciphertext::worddecomp(std::vector<Polynomial> *P){
+  #ifdef CYCLECOUNTING
   uint64_t start,end;
-
   start = get_cycles();
+  #endif
+
   for(int i = 0; i <= this->deg(); i++){
     ZZ c = this->get_coeff(i);
     int j = 0;
@@ -126,6 +128,9 @@ void Ciphertext::worddecomp(std::vector<Polynomial> *P){
       j++;
     }
   }
+
+  #ifdef CYCLECOUNTING
   end = get_cycles();
   std::cout << (end-start) << " cycles to worddecomp" << std::endl;
+  #endif
 }

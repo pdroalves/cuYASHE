@@ -100,9 +100,9 @@ void common_addition_inplace(P *a,P *b){
 	#endif
 
 	// Apply CRT and copy data to global memory, if needed
-	#pragma omp parallel sections num_threads(2)
+	// #pragma omp parallel sections num_threads(2)
 	{
-		#pragma omp section
+		// #pragma omp section
 		{
 
 			if(!a->get_device_updated()){
@@ -110,7 +110,7 @@ void common_addition_inplace(P *a,P *b){
 			}
 
 		}
-		#pragma omp section
+		// #pragma omp section
 		{
 			if(!b->get_device_updated()){
 				b->update_device_data();
@@ -127,49 +127,60 @@ void common_addition_inplace(P *a,P *b){
 
 	a->set_host_updated(false);
 	a->set_device_updated(true);
-	cudaDeviceSynchronize();
-
 }
 
 template <class P>
 P common_multiplication(P *a, P *b){
 
   // Check align
-  int new_spacing = pow(2,ceil(log2(a->deg()+b->deg())));
+  int needed_spacing = pow(2,ceil(log2(a->get_crt_spacing()+b->get_crt_spacing())));
   
-  if(new_spacing < CUDAFunctions::N)
-	new_spacing = CUDAFunctions::N;
-	else if(new_spacing != CUDAFunctions::N){
+  if(needed_spacing < CUDAFunctions::N)
+	needed_spacing = CUDAFunctions::N;
+	else if(needed_spacing != CUDAFunctions::N){
 	// Re-compute W matrix
-	CUDAFunctions::init(new_spacing);
+	CUDAFunctions::init(needed_spacing);
   }
 
-  a->update_crt_spacing(new_spacing);
-  b->update_crt_spacing(new_spacing);
+  bool update_A_spacing = false; 
+  bool update_B_spacing = false;
+  if(a->get_crt_spacing() != needed_spacing){
+  	if(!a->get_device_updated())
+  		a->update_crt_spacing(needed_spacing);
+  	else
+	  	update_A_spacing = true;
+  	
+  }
+  if(b->get_crt_spacing() != needed_spacing){
+  	if(!b->get_device_updated())
+  		b->update_crt_spacing(needed_spacing);
+  	else
+	  	update_B_spacing = true;
+  }
 
   #ifdef VERBOSE
-  std::cout << "Mul with CRTSPACING" << new_spacing << std::endl;
+  std::cout << "Mul with CRTSPACING " << needed_spacing << std::endl;
   // std::cout << "this: " << a->to_string() << std::endl;
   // std::cout << "other " << b->to_string() << std::endl;
   #endif
 
   // Apply CRT and copy data to global memory, if needed
-  #pragma omp sections
+  // #pragma omp sections
   {
-      #pragma omp section
+      // #pragma omp section
       {	
 		#ifdef VERBOSE
-		std::cout << "a: " << std::endl;
+		std::cout << "a" << std::endl;
 		#endif
 		if(!a->get_device_updated()){
 			a->update_device_data(2);
 		}
 
       }
-      #pragma omp section
+      // #pragma omp section
       {
 		#ifdef VERBOSE
-		std::cout << "b: " << std::endl;
+		std::cout << "b" << std::endl;
 		#endif
 		if(!b->get_device_updated()){
 			b->update_device_data(2);
@@ -179,8 +190,12 @@ P common_multiplication(P *a, P *b){
 
   cuyasheint_t *d_result = CUDAFunctions::callPolynomialMul(a->get_stream(),
 															a->get_device_crt_residues(),
+															update_A_spacing,
+															a->get_crt_spacing(),
 															b->get_device_crt_residues(),
-															a->CRTSPACING,
+															update_B_spacing,
+															b->get_crt_spacing(),
+															needed_spacing,
 															a->CRTPrimes.size());
 
   P c = P(a->get_mod(),a->get_phi(),a->CRTSPACING);

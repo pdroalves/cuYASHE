@@ -13,6 +13,8 @@ class Integer{
 			this->set_device_updated(false);
 			this->set_crt_computed(false);
 			this->set_icrt_computed(true);
+
+			this->update_device_data();
 		}
 		Integer(cuyasheint_t a){
 			this->set_value(a);
@@ -21,6 +23,8 @@ class Integer{
 			this->set_device_updated(false);
 			this->set_crt_computed(false);
 			this->set_icrt_computed(true);
+
+			this->update_device_data();
 		}
 		Integer operator=(ZZ a){			
 			this->set_value(a);
@@ -30,6 +34,7 @@ class Integer{
 			this->set_crt_computed(false);
 			this->set_icrt_computed(true);
 
+			this->update_device_data();
 			return *this;
 		}
 		Integer operator=(cuyasheint_t a){			
@@ -40,6 +45,8 @@ class Integer{
 			this->set_crt_computed(false);
 			this->set_icrt_computed(true);
 
+			this->update_device_data();
+			
 			return *this;
 		}
 		Integer operator/=(Integer a){			

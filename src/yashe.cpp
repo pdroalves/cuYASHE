@@ -79,7 +79,9 @@ void Yashe::generate_keys(){
   h = t*fInv;
   h *= g;
   h.reduce();
+  // std::cout << "h " << h.to_string() << std::endl;
   h %= q;
+
   gamma.resize(lwq);
   for(int k = 0 ; k < lwq; k ++){
     gamma[k] = Polynomial(f);//Copy
@@ -125,13 +127,14 @@ Ciphertext Yashe::encrypt(Polynomial m){
   std::cout << "delta: "<< delta.get_value() <<std::endl;
   #endif
 
+  uint64_t start,end;
+
+  start = get_cycles();
   Polynomial ps = xerr.get_sample(phi.deg()-1);
-  ps.reduce();
-  ps %= q;
   Polynomial e = xerr.get_sample(phi.deg()-1);
-  e.reduce();
-  e %= q;
-  
+  end = get_cycles();
+  uint64_t gen_samples = end-start;
+
   #ifdef DEBUG
   std::cout << "ps: "<< ps <<std::endl;
   #endif
@@ -139,22 +142,60 @@ Ciphertext Yashe::encrypt(Polynomial m){
   std::cout << "e: "<< e <<std::endl;
   #endif
 
+  start = get_cycles();
   Polynomial p;
-
+  uint64_t build_p = get_cycles()-start;
+  // std::cout << "h: " << h.to_string() << std::endl;
+  // std::cout << "ps: " << ps.to_string() << std::endl;
+  
+  start = get_cycles();
   p = (h*ps);
+  uint64_t hMps = get_cycles()-start;
+  
+  start = get_cycles();
   p += e;
+  uint64_t addInplacee = get_cycles()-start;
+
+  start = get_cycles();
   Polynomial mdelta = delta*m;
-  // std::cout << "mdelta: " << mdelta.to_string() << std::endl;
-  #warning Need to debug this
-  mdelta.update_host_data();
+  uint64_t build_mdelta = get_cycles()-start;  
+  
+  start = get_cycles();
   p += mdelta;
+  uint64_t addInplaceMdelta = get_cycles()-start;
+
+  start = get_cycles();
   p.reduce();
-  p %= q;
+  uint64_t p_reduce = get_cycles()-start;
+  
+  // p %= q;
+  // uint64_t pModq = get_cycles()-start;
+
+  std::cout << "gen_samples: " << gen_samples << std::endl; 
+  std::cout << "build_p: " << build_p << std::endl; 
+  std::cout << "hMps: " << hMps << std::endl; 
+  std::cout << "addInplacee: " << addInplacee << std::endl; 
+  std::cout << "build_mdelta: " << build_mdelta << std::endl; 
+  std::cout << "addInplaceMdelta: " << addInplaceMdelta << std::endl; 
+  std::cout << "p_reduce: " << p_reduce << std::endl; 
+  // std::cout << "pModq: " << pModq << std::endl; 
+
+  // std::cout << "phi.deg() " << phi.deg() << std::endl;
+  // std::cout << "h " << h.to_string() << std::endl;
+  // std::cout << "ps " << ps.to_string() << std::endl;
+  // std::cout << "e " << e.to_string() << std::endl;
+  // std::cout << "mdelta " << mdelta.to_string() << std::endl;
+  // std::cout << "p " << p.to_string() << std::endl;
 
   #ifdef DEBUG
   std::cout << "ciphertext: "<< p <<std::endl;
   #endif
   Ciphertext c(p);
+
+  // delete &ps;
+  // delete &e;
+  // delete &mdelta;
+
   return c;
 }
 Polynomial Yashe::decrypt(Ciphertext c){
@@ -193,7 +234,6 @@ Polynomial Yashe::decrypt(Ciphertext c){
 
   quot %= q;
   rem %= q;
-  std::cout << "quot: " << quot << std::endl;
   #ifdef VERBOSE
   std::cout << "rem: " << rem << std::endl;
   std::cout << "coeff: " << coeff << std::endl;
@@ -203,7 +243,6 @@ Polynomial Yashe::decrypt(Ciphertext c){
   
   Polynomial m;
   if(2*rem > q){
-    std::cout << "t-1: " << (t.get_value()-1) << std::endl;
     if(coeff == t.get_value()-1){
       m.set_coeff(0,0);
     }else{

@@ -361,7 +361,7 @@ BOOST_AUTO_TEST_CASE(simpleMultiplication)
     // Multiply
     cudaStream_t stream;
     cudaStreamCreate(&stream);
-    cuyasheint_t *d_c = CUDAFunctions::callPolynomialMul(stream,d_a,d_b,N, NPOLYS);
+    cuyasheint_t *d_c = CUDAFunctions::callPolynomialMul(stream,d_a,false,N,d_b,false,N,N, NPOLYS);
 
     ZZ_pEX c_ntl = a_ntl*b_ntl;
 
@@ -822,6 +822,7 @@ BOOST_AUTO_TEST_CASE(modularInversion)
   
   result.reduce();
   result %= a.get_mod();
+  std::cout << result.to_string() << std::endl;
 
   Polynomial one = Polynomial();
   one.set_coeff(0,1);
@@ -831,19 +832,6 @@ BOOST_AUTO_TEST_CASE(modularInversion)
   BOOST_REQUIRE(result == one);
 
 }
-
-// BOOST_AUTO_TEST_CASE(expectedDegree)
-// {
-
-//     Polynomial a;
-//     Polynomial::random(&a,rand()%degree);
-
-//     BOOST_REQUIRE(a.deg() == a.get_expected_degre());
-
-//     a.set_coeff(degree+1,1);
-//     BOOST_REQUIRE(degree+1 == a.get_expected_degre());
-
-// }
 
 
 BOOST_AUTO_TEST_CASE(phiReduceCPU)
@@ -859,6 +847,7 @@ BOOST_AUTO_TEST_CASE(phiReduceCPU)
       NTL::SetCoeff(a_ntl,i,conv<ZZ_p>(a.get_coeff(i)));
 
     a.reduce();
+    a %= Polynomial::global_mod;
     a_ntl %= conv<ZZ_pEX>(ZZ_pE::modulus());
 
     // std::cout << a.to_string() << std::endl;
@@ -873,7 +862,7 @@ BOOST_AUTO_TEST_CASE(phiReduceCPU)
       else
         ntl_value = conv<ZZ>(NTL::rep(NTL::coeff(a_ntl,i))[0]);
 
-      BOOST_REQUIRE(a.get_coeff(i)%Polynomial::global_mod == ntl_value);
+      BOOST_REQUIRE(a.get_coeff(i) == ntl_value);
     }
   }
 }
@@ -949,11 +938,11 @@ BOOST_AUTO_TEST_CASE(encryptandAdd)
     value.icrt();
     Polynomial value_reduced = value % t;
 
-    #ifdef VERBOSE
+    // #ifdef VERBOSE
     std::cout << "Original: " << a.to_string() << std::endl;
     std::cout << "Original *2: " << ((a+a)%t).to_string() << std::endl;
     std::cout << "Decrypted: " << a_decrypted.to_string() << std::endl;
-    #endif
+    // #endif
 
     BOOST_REQUIRE( a_decrypted == value_reduced);
   }

@@ -201,6 +201,18 @@ __global__ void copyIntegerToComplex(Complex *a,cuyasheint_t *b,int size){
   }
 }
 
+__global__ void copyAndRealignIntegerToComplex(Complex *a,cuyasheint_t *b,const unsigned oldSpacing,const unsigned int newSpacing,const unsigned int residuesQty){
+  const int tid = threadIdx.x + blockDim.x*blockIdx.x;
+  const int residueId = tid / oldSpacing;
+  const int new_array_offset = (tid % oldSpacing) + residueId*newSpacing;
+  const int old_array_offset = (tid % oldSpacing) + residueId*oldSpacing;
+
+  if(new_array_offset < newSpacing*residuesQty && old_array_offset < oldSpacing*residuesQty ){
+      a[new_array_offset].x = b[old_array_offset];
+      a[new_array_offset].y = 0;
+  }
+}
+
 __global__ void copyAndNormalizeComplexRealPartToInteger(cuyasheint_t *b,const Complex *a,const int size,const double scale,const int N){
   const int tid = threadIdx.x + blockDim.x*blockIdx.x;
   const int rid = tid / N; // Residue id
@@ -443,14 +455,26 @@ __host__ void CUDAFunctions::callPolynomialOPInteger(int opcode,cudaStream_t str
 
 }
 
-__host__ cuyasheint_t* CUDAFunctions::callPolynomialMul(cudaStream_t stream,cuyasheint_t *a,cuyasheint_t *b,int N,int NPolis){
+__host__ cuyasheint_t* CUDAFunctions::callPolynomialMul(cudaStream_t stream,
+                                                        cuyasheint_t *a,
+                                                        const bool realign_A,
+                                                        const int A_N,
+                                                        cuyasheint_t *b,
+                                                        const bool realign_B,
+                                                        const int B_N,
+                                                        const int N,
+                                                        const int NPolis){
   // This method expects that both arrays are aligned
 
   // Input:
   // stream: cudaStream
   // a: first operand
+  // realign_A: flag. true if this operand need to be realign
+  // A_N: number of coefficients for each operand. Used only if we need to realign this
   // b: second operand
-  // N: number of coefficients for each operand
+  // realign_B: flag. true if this operand need to be realign
+  // B_N: number of coefficients for each residue. Used only if we need to realign this
+  // N: number of coefficients for each residue. This is the N that should be considered for the operation.
   // NPolis: number of residues
   // All representations should be concatenated aligned
   assert((N>0)&&((N & (N - 1)) == 0));//Check if N is power of 2
@@ -583,10 +607,16 @@ __host__ cuyasheint_t* CUDAFunctions::callPolynomialMul(cudaStream_t stream,cuya
 
   dim3 blockDim(32);
   dim3 gridDim(size/32 + (size % 32 == 0? 0:1));
-  copyIntegerToComplex<<< gridDim,blockDim,1,stream >>>(d_a,a,size);
+  if(realign_A)
+    copyAndRealignIntegerToComplex<<< gridDim,blockDim,1,stream >>>(d_a,a,A_N,N,NPolis);
+  else
+    copyIntegerToComplex<<< gridDim,blockDim,1,stream >>>(d_a,a,size);
   assert(cudaGetLastError() == cudaSuccess);
 
-  copyIntegerToComplex<<< gridDim,blockDim,1,stream >>>(d_b,b,size);
+  if(realign_B)
+    copyAndRealignIntegerToComplex<<< gridDim,blockDim,1,stream >>>(d_b,b,B_N,N,NPolis);
+  else
+    copyIntegerToComplex<<< gridDim,blockDim,1,stream >>>(d_b,b,size);
   assert(cudaGetLastError() == cudaSuccess);
 
   // cufftHandle plan;
@@ -691,7 +721,7 @@ __global__ void polynomialReduction(cuyasheint_t *a,const int half,const int N,c
   const int cid = tid % (N-half);
   // const int cid = tid & (N/2-1); // We suppose that N = 2^k
 
-  if((cid+half+1) < N){
+  if((cid+half+1) < N && (residueID*N + cid + half+1) < (N*NPolis)){
     // int64_t result = a[residueID*N + cid];
     // result -= (int64_t)a[residueID*N + cid + half+1];
     // result %= CRTPrimesConstant[residueID];
@@ -707,9 +737,9 @@ __host__ void Polynomial::reduce(){
   // Just like DivRem, but here we reduce a with a cyclotomic polynomial
   Polynomial *phi = (Polynomial::global_phi);
 
-  #warning "Reduce on device has a bug. Deviating to host."
-  this->update_host_data();
-  this->set_device_updated(false);
+  // #warning "Reduce on device has a bug. Deviating to host."
+  // this->update_host_data();
+  // this->set_device_updated(false);
 
   if(!this->get_device_updated()){
     #ifdef VERBOSE
@@ -719,7 +749,6 @@ __host__ void Polynomial::reduce(){
     Polynomial rem;
     Polynomial::DivRem((*this),phi,quot, rem);
     this->copy(rem);
-    return;
   }else{
 
     #ifdef VERBOSE
@@ -744,6 +773,7 @@ __host__ void Polynomial::reduce(){
     
     this->set_host_updated(false);
     this->set_device_updated(true);
+    this->update_crt_spacing(phi->deg());
   }
 }
 

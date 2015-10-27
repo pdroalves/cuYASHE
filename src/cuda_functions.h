@@ -24,7 +24,7 @@ class CUDAFunctions{
 
     static cuyasheint_t* callPolynomialAddSub(cudaStream_t stream,cuyasheint_t *a,cuyasheint_t *b,int size,int OP);
     static void callPolynomialAddSubInPlace(cudaStream_t stream,cuyasheint_t *a,cuyasheint_t *b,int size,int OP);
-    static cuyasheint_t* callPolynomialMul(cudaStream_t stream,cuyasheint_t *a,cuyasheint_t *b, int N, int NPolis);
+    static cuyasheint_t* callPolynomialMul(cudaStream_t stream,cuyasheint_t *a,const bool realign_A,const int A_N,cuyasheint_t *b,const bool realign_B,const int B_N,const int N,const int NPolis);
     static void callPolynomialOPInteger(int opcode,cudaStream_t stream,cuyasheint_t *a,cuyasheint_t *b,int N,int NPolis);
     static cuyasheint_t* callRealignCRTResidues(cudaStream_t stream,int oldSpacing,int newSpacing, cuyasheint_t *array,int residuesSize,int residuesQty);
     static void init(int N);
