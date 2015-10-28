@@ -96,29 +96,31 @@ void Ciphertext::convert(){
 
 void Ciphertext::keyswitch(){
   uint64_t start,end;
-  start = get_cycles();
+  this->update_host_data();
 
   std::vector<Polynomial> P(Yashe::lwq);
+  for(int i = 0; i < Yashe::lwq;i++)
+    P[i].set_coeffs(this->get_crt_spacing());
   this->worddecomp(&P);
   this->set_coeffs();//Discards all coefficients
 
+  start = get_cycles();
   for(int i = 0; i < Yashe::lwq; i ++){
     Polynomial p = (P[i])*(Yashe::gamma[i]);
     *this += p;
   }
   this->reduce();
-
   end = get_cycles();
-  std::cout << (end-start) << " cycles to keyswitch" << std::endl;
+  // std::cout << (end-start) << " cycles for the loop on keyswitch" << std::endl;
 }
 
 void Ciphertext::worddecomp(std::vector<Polynomial> *P){
-  #ifdef CYCLECOUNTING
+  // #ifdef CYCLECOUNTING
   uint64_t start,end;
   start = get_cycles();
-  #endif
+  // #endif
 
-  for(int i = 0; i <= this->deg(); i++){
+  for(int i = 0; i <= this->deg() ; i++){
     ZZ c = this->get_coeff(i);
     int j = 0;
     while(c > 0){
@@ -129,8 +131,12 @@ void Ciphertext::worddecomp(std::vector<Polynomial> *P){
     }
   }
 
-  #ifdef CYCLECOUNTING
+  // #pragma omp parallel for
+  // for (unsigned int i = 0; i < P->size(); i++)
+    // (P->at(i)).update_device_data();
+  
+  // #ifdef CYCLECOUNTING
   end = get_cycles();
-  std::cout << (end-start) << " cycles to worddecomp" << std::endl;
-  #endif
+  // std::cout << (end-start) << " cycles to worddecomp" << std::endl;
+  // #endif
 }

@@ -204,7 +204,7 @@ class Integer{
 			this->crt_values.resize(P.size());
 
 			// We pick each prime
-			#pragma omp parallel for  
+			// #pragma omp parallel for  
 			for(unsigned int i = 0; i < P.size();i++)
 		    	crt_values[i] = conv<cuyasheint_t>(value % P[i]);
 			  	

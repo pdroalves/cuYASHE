@@ -272,9 +272,9 @@ class Polynomial{
       #endif
 
       // Apply CRT and copy data to global memory, if needed
-      #pragma omp parallel sections
+      // #pragma omp parallel sections
       {
-          #pragma omp section
+          // #pragma omp section
           {
 
               if(!this->get_device_updated()){
@@ -283,7 +283,7 @@ class Polynomial{
               }
 
           }
-          #pragma omp section
+          // #pragma omp section
           {
               if(!b.get_device_updated()){
                   b.crt();
@@ -745,7 +745,7 @@ class Polynomial{
           
         }catch(string s){
           #ifdef VERBOSE
-          std::err << "Exception at cudaFree: " << s << std::endl;
+          std::cout << "Exception at cudaFree: " << s << std::endl;
           #endif 
           cudaGetLastError();//Reset last error
         }
