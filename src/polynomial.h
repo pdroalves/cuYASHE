@@ -737,10 +737,18 @@ class Polynomial{
     }
     void set_device_crt_residues(cuyasheint_t *residues){
       if(d_polyCRT != 0x0){
-        // cudaError_t result = cudaFree(d_polyCRT);
-        // if(result != cudaSuccess)
-          // std::cout << "Peguei! " << std::endl;
-        // assert(result == cudaSuccess);
+        try
+        {
+          cudaError_t result = cudaFree(d_polyCRT);
+          if(result != cudaSuccess)
+            throw string( cudaGetErrorString(result));
+          
+        }catch(string s){
+          #ifdef VERBOSE
+          std::err << "Exception at cudaFree: " << s << std::endl;
+          #endif 
+          cudaGetLastError();//Reset last error
+        }
       }
       d_polyCRT = residues;
     }
@@ -765,7 +773,7 @@ class Polynomial{
         cuyasheint_t n;
 
         // Get primes
-        while( (M < (2*degree)*q*q*q) ){
+        while( (M < (2*degree)*q*q) ){
             n = NTL::GenPrime_long(primes_size);
             if( std::find(P.begin(), P.end(), n) == P.end()){
               // Does not contains

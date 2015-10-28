@@ -29,9 +29,9 @@ int CUDAFunctions::N = 0;
 __global__ void realignCRTResidues(int oldSpacing,int newSpacing, cuyasheint_t *array,cuyasheint_t *new_array,int residuesSize,int residuesQty){
   //
   const int tid = threadIdx.x + blockDim.x*blockIdx.x;
-  const int residueId = tid / residuesSize;
-  const int new_array_offset = (tid % residuesSize) + residueId*newSpacing;
-  const int old_array_offset = (tid % residuesSize) + residueId*oldSpacing;
+  const int residueId = (newSpacing < oldSpacing ? tid / newSpacing: tid / oldSpacing);
+  const int new_array_offset = (newSpacing < oldSpacing ? (tid % newSpacing) + residueId*newSpacing:(tid % oldSpacing) + residueId*newSpacing);
+  const int old_array_offset = (newSpacing < oldSpacing ? (tid % newSpacing) + residueId*oldSpacing:(tid % oldSpacing) + residueId*oldSpacing);
 
   if(new_array_offset < newSpacing*residuesQty && old_array_offset < oldSpacing*residuesQty )
     new_array[new_array_offset] = array[old_array_offset];
@@ -39,13 +39,23 @@ __global__ void realignCRTResidues(int oldSpacing,int newSpacing, cuyasheint_t *
 }
 
 
-__host__ cuyasheint_t* CUDAFunctions::callRealignCRTResidues(cudaStream_t stream,int oldSpacing,int newSpacing, cuyasheint_t *array,int residuesSize,int residuesQty){
+__host__ cuyasheint_t* CUDAFunctions::callRealignCRTResidues(cudaStream_t stream,
+                                                              const int oldSpacing,
+                                                              const int newSpacing,
+                                                              cuyasheint_t *array,
+                                                              const int residuesSize,
+                                                              const int residuesQty){
   if(oldSpacing == newSpacing)
     return NULL;
   #ifdef VERBOSE
   std::cout << "Realigning..." << std::endl;
   #endif
-  const int size = residuesSize*residuesQty;
+  
+  int size;
+  if(newSpacing < oldSpacing)
+    size = newSpacing*residuesQty;
+  else
+    size = oldSpacing *residuesQty;
   int ADDGRIDXDIM = (size%ADDBLOCKXDIM == 0? size/ADDBLOCKXDIM : size/ADDBLOCKXDIM + 1);
   dim3 gridDim(ADDGRIDXDIM);
   dim3 blockDim(ADDBLOCKXDIM);
@@ -717,20 +727,22 @@ __global__ void polynomialReduction(cuyasheint_t *a,const int half,const int N,c
   // This kernel must have N*Npolis/2 threads
 
   const int tid = threadIdx.x + blockIdx.x*blockDim.x;
-  const int residueID = tid / (N-half); 
-  const int cid = tid % (N-half);
-  // const int cid = tid & (N/2-1); // We suppose that N = 2^k
+  const int residueID = tid / half; 
+  const int cid = tid % half;
 
-  if((cid+half+1) < N && (residueID*N + cid + half+1) < (N*NPolis)){
-    // int64_t result = a[residueID*N + cid];
-    // result -= (int64_t)a[residueID*N + cid + half+1];
-    // result %= CRTPrimesConstant[residueID];
-
-    // a[residueID*N + cid] = result;
-    a[residueID*N + cid] -= a[residueID*N + cid + half+1];
+  if( (cid+half+1 < N) && (residueID*N + cid + half + 1 < N*NPolis)){
+    a[residueID*N + cid] -= a[residueID*N + cid + half + 1];
     __syncthreads();
-    a[residueID*N + cid + half+1] = 0;
+    if(residueID*N + cid == 16)
+      a[residueID*N + cid + half + 1] = tid;
+    else
+      a[residueID*N + cid + half + 1] = 0;
   }
+  // else{
+  //   if((residueID*N + cid < N*NPolis))
+  //   a[residueID*N + cid] = 0;
+  // }
+
 }
 
 __host__ void Polynomial::reduce(){
@@ -756,24 +768,25 @@ __host__ void Polynomial::reduce(){
     #endif
     
     const int half = phi->deg()-1;
-    const int N = this->CRTSPACING;
+    const int N = this->get_crt_spacing();
     const int NPolis = this->CRTPrimes.size();
-    const int size = (N-half)*NPolis;
+    const int size = half*NPolis;
 
-    dim3 blockDim(32);
-    dim3 gridDim(size/32 + (size % 32 == 0? 0:1));
+    if(size > 0){
+      dim3 blockDim(32);
+      dim3 gridDim(size/32 + (size % 32 == 0? 0:1));
 
-    // std::cout << this->polyCRT[0].size() << " == " << this->CRTSPACING << std::endl;
-    polynomialReduction<<< gridDim,blockDim >>>( this->get_device_crt_residues(),
-                                                                      half,
-                                                                      N,
-                                                                      NPolis);
-    cudaError_t result = cudaGetLastError();
-    assert(result == cudaSuccess);
-    
-    this->set_host_updated(false);
-    this->set_device_updated(true);
-    this->update_crt_spacing(phi->deg());
+      polynomialReduction<<< gridDim,blockDim >>>( this->get_device_crt_residues(),
+                                                                        half,
+                                                                        N,
+                                                                        NPolis);
+      cudaError_t result = cudaGetLastError();
+      assert(result == cudaSuccess);
+      
+      this->set_host_updated(false);
+      this->set_device_updated(true);
+      this->update_crt_spacing(phi->deg());
+    }
   }
 }
 

@@ -52,9 +52,18 @@ void Polynomial::operator delete(void *ptr){
       Polynomial *p = (Polynomial*)ptr;
 
       if(p->get_device_crt_residues() != 0x0){
-        std::cout << "cudaFree!" << std::endl;
-        cudaError_t result = cudaFree(p->get_device_crt_residues());
-        assert(result == cudaSuccess);
+        try
+        {
+          cudaError_t result = cudaFree(p->get_device_crt_residues());
+          if(result != cudaSuccess)
+            throw string( cudaGetErrorString(result));
+          
+        }catch(string s){
+          #ifdef VERBOSE
+          std::err << "Exception at cudaFree: " << s << std::endl;
+          #endif 
+          cudaGetLastError();//Reset last error
+        }
       }
 
       // free(ptr);
@@ -251,12 +260,12 @@ void Polynomial::crt(){
       
     }
 
-    // for(unsigned int j = 0; j < polyCRT.size();j++){
-    //   std::cout << "CRT Polynomial residue "<< j << ":" << std::endl; 
-    //   for(unsigned int i = 0; i < polyCRT[j].size() ;i++)
-    //     std::cout << polyCRT[j][i] << " ";
-    //   std::cout << std::endl << std::endl;
-    // }
+    for(unsigned int j = 0; j < polyCRT.size();j++){
+      std::cout << "CRT Polynomial residue "<< j << ":" << std::endl; 
+      for(unsigned int i = 0; i < polyCRT[j].size() ;i++)
+        std::cout << polyCRT[j][i] << " ";
+      std::cout << std::endl << std::endl;
+    }
 
     this->set_host_updated(true);
     this->set_device_updated(false);
@@ -283,12 +292,12 @@ void Polynomial::icrt(){
   end = get_cycles();
   std::cout << "Cycles for host update: " << (end-start) << std::endl;
   #endif
-    // for(unsigned int j = 0; j < polyCRT.size();j++){
-    //   std::cout << "ICRT Polynomial residue"<< j << ":" << std::endl; 
-    //   for(unsigned int i = 0; i < polyCRT[j].size() ;i++)
-    //     std::cout << polyCRT[j][i] << " ";
-    //   std::cout << std::endl << std::endl;
-    // }
+    for(unsigned int j = 0; j < polyCRT.size();j++){
+      std::cout << "ICRT Polynomial residue"<< j << ":" << std::endl; 
+      for(unsigned int i = 0; i < polyCRT[j].size() ;i++)
+        std::cout << polyCRT[j][i] << " ";
+      std::cout << std::endl << std::endl;
+    }
   #ifdef CYCLECOUNTING
   start = get_cycles();
   #endif
@@ -335,8 +344,9 @@ void Polynomial::icrt(){
 
     // Iteration over coefficients
     #pragma omp parallel for
-    for(unsigned int j = 0; j < this->polyCRT[i].size();j++)
+    for(unsigned int j = 0; j < this->polyCRT[i].size();j++){
       this->coefs[j] += Mpi*( invMpi*(this->polyCRT[i][j]) % pi);  
+    }
     #ifdef CYCLECOUNTING
     end_iteration = get_cycles();
     std::cout << "Cycles in the inner loop: " << (end_iteration-start_iteration) << std::endl;
