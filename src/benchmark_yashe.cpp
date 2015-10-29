@@ -14,7 +14,7 @@
 
 #define BILLION  1000000000L
 #define MILLION  1000000L
-#define N 20
+#define N 10
 
 double compute_time_ms(struct timespec start,struct timespec stop){
   return (( stop.tv_sec - start.tv_sec )*BILLION + ( stop.tv_nsec - start.tv_nsec ))/MILLION;
@@ -71,13 +71,14 @@ int main(int argc, char* argv[]){
     // Yashe
     cipher = Yashe();
 
+    Polynomial::gen_crt_primes(Polynomial::global_mod,8);
     CUDAFunctions::init(64);// Warming cuda api
     ////////////////////////////////
 
     ofstream encrypt;
     ofstream decrypt;
     ofstream add_with_memcopy;
-    ofstream add_withou_memcopy;
+    ofstream add_without_memcopy;
     ofstream mult_with_memcopy;
     ofstream mult_without_memcopy;
     ofstream keyswitch;
@@ -85,7 +86,7 @@ int main(int argc, char* argv[]){
     std::string encrypt_filename;
     std::string decrypt_filename;
     std::string add_with_memcopy_filename;
-    std::string add_withou_memcopy_filename;
+    std::string add_withou_memcopy_tfilename;
     std::string mult_with_memcopy_filename;
     std::string mult_without_memcopy_filename;
     std::string keyswitch_filename;
@@ -96,7 +97,7 @@ int main(int argc, char* argv[]){
       encrypt_filename = "encrypt_"+current_date_time()+"_"+suffix+".dat";
       decrypt_filename = "decrypt_"+current_date_time()+"_"+suffix+".dat";
       add_with_memcopy_filename = "add_with_memcopy_"+current_date_time()+"_"+suffix+".dat";
-      add_withou_memcopy_filename = "add_withou_memcopy_"+current_date_time()+"_"+suffix+".dat";
+      add_withou_memcopy_tfilename = "add_withou_tmemcopy_"+current_date_time()+"_"+suffix+".dat";
       mult_with_memcopy_filename = "mult_with_memcopy_"+current_date_time()+"_"+suffix+".dat";
       mult_without_memcopy_filename = "mult_without_memcopy_"+current_date_time()+"_"+suffix+".dat";
       keyswitch_filename = "keyswitch_"+current_date_time()+"_"+suffix+".dat";
@@ -104,7 +105,7 @@ int main(int argc, char* argv[]){
       encrypt_filename = "encrypt_"+current_date_time()+".dat";
       decrypt_filename = "decrypt_"+current_date_time()+".dat";
       add_with_memcopy_filename = "add_with_memcopy_"+current_date_time()+".dat";
-      add_withou_memcopy_filename = "add_withou_memcopy_"+current_date_time()+".dat";
+      add_withou_memcopy_tfilename = "add_withou_tmemcopy_"+current_date_time()+".dat";
       mult_with_memcopy_filename = "mult_with_memcopy_"+current_date_time()+".dat";
       mult_without_memcopy_filename = "mult_without_memcopy_"+current_date_time()+".dat";
       keyswitch_filename = "keyswitch_"+current_date_time()+".dat";
@@ -112,7 +113,7 @@ int main(int argc, char* argv[]){
     encrypt.open (encrypt_filename);
     decrypt.open (decrypt_filename);
     add_with_memcopy.open (add_with_memcopy_filename);
-    add_withou_memcopy.open (add_withou_memcopy_filename);
+    add_without_memcopy.open (add_withou_memcopy_tfilename);
     mult_with_memcopy.open (mult_with_memcopy_filename);
     mult_without_memcopy.open (mult_without_memcopy_filename);
     keyswitch.open (keyswitch_filename);
@@ -120,7 +121,7 @@ int main(int argc, char* argv[]){
     std::cout << "Writing encrypt data to " << encrypt_filename << std::endl;
     std::cout << "Writing decrypt data to " << decrypt_filename << std::endl;
     std::cout << "Writing add_with_memcopy data to " << add_with_memcopy_filename << std::endl;
-    std::cout << "Writing add_withou_memcopy data to " << add_withou_memcopy_filename << std::endl;
+    std::cout << "Writing add_without_memcopy data to " << add_withou_memcopy_tfilename << std::endl;
     std::cout << "Writing mult_with_memcopy data to " << mult_with_memcopy_filename << std::endl;
     std::cout << "Writing mult_without_memcopy data to " << mult_without_memcopy_filename << std::endl;
     std::cout << "Writing keyswitch data to " << keyswitch_filename << std::endl;
@@ -247,14 +248,13 @@ int main(int argc, char* argv[]){
     clock_gettime( CLOCK_REALTIME, &stop);
     diff = compute_time_ms(start,stop)/N;
     std::cout << "Homomorphic Addition) Time measured without memory copy: " << diff << " ms" << std::endl;
-    add_withou_memcopy << d << " " << diff << std::endl;;
+    add_without_memcopy << d << " " << diff << std::endl;;
 
     Polynomial::random(&a,d-1);
     Polynomial::random(&b,d-1);
-
     ct_a = cipher.encrypt(a);
-    ct_b = cipher.encrypt(b);
-        
+    ct_b = cipher.encrypt(b);    
+
     clock_gettime( CLOCK_REALTIME, &start);
         for(int i = 0; i < N;i++){
           #ifdef VERBOSE
@@ -262,9 +262,6 @@ int main(int argc, char* argv[]){
           #endif
 
           Ciphertext c =  (ct_a*ct_b);
-          // delete &a;
-          // ct_a.set_device_updated(false);
-          // ct_b.set_device_updated(false);
           cudaDeviceSynchronize();
         }
         
@@ -272,6 +269,7 @@ int main(int argc, char* argv[]){
     diff = compute_time_ms(start,stop)/N;
     std::cout << "Homomorphic Multiplication) Time measured with memory copy: " << diff << " ms" << std::endl;
     mult_with_memcopy << d << " " << diff << std::endl;;
+
 
     // ct_a.crt();
     // ct_b.crt();

@@ -22,18 +22,45 @@ class CUDAFunctions{
     static cufftHandle plan;
     #endif
 
-    static cuyasheint_t* callPolynomialAddSub(cudaStream_t stream,cuyasheint_t *a,cuyasheint_t *b,int size,int OP);
-    static void callPolynomialAddSubInPlace(cudaStream_t stream,cuyasheint_t *a,cuyasheint_t *b,int size,int OP);
-    static cuyasheint_t* callPolynomialMul(cudaStream_t stream,cuyasheint_t *a,const bool realign_A,const int A_N,cuyasheint_t *b,const bool realign_B,const int B_N,const int N,const int NPolis);
-    static void callPolynomialOPInteger(int opcode,cudaStream_t stream,cuyasheint_t *a,cuyasheint_t *b,int N,int NPolis);
-    static cuyasheint_t* callRealignCRTResidues(cudaStream_t stream,int oldSpacing,int newSpacing, cuyasheint_t *array,int residuesSize,int residuesQty);
+    static cuyasheint_t* callPolynomialAddSub(cudaStream_t stream,
+                                            cuyasheint_t *a,
+                                            cuyasheint_t *b,
+                                            int size,
+                                            int OP);
+    static void callPolynomialAddSubInPlace(cudaStream_t stream,
+                                            cuyasheint_t *a,
+                                            cuyasheint_t *b,
+                                            int size,
+                                            int OP);
+    static cuyasheint_t* callPolynomialMul(cudaStream_t stream,
+                                            cuyasheint_t *a,
+                                            const bool realign_A,
+                                            const int A_N,
+                                            cuyasheint_t *b,
+                                            const bool realign_B,
+                                            const int B_N,
+                                            const int N,
+                                            const int NPolis);
+    static cuyasheint_t* callPolynomialOPInteger( const int opcode,
+                                            cudaStream_t stream,
+                                            cuyasheint_t *a,
+                                            cuyasheint_t *integer_array,
+                                            const int N,
+                                            const int NPolis);
+    static cuyasheint_t* callRealignCRTResidues(cudaStream_t stream,
+                                            int oldSpacing,
+                                            int newSpacing,
+                                            cuyasheint_t *array,
+                                            int residuesSize,
+                                            int residuesQty);
     static void init(int N);
     static void write_crt_primes();
   private:
 };
 #ifdef NTTMUL
 __device__ __host__ inline cuyasheint_t s_rem (uint64_t a);
-__device__ __host__  uint64_t s_mul(uint64_t a,uint64_t b);
+__device__ __host__  uint64_t s_mul(uint64_t a,
+                                    uint64_t b);
 #endif
 
 #endif

@@ -24,5 +24,6 @@ Polynomial Distribution::get_sample(int degree){
   for(int i = 0; i <= degree; i++)
     p.set_coeff(i,(rand() % mod - mod/2) - phase);
 
+  p.set_crt_spacing(degree+1);
   return p;
 }

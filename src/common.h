@@ -70,7 +70,7 @@ P common_addition(P *a,P *b){
 			c.set_device_crt_residues(d_result);
 			c.set_host_updated(false);
 			c.set_device_updated(true);
-			cudaDeviceSynchronize();
+			// cudaDeviceSynchronize();
 			return c;
 	#ifdef MAYADDONCPU
 		}
@@ -131,6 +131,8 @@ void common_addition_inplace(P *a,P *b){
 
 template <class P>
 P common_multiplication(P *a, P *b){
+  
+  uint64_t start,end;
 
   // Check align
   int needed_spacing = pow(2,ceil(log2(a->get_crt_spacing()+b->get_crt_spacing())));
@@ -145,16 +147,16 @@ P common_multiplication(P *a, P *b){
   bool update_A_spacing = false; 
   bool update_B_spacing = false;
   if(a->get_crt_spacing() != needed_spacing){
-  	if(!a->get_device_updated())
-  		a->update_crt_spacing(needed_spacing);
-  	else
+  	// if(!a->get_device_updated())
+  		// a->update_crt_spacing(needed_spacing);
+  	// else
 	  	update_A_spacing = true;
   	
   }
   if(b->get_crt_spacing() != needed_spacing){
-  	if(!b->get_device_updated())
-  		b->update_crt_spacing(needed_spacing);
-  	else
+  	// if(!b->get_device_updated())
+  		// b->update_crt_spacing(needed_spacing);
+  	// else
 	  	update_B_spacing = true;
   }
 
@@ -187,6 +189,7 @@ P common_multiplication(P *a, P *b){
 		}
       }
   }
+  start = get_cycles();
 
   cuyasheint_t *d_result = CUDAFunctions::callPolynomialMul(a->get_stream(),
 															a->get_device_crt_residues(),
@@ -198,11 +201,13 @@ P common_multiplication(P *a, P *b){
 															needed_spacing,
 															a->CRTPrimes.size());
 
-  P c = P(a->get_mod(),a->get_phi(),a->CRTSPACING);
+  end = get_cycles();
+  P c = P(a->get_mod(),a->get_phi(),needed_spacing);
   c.set_device_crt_residues(d_result);
   c.set_host_updated(false);
   c.set_device_updated(true);
   // cudaDeviceSynchronize();
+  // std::cout << (end-start) << " cycles for polynomial x polynomial mul" << std::endl;
   return c;
 }
 #endif

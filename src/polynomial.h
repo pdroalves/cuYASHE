@@ -299,7 +299,7 @@ class Polynomial{
       c->set_device_crt_residues(d_result);
       c->set_host_updated(false);
       c->set_device_updated(true);
-      cudaDeviceSynchronize();
+      // cudaDeviceSynchronize();
       return c;
     }
     Polynomial operator-=(Polynomial &b){
@@ -662,6 +662,8 @@ class Polynomial{
 
         this->set_device_updated(false);
         this->set_host_updated(true);
+        if(this->get_crt_spacing() < (this->deg()+1))
+          this->set_crt_spacing(this->deg()+1);
     }
     void set_coeff(int index,int value){
 
@@ -686,6 +688,8 @@ class Polynomial{
       }
       this->set_device_updated(false);
       this->set_host_updated(true);
+      if(this->get_crt_spacing() < (this->deg()+1))
+        this->set_crt_spacing(this->deg()+1);  
     }
     void set_coeffs(std::vector<ZZ> values){
 
@@ -694,6 +698,8 @@ class Polynomial{
 
       this->set_device_updated(false);
       this->set_host_updated(true);
+      if(this->get_crt_spacing() < (this->deg()+1))
+        this->set_crt_spacing(this->deg()+1);  
     }
     void set_coeffs(){
 
@@ -709,6 +715,9 @@ class Polynomial{
 
       this->set_device_updated(false);
       this->set_host_updated(true);
+      // if(this->get_crt_spacing() < (this->deg()+1))
+        // this->set_crt_spacing(Polynomial::global_phi->deg()+1);
+
     }
      void set_coeffs(int size){
       // Prepare this polynomial to receive size coefficientes
@@ -721,6 +730,8 @@ class Polynomial{
 
       this->set_device_updated(false);
       this->set_host_updated(true);
+      if(this->get_crt_spacing() < (size))
+        this->set_crt_spacing(size);
     }
     std::vector<std::vector<cuyasheint_t> > get_crt_residues(){
       std::vector<std::vector<cuyasheint_t> > crt_residues_copy(this->polyCRT);
@@ -796,8 +807,8 @@ class Polynomial{
         #ifdef VERBOSE
         std::cout << "Primes size: " << primes_size << std::endl;
         std::cout << "Primes set - M:" << Polynomial::CRTProduct << std::endl;
-        std::cout << P.size() << " primes generated." << std::endl;
         #endif
+        std::cout << P.size() << " primes generated." << std::endl;
 
         // Send primes to GPU
         CUDAFunctions::write_crt_primes();

@@ -1,4 +1,4 @@
-OPT = -O3
+OPT = -O0
 
 CUDA_CC = nvcc $(OPT) -G -g -std=c++11
 CC = g++ -std=c++11 -g -Wall -Wfatal-errors -m64 $(OPT)
@@ -28,8 +28,11 @@ tests:  polynomial.o cuda_functions.o test.o test_ctpt.o test_ct_mul.o test_mul.
 	# $(CUDA_CC) $(CUDA_ARCH) $(LCUDA) $(ICUDA) -o $(TESTBIN)_ctpt test_ctpt.o polynomial.o cuda_functions.o ciphertext.o distribution.o yashe.o common.o integer.o -lcufft -Xcompiler $(OPENMP) $(NTL)
 	# $(CUDA_CC) $(CUDA_ARCH) $(LCUDA) $(ICUDA) -o $(TESTBIN)_crt test_crt.o polynomial.o cuda_functions.o ciphertext.o distribution.o yashe.o common.o integer.o -lcufft -Xcompiler $(OPENMP) $(NTL)
 	$(CUDA_CC) $(CUDA_ARCH) $(LCUDA) $(ICUDA) -o $(TESTBIN)_reduce test_reduce.o polynomial.o cuda_functions.o ciphertext.o distribution.o yashe.o common.o integer.o -lcufft -Xcompiler $(OPENMP) $(NTL)
-	$(CUDA_CC) $(CUDA_ARCH) $(LCUDA) $(ICUDA) -o $(TESTBIN)_ct_mul test_ct_mul.o polynomial.o cuda_functions.o ciphertext.o distribution.o yashe.o common.o integer.o -lcufft -Xcompiler $(OPENMP) $(NTL)
+	# $(CUDA_CC) $(CUDA_ARCH) $(LCUDA) $(ICUDA) -o $(TESTBIN)_ct_mul test_ct_mul.o polynomial.o cuda_functions.o ciphertext.o distribution.o yashe.o common.o integer.o -lcufft -Xcompiler $(OPENMP) $(NTL)
 	$(CUDA_CC) $(CUDA_ARCH) $(LCUDA) $(ICUDA) -o $(TESTBIN)_mul test_mul.o polynomial.o cuda_functions.o ciphertext.o distribution.o yashe.o common.o integer.o -lcufft -Xcompiler $(OPENMP) $(NTL)
+	
+test_fft:
+	$(CUDA_CC) $(CUDA_ARCH) $(LCUDA) $(ICUDA) -o $(TESTBIN)_fft test_fft.cu -lcufft
 
 benchmarks:benchmark_yashe.o yashe.o benchmark_polynomial.o polynomial.o cuda_functions.o distribution.o ciphertext.o integer.o
 		$(CUDA_CC) $(CUDA_ARCH) $(LCUDA) $(ICUDA)  -o $(BENCHMARKPOLYBIN) benchmark_polynomial.o polynomial.o cuda_functions.o common.o integer.o -lcufft -Xcompiler $(OPENMP) $(NTL) $(LTIME_MEASURE)
@@ -51,7 +54,7 @@ integer.o:integer.cpp
 	$(CC) -c integer.cpp -o integer.o $(NTL) $(LCUDA) $(OPENMP) $(ICUDA)
 
 cuda_functions.o:cuda_functions.cu
-	$(CUDA_CC) $(CUDA_ARCH) -c cuda_functions.cu $(LCUDA) $(ICUDA) -lcufft -Xcompiler -m64
+	$(CUDA_CC) $(CUDA_ARCH) -c cuda_functions.cu $(LCUDA) $(ICUDA) -lcufft -Xcompiler $(OPENMP)
 
 
 distribution.o:distribution.cpp

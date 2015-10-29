@@ -38,7 +38,6 @@ struct PolySuite
         BOOST_TEST_MESSAGE("setup PolySuite");
 
         degree = 8;
-        CUDAFunctions::init(degree);
 
         Polynomial::global_mod = conv<ZZ>("1171313591017775093490277364417L"); // Defines default GF(q)
         Polynomial::BuildNthCyclotomic(&phi,degree);
@@ -55,6 +54,7 @@ struct PolySuite
         ZZ_pE::init(NTL_Phi);
 
         Polynomial::gen_crt_primes(Polynomial::global_mod,degree);
+        CUDAFunctions::init(degree);
     }
 
     ~PolySuite()
@@ -103,9 +103,9 @@ struct YasheSuite
         }
         ZZ_pE::init(NTL_Phi);
 
-        CUDAFunctions::init(2*degree);
 
         Polynomial::gen_crt_primes(Polynomial::global_mod,degree);
+        CUDAFunctions::init(2*degree);
 
         // Yashe
         cipher = Yashe();
@@ -818,11 +818,15 @@ BOOST_AUTO_TEST_CASE(modularInversion)
   Polynomial aInv = Polynomial::InvMod(a,Polynomial::global_phi);
   
   Polynomial result = a*aInv;
-  result %= Polynomial::global_mod;
+  std::cout << result.to_string() << std::endl;
+  // result %= Polynomial::global_mod;
   
+  std::cout << "a: " << a.to_string() << std::endl;
+  std::cout << "aInv: " << aInv.to_string() << std::endl;
+  std::cout << "result before reduce: " << result.to_string() << std::endl;
   result.reduce();
   result %= a.get_mod();
-  std::cout << result.to_string() << std::endl;
+  std::cout << "result after reduce: " << result.to_string() << std::endl;
 
   Polynomial one = Polynomial();
   one.set_coeff(0,1);

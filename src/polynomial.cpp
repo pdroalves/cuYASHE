@@ -34,12 +34,8 @@ Polynomial Polynomial::operator*(ZZ b){
       if(!p.get_host_updated()){
         // Operate on device
         Integer I = b;
-        CUDAFunctions::callPolynomialOPInteger(MUL,
-                                                p.get_stream(),
-                                                p.get_device_crt_residues(),
-                                                I.get_device_crt_residues(),
-                                                p.CRTSPACING,Polynomial::CRTPrimes.size());
-      }else{
+        return I*p;
+        }else{
         //#pragma omp parallel for
         for(int i = 0; i <= p.deg();i++)
           p.set_coeff(i,p.get_coeff(i)*b);
@@ -110,13 +106,11 @@ void Polynomial::update_device_data(unsigned int usable_ratio){
   // "usable_ratio" could be used to avoid unnecessary copies
   if(this->get_device_updated())
     return;
-  else if(!this->get_crt_computed()){
+  else if(!this->get_crt_computed())
     this->crt();
-  }
 
-   #ifdef VERBOSEMEMORYCOPY
-  uint64_t start = get_cycles();
-  #endif
+   // #ifdef VERBOSEMEMORYCOPY
+  // #endif
 
   #if defined(VERBOSE) || defined(VERBOSEMEMORYCOPY) 
   std::cout << "Copying data to GPU." << std::endl;
@@ -137,21 +131,6 @@ void Polynomial::update_device_data(unsigned int usable_ratio){
     this->set_crt_spacing(new_spacing);
   }
 
-  // cuyasheint_t *d_data;
-  // cudaError_t result = cudaMalloc((void**)&d_data,this->get_crt_spacing()*(this->polyCRT.size())*sizeof(cuyasheint_t));
-  // assert(result == cudaSuccess);
-
-  // cuyasheint_t *aux;
-  // // aux = (cuyasheint_t*)malloc(this->CRTSPACING*(this->polyCRT.size())*sizeof(cuyasheint_t));
-  // aux = (cuyasheint_t*)calloc(this->get_crt_spacing()*(1+this->polyCRT.size()),sizeof(cuyasheint_t));
-  // for(unsigned int i=0;i < this->polyCRT.size();i++)
-  //   // memcpy(aux+this->get_crt_spacing()*i,&(this->polyCRT[i][0]),(this->polyCRT[i].size()/usable_ratio)*sizeof(cuyasheint_t));
-  //   memcpy(aux+this->get_crt_spacing()*i,&(this->polyCRT[i][0]),(this->polyCRT[i].size())*sizeof(cuyasheint_t));
-  
-
-  // cudaError_t result = cudaMemcpy(this->get_device_crt_residues(), aux , this->get_crt_spacing()*(this->polyCRT.size())*sizeof(cuyasheint_t), cudaMemcpyHostToDevice);
-  // assert(result == cudaSuccess);
-
   cudaError_t result = cudaMemsetAsync( this->get_device_crt_residues(),
                                         0,
                                         this->get_crt_spacing()*(this->polyCRT.size())*sizeof(cuyasheint_t),
@@ -167,17 +146,11 @@ void Polynomial::update_device_data(unsigned int usable_ratio){
   }
 
 
-  // #warning "free(aux) commented"
-  // free(aux);
-  // cudaError_t result = cudaDeviceSynchronize();
-  // assert(result == cudaSuccess);
   this->ON_COPY = false;
   this->set_device_updated(true);
 
-  #ifdef VERBOSEMEMORYCOPY
-  uint64_t end = get_cycles();
-  std::cout << "Cycles needed: " << (end-start) <<std::endl;
-  #endif
+  // #ifdef VERBOSEMEMORYCOPY
+  // #endif
 }
 
 void Polynomial::update_host_data(){
@@ -226,13 +199,7 @@ void Polynomial::update_host_data(){
 void Polynomial::crt(){
     // "The product of those prime numbers should be larger than the potentially largest coefficient of polynomial c, that we will obtain as a result of a computation for accurate recovery through ICRT." produtorio_{i=1}^n (pi) > n*q^2
 
-    // if(this->CRTProduct == NULL or this->CRTPrimes == NULL){
-    //     throw -1;
-    // }
-
-    // Escapes, if possible
-
-    
+    // Escapes, if possible    
     if(this->get_crt_computed())
       return;
     else if(!this->get_host_updated())
@@ -242,31 +209,25 @@ void Polynomial::crt(){
     std::vector<cuyasheint_t> P = this->CRTPrimes;
     this->polyCRT.resize(P.size());
 
-    // Updated CRTSPACINg
-    // if(this->get_crt_spacing() < (Polynomial::global_phi->deg()))
-    //   this->update_crt_spacing((Polynomial::global_phi->deg()));
-
-
     // Extract the coefficients to a array of ZZs
     std::vector<ZZ> array = this->get_coeffs();
 
     // We pick each prime
-    // #pragma omp parallel for  
     for(unsigned int i = 0; i < P.size();i++){
       this->polyCRT[i].resize(array.size());
-
+  
+    #pragma omp parallel for  
       for(unsigned int j = 0; j < array.size();j++)
         this->polyCRT[i][j] = conv<cuyasheint_t>(array[j] % P[i]);
-      
     }
+
 
     // for(unsigned int j = 0; j < polyCRT.size();j++){
     //   std::cout << "CRT Polynomial residue "<< j << ":" << std::endl; 
     //   for(unsigned int i = 0; i < polyCRT[j].size() ;i++)
-    //     std::cout << polyCRT[j][i] << " ";
+    //     std::cout << polyCRT[j][i] << ", ";
     //   std::cout << std::endl << std::endl;
     // }
-
     this->set_host_updated(true);
     this->set_device_updated(false);
     this->set_crt_computed(true);
@@ -295,7 +256,7 @@ void Polynomial::icrt(){
     // for(unsigned int j = 0; j < polyCRT.size();j++){
     //   std::cout << "ICRT Polynomial residue"<< j << ":" << std::endl; 
     //   for(unsigned int i = 0; i < polyCRT[j].size() ;i++)
-    //     std::cout << polyCRT[j][i] << " ";
+    //     std::cout << polyCRT[j][i] << ", ";
     //   std::cout << std::endl << std::endl;
     // }
   #ifdef CYCLECOUNTING
@@ -322,7 +283,7 @@ void Polynomial::icrt(){
   start = get_cycles();
   #endif
   // Iteration over all primes
-  #pragma omp parallel for
+  // #pragma omp parallel for
   for(unsigned int i = 0; i < primes.size();i++){
     // Get a prime
     #ifdef CYCLECOUNTING
@@ -342,6 +303,11 @@ void Polynomial::icrt(){
 
     if(&this->polyCRT[i] == NULL)
       std::cout << &this->polyCRT[i] << std::endl;
+
+    // Remove last 0-coefficients
+    while(this->polyCRT[i].size() >= 0 &&
+          this->polyCRT[i][this->polyCRT[i].size()-1] == ZZ(0))
+      this->polyCRT[i].pop_back();
 
     // Iteration over coefficients
     for(unsigned int j = 0; j < this->polyCRT[i].size();j++){
@@ -372,8 +338,8 @@ void Polynomial::icrt(){
 
   // Correction on negative values
   for(unsigned int i = 0; i < this->coefs.size(); i++){
-    // std::cout << this->coefs[i] << " > " << Polynomial::global_mod << "?" << std::endl;
-    this->coefs[i] = (this->coefs[i] > Polynomial::global_mod)? (this->coefs[i]-M) % Polynomial::global_mod : this->coefs[i]; 
+    // std::cout << "Correção: " << this->coefs[i] << " > " << Polynomial::global_mod << "?" << std::endl;
+    this->coefs[i] = (this->coefs[i] >= Polynomial::global_mod)? (this->coefs[i]-M) % Polynomial::global_mod : this->coefs[i]; 
     // std::cout << this->coefs[i] << std::endl;
   }
   // this->update_crt_spacing(this->deg()+1);
@@ -481,8 +447,6 @@ void Polynomial::DivRem(Polynomial a,Polynomial b,Polynomial &quot,Polynomial &r
 
       for(unsigned int i = 0;i <= half;i++)
         rem.set_coeff(i,a.get_coeff(i)-a.get_coeff(i+half+1));
-      
-
     }else{
       throw "DivRem: I don't know how to div this!";
     }

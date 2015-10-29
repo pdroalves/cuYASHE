@@ -2,12 +2,10 @@
 #include "cuda_functions.h"
 
 void Integer::update_device_data(){
-    // uint64_t start = cycles();
-
     if(this->get_device_updated())
-    	return;
+      return;
     else if(!this->get_crt_computed())
-    	this->crt();
+      this->crt();
 
     #ifdef VERBOSE
     std::cout << "Copying data to GPU." << std::endl;
@@ -16,16 +14,18 @@ void Integer::update_device_data(){
     cudaError_t result;
     this->ON_COPY = true;
 
-    // if(this->d_polyCRT == NULL){
-      result = cudaMalloc((void**)&this->d_crt_values,(this->crt_values.size())*sizeof(cuyasheint_t));
-      assert(result == cudaSuccess);
-    // }
-
-    result = cudaMemcpy(this->d_crt_values, &crt_values[0] , (this->crt_values.size())*sizeof(cuyasheint_t), cudaMemcpyHostToDevice);
+    result = cudaMalloc((void**)&this->d_crt_values,
+                          (this->crt_values.size())*sizeof(cuyasheint_t));
     assert(result == cudaSuccess);
 
-    result = cudaDeviceSynchronize();
+    result = cudaMemcpyAsync(this->d_crt_values,
+                            &crt_values[0] ,
+                            (this->crt_values.size())*sizeof(cuyasheint_t),
+                            cudaMemcpyHostToDevice);
     assert(result == cudaSuccess);
+
+    // result = cudaDeviceSynchronize();
+    // assert(result == cudaSuccess);
 
     this->ON_COPY = false;
     this->set_device_updated(true);
@@ -107,40 +107,43 @@ Polynomial Integer::operator+(Polynomial &a){
 }
 
 Polynomial Integer::operator*(Polynomial &a){
-    Polynomial *p;
-    p = new Polynomial();
-    p->copy(a);
-    // Apply CRT and copy data to global memory, if needed
-    // #pragma omp parallel sections num_threads(2)
-    {
-        // #pragma omp section
-        {
-          #ifdef VERBOSE
-            std::cout << "p: " << std::endl;
-            #endif
-          if(!p->get_device_updated()){
-            p->update_device_data();
-          }
 
+  // Apply CRT and copy data to global memory, if needed
+  // #pragma omp parallel sections num_threads(2)
+  {
+      // #pragma omp section
+      {
+        #ifdef VERBOSE
+          std::cout << "this: " << std::endl;
+          #endif
+        if(!a.get_device_updated()){
+          a.update_device_data();
         }
-        // #pragma omp section
-        {
-          #ifdef VERBOSE
-            std::cout << "b: " << std::endl;
-            #endif
-            if(!this->get_device_updated()){
-            this->update_device_data();
-          }
-        }
-    }
 
-    CUDAFunctions::callPolynomialOPInteger( MUL,
-                                            p->get_stream(),
-                                            p->get_device_crt_residues(),
-                                            this->get_device_crt_residues(),
-                                            p->get_crt_spacing(),
-                                            Polynomial::CRTPrimes.size());
-    p->set_host_updated(false);
-    p->set_device_updated(true);
-    return p;
+      }
+      // #pragma omp section
+      {
+        #ifdef VERBOSE
+          std::cout << "b: " << std::endl;
+          #endif
+          if(!this->get_device_updated()){
+          this->update_device_data();
+        }
+      }
+  }
+
+  cuyasheint_t *result = CUDAFunctions::callPolynomialOPInteger( MUL,
+                                          a.get_stream(),
+                                          a.get_device_crt_residues(),
+                                          this->get_device_crt_residues(),
+                                          a.get_crt_spacing(),
+                                          Polynomial::CRTPrimes.size());
+
+  Polynomial *p = new Polynomial();
+  p->set_crt_spacing(a.get_crt_spacing());
+  p->set_device_crt_residues(result);
+
+  p->set_host_updated(false);
+  p->set_device_updated(true);
+  return p;
 }

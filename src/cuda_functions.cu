@@ -202,7 +202,7 @@ __global__ void copyIntegerToComplex(Complex *a,cuyasheint_t *b,int size){
   const int tid = threadIdx.x + blockDim.x*blockIdx.x;
 
   if(tid < size ){
-      a[tid].x =  (b[tid]);
+      a[tid].x =   __ull2double_rn(b[tid]);
       // printf("%ld => %f\n\n",b[tid],a[tid].x);
       a[tid].y = 0;
   }else{
@@ -213,13 +213,16 @@ __global__ void copyIntegerToComplex(Complex *a,cuyasheint_t *b,int size){
 
 __global__ void copyAndRealignIntegerToComplex(Complex *a,cuyasheint_t *b,const unsigned oldSpacing,const unsigned int newSpacing,const unsigned int residuesQty){
   const int tid = threadIdx.x + blockDim.x*blockIdx.x;
-  const int residueId = tid / oldSpacing;
-  const int new_array_offset = (tid % oldSpacing) + residueId*newSpacing;
-  const int old_array_offset = (tid % oldSpacing) + residueId*oldSpacing;
+  const int residueId = (newSpacing < oldSpacing ? tid / newSpacing: tid / oldSpacing);
+  const int new_array_offset = (newSpacing < oldSpacing ? (tid % newSpacing) + residueId*newSpacing:(tid % oldSpacing) + residueId*newSpacing);
+  const int old_array_offset = (newSpacing < oldSpacing ? (tid % newSpacing) + residueId*oldSpacing:(tid % oldSpacing) + residueId*oldSpacing);
 
   if(new_array_offset < newSpacing*residuesQty && old_array_offset < oldSpacing*residuesQty ){
-      a[new_array_offset].x = b[old_array_offset];
+      a[new_array_offset].x =  __ull2double_rn(b[old_array_offset]);
       a[new_array_offset].y = 0;
+  }else{
+    a[new_array_offset].x = 0;
+    a[new_array_offset].y = 0;
   }
 }
 
@@ -412,7 +415,12 @@ __global__ void polynomialNTTMul(cuyasheint_t *a,const cuyasheint_t *b,const int
 }
 #endif
 
-__global__ void polynomialOPInteger(int opcode,cuyasheint_t *a,cuyasheint_t *b,const int N,const int NPolis){
+__global__ void polynomialOPInteger(const int opcode,
+                                      const cuyasheint_t *a,
+                                      const cuyasheint_t *integer_array,
+                                      cuyasheint_t *output,
+                                      const int N,
+                                      const int NPolis){
   // We have one thread per polynomial coefficient on 32 threads-block.
   // For CRT polynomial adding, all representations should be concatenated aligned
   const int size = N*NPolis;
@@ -427,31 +435,40 @@ __global__ void polynomialOPInteger(int opcode,cuyasheint_t *a,cuyasheint_t *b,c
     {
     case ADD:
       if(cid == 0){
-        a[tid] += b[rid];
-        // a[tid] %= CRTPrimesConstant[rid];
+        output[tid] = a[tid] + integer_array[rid];
+        // output[tid] = a[tid] % CRTPrimesConstant[rid];
       }
       break;
     case SUB:
       if(cid == 0){
-        a[tid] -= b[rid];
-        // a[tid] %= CRTPrimesConstant[rid];
+        output[tid] = a[tid] - integer_array[rid];
+        // output[tid] = a[tid] % CRTPrimesConstant[rid];
       }
       break;
     case DIV:
-        a[tid] /= b[rid];
+        output[tid] = a[tid] / integer_array[rid];
       break;
     case MUL:
-        a[tid] *= b[rid];
-        // a[tid] %= CRTPrimesConstant[rid];
+        output[tid] = a[tid] * integer_array[rid];
+        // output[tid] = a[tid] % CRTPrimesConstant[rid];
       break;
     case MOD:
-        a[tid] %= b[rid];
+        output[tid] = a[tid] % integer_array[rid];
+      break;
+    default:
+      //This case shouldn't be used. I will use 42 to recognize if we got in this case.
+      output[tid] = 42;
       break;
     }
 
 }
 
-__host__ void CUDAFunctions::callPolynomialOPInteger(int opcode,cudaStream_t stream,cuyasheint_t *a,cuyasheint_t *b,int N,int NPolis)
+__host__ cuyasheint_t* CUDAFunctions::callPolynomialOPInteger(const int opcode,
+                                                      cudaStream_t stream,
+                                                      cuyasheint_t *a,
+                                                      cuyasheint_t *integer_array,
+                                                      const int N,
+                                                      const int NPolis)
 {
   // This method applies a 0-degree operation over all CRT residues
   const int size = N*NPolis;
@@ -460,9 +477,20 @@ __host__ void CUDAFunctions::callPolynomialOPInteger(int opcode,cudaStream_t str
   const dim3 gridDim(ADDGRIDXDIM);
   const dim3 blockDim(ADDBLOCKXDIM);
 
-  polynomialOPInteger<<< gridDim,blockDim, 1, stream>>> (opcode,a,b,N,NPolis);
+  cuyasheint_t *d_pointer;
+  cudaError_t result = cudaMalloc((void**)&d_pointer,
+                                  N*NPolis*sizeof(cuyasheint_t));        
+  assert(result == cudaSuccess);
+
+  polynomialOPInteger<<< gridDim,blockDim, 1, stream>>> ( opcode,
+                                                          a,
+                                                          integer_array,
+                                                          d_pointer,
+                                                          N,
+                                                          NPolis);
   assert(cudaGetLastError() == cudaSuccess);
 
+  return d_pointer;
 }
 
 __host__ cuyasheint_t* CUDAFunctions::callPolynomialMul(cudaStream_t stream,
@@ -614,49 +642,76 @@ __host__ cuyasheint_t* CUDAFunctions::callPolynomialMul(cudaStream_t stream,
 
   result = cudaMalloc((void **)&d_c, size*sizeof(Complex));
   assert(result == cudaSuccess);
+  
+  result = cudaMemsetAsync(d_a,0,size*sizeof(Complex),stream);
+  assert(result == cudaSuccess);
+  result = cudaMemsetAsync(d_b,0,size*sizeof(Complex),stream);
+  assert(result == cudaSuccess);
+  result = cudaMemsetAsync(d_c,0,size*sizeof(Complex),stream);
+  assert(result == cudaSuccess);
 
   dim3 blockDim(32);
   dim3 gridDim(size/32 + (size % 32 == 0? 0:1));
-  if(realign_A)
+
+  if(realign_A){
+    int size;
+    const int newSpacing = N;
+    const int oldSpacing = A_N;
+
+    if(newSpacing < oldSpacing)
+      size = newSpacing*NPolis;
+    else
+      size = oldSpacing*NPolis;
+
+    const int ADDGRIDXDIM = (size%ADDBLOCKXDIM == 0? size/ADDBLOCKXDIM : size/ADDBLOCKXDIM + 1);
+    dim3 gridDim(ADDGRIDXDIM);
+    dim3 blockDim(ADDBLOCKXDIM);
     copyAndRealignIntegerToComplex<<< gridDim,blockDim,1,stream >>>(d_a,a,A_N,N,NPolis);
-  else
+  }else
     copyIntegerToComplex<<< gridDim,blockDim,1,stream >>>(d_a,a,size);
   assert(cudaGetLastError() == cudaSuccess);
 
-  if(realign_B)
+  if(realign_B){
+    int size;
+    const int newSpacing = N;
+    const int oldSpacing = A_N;
+
+    if(newSpacing < oldSpacing)
+      size = newSpacing*NPolis;
+    else
+      size = oldSpacing*NPolis;
+
+    const int ADDGRIDXDIM = (size%ADDBLOCKXDIM == 0? size/ADDBLOCKXDIM : size/ADDBLOCKXDIM + 1);
+    dim3 gridDim(ADDGRIDXDIM);
+    dim3 blockDim(ADDBLOCKXDIM);
     copyAndRealignIntegerToComplex<<< gridDim,blockDim,1,stream >>>(d_b,b,B_N,N,NPolis);
+  }
   else
     copyIntegerToComplex<<< gridDim,blockDim,1,stream >>>(d_b,b,size);
   assert(cudaGetLastError() == cudaSuccess);
 
-  // cufftHandle plan;
+  
+
+  // Stream set
   cufftResult fftResult;
-  // fftResult = cufftPlan1d(&plan, N, CUFFT_Z2Z, 1);
-  // assert(fftResult == CUFFT_SUCCESS);
+  fftResult = cufftSetStream(CUDAFunctions::plan, stream);
+  assert(fftResult == CUFFT_SUCCESS);
 
-  cufftSetStream(CUDAFunctions::plan, stream);
+  // Apply FFT
+  fftResult = cufftExecZ2Z(CUDAFunctions::plan, (cufftDoubleComplex *)(d_a), (cufftDoubleComplex *)(d_a), CUFFT_FORWARD);
+  assert(fftResult == CUFFT_SUCCESS);
 
-  for(int i = 0; i < NPolis; i ++){
-    int phase = N*i;
-    // Apply FFT
-    fftResult = cufftExecZ2Z(CUDAFunctions::plan, (cufftDoubleComplex *)(d_a+phase), (cufftDoubleComplex *)(d_a+phase), CUFFT_FORWARD);
-    assert(fftResult == CUFFT_SUCCESS);
-
-    fftResult = cufftExecZ2Z(CUDAFunctions::plan, (cufftDoubleComplex *)(d_b+phase), (cufftDoubleComplex *)(d_b+phase), CUFFT_FORWARD);
-    assert(fftResult == CUFFT_SUCCESS);
-  }
+  fftResult = cufftExecZ2Z(CUDAFunctions::plan, (cufftDoubleComplex *)(d_b), (cufftDoubleComplex *)(d_b), CUFFT_FORWARD);
+  assert(fftResult == CUFFT_SUCCESS);
 
   polynomialcuFFTMul<<<gridDim,blockDim,1,stream>>>(d_a,d_b,d_c,size_c,size);
   assert(cudaGetLastError() == cudaSuccess);
 
+  // Apply inverse FFT
+  fftResult = cufftExecZ2Z(CUDAFunctions::plan, (cufftDoubleComplex *)(d_c), (cufftDoubleComplex *)(d_c), CUFFT_INVERSE);
+  assert(fftResult == CUFFT_SUCCESS);
 
-  for(int i = 0; i < NPolis; i ++){
-    int phase = N*i;
-    // Apply inverse FFT
-    fftResult = cufftExecZ2Z(CUDAFunctions::plan, (cufftDoubleComplex *)(d_c+phase), (cufftDoubleComplex *)(d_c+phase), CUFFT_INVERSE);
-    assert(fftResult == CUFFT_SUCCESS);
-  }
-  copyAndNormalizeComplexRealPartToInteger<<< gridDim,blockDim,1,stream >>>(d_result,d_c,size,1.0f/signal_size,N);
+  copyAndNormalizeComplexRealPartToInteger<<< gridDim,blockDim,1,stream >>>(d_result,(cufftDoubleComplex *)d_c,size,1.0f/signal_size,N);
   assert(cudaGetLastError() == cudaSuccess);
 
 
@@ -715,10 +770,28 @@ __host__ void CUDAFunctions::init(int N){
   free(h_WInv);
   #elif defined(CUFFTMUL)
     cufftResult fftResult;
-    fftResult = cufftPlan1d(&CUDAFunctions::plan, N, CUFFT_Z2Z, 1);
+
+    // # of CRT residues
+    const int batch = Polynomial::CRTPrimes.size();
+    assert(batch > 0);
+
+    // # 1 dimensional FFT
+    const int rank = 1;
+
+    // No idea what is this
+    int n[1] = {N};
+
+
+    fftResult = cufftPlanMany(&CUDAFunctions::plan, rank, n,
+         NULL, 1, N,  //advanced data layout, NULL shuts it off
+         NULL, 1, N,  //advanced data layout, NULL shuts it off
+         CUFFT_Z2Z, batch);
+    // fftResult = cufftPlan1d(&CUDAFunctions::plan, N, CUFFT_Z2Z, 1);
+
+
     assert(fftResult == CUFFT_SUCCESS);
-    #ifdef VERBOSE
     std::cout << "Plan created with signal size " << N << std::endl;
+    #ifdef VERBOSE
     #endif
   #endif
 }
@@ -752,6 +825,9 @@ __host__ void Polynomial::reduce(){
   // #warning "Reduce on device has a bug. Deviating to host."
   // this->update_host_data();
   // this->set_device_updated(false);
+  // if(!this->get_device_updated())
+    // this->update_device_data();
+
 
   if(!this->get_device_updated()){
     #ifdef VERBOSE
@@ -761,6 +837,7 @@ __host__ void Polynomial::reduce(){
     Polynomial rem;
     Polynomial::DivRem((*this),phi,quot, rem);
     this->copy(rem);
+    this->update_crt_spacing(this->deg()+1);
   }else{
 
     #ifdef VERBOSE
