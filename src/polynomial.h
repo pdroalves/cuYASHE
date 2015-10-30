@@ -769,10 +769,10 @@ class Polynomial{
     int get_crt_spacing(){
       return this->CRTSPACING;
     }
-    void set_crt_spacing(const int spacing){
-      // This function doesn't update CRTSPACING completely. Just set the variable.      
-      this->CRTSPACING = spacing;
-    }
+    // void set_crt_spacing(const int spacing){
+    //   // This function doesn't update CRTSPACING completely. Just set the variable.      
+    //   this->CRTSPACING = spacing;
+    // }
     static void gen_crt_primes(ZZ q,cuyasheint_t degree){
         // We will use 63bit primes to fit cuyasheint_t data type (64 bits raises "GenPrime: length too large")
         ZZ M = ZZ(1);
@@ -977,12 +977,12 @@ class Polynomial{
       }else if(!get_device_updated()){
         // Data isn't updated on GPU's global memory
         // Just set the spacing and update gpu
-        this->set_crt_spacing(new_spacing);
+        this->CRTSPACING = new_spacing;
 
         // if(this->deg() >= 0)
           // update_device_data();
         cuyasheint_t *d_pointer;
-        cudaError_t result = cudaMalloc((void**)&d_pointer,get_crt_spacing()*(CRTPrimes.size())*sizeof(cuyasheint_t));        
+        cudaError_t result = cudaMalloc((void**)&d_pointer,new_spacing*(CRTPrimes.size())*sizeof(cuyasheint_t));        
         assert(result == cudaSuccess);
 
         set_device_crt_residues(d_pointer);
@@ -1006,7 +1006,7 @@ class Polynomial{
           #endif
         }
 
-        this->set_crt_spacing(new_spacing);
+        this->CRTSPACING = new_spacing;
         
         #ifdef VERBOSE
         std::cout << "crt spacing updated to " << this->get_crt_spacing() << std::endl;

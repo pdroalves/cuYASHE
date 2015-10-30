@@ -123,12 +123,9 @@ void Polynomial::update_device_data(unsigned int usable_ratio){
   if(this->get_crt_spacing() < std::max(this->deg()+1,(Polynomial::global_phi->deg()+1))){
     const int new_spacing = std::max(this->deg()+1,(Polynomial::global_phi->deg()+1));
 
-    cuyasheint_t *d_pointer;
-    cudaError_t result = cudaMalloc((void**)&d_pointer,new_spacing*(CRTPrimes.size())*sizeof(cuyasheint_t));        
-    assert(result == cudaSuccess);
-
-    this->set_device_crt_residues(d_pointer);
-    this->set_crt_spacing(new_spacing);
+    // Data on device isn't updated (we check it on begginning)
+    // So, update_crt_spacing(int) will only update CRTSpacing and alloc memory
+    this->update_crt_spacing(new_spacing);
   }
 
   cudaError_t result = cudaMemsetAsync( this->get_device_crt_residues(),
@@ -356,68 +353,6 @@ void Polynomial::icrt(){
   #endif
   return;
 }
-
-// void Polynomial::icrt(){
-//   // Escapes, if possible
-//   if(this->get_host_updated())
-//     return;
-//   else
-//     this->update_host_data();
-
-//   std::cout << "Polynomial 0: " << std::endl; 
-//   for(unsigned int i = 0; i < polyCRT[0].size();i++)
-//     std::cout << polyCRT[0][i] << " ";
-//   std::cout << std::endl << std::endl;
-
-//   std::vector<cuyasheint_t> P = this->CRTPrimes;
-//   ZZ M = this->CRTProduct;
-
-//   // Polynomial icrt(this->get_mod(),this->get_phi(),this->get_crt_spacing());
-//   this->set_coeffs();//Discards all coeffs
-
-//   // 4M cycles per iteration
-//   for(unsigned int i = 0; i < this->CRTPrimes.size();i++){
-//     // uint64_t start_cycle = get_cycles();
-//     // Convert CRT representations to Polynomial
-//     // Polynomial xi(this->get_mod(),this->get_phi(),this->get_crt_spacing());
-  
-//     Polynomial xi(this->get_mod(),this->get_phi(),this->get_crt_spacing());
-//     xi.set_coeffs(this->polyCRT[i]);
-//     // Asserts that each residue is in the correct field
-//     ZZ pi = ZZ(P[i]);
-//     xi %= pi;
-
-//     ZZ Mpi= M/pi;
-//     //
-//     ZZ InvMpi = NTL::InvMod(Mpi%pi,pi);
-//     //
-
-
-
-//     xi = ((xi*InvMpi)%pi)*Mpi;
-
-//     this->CPUAddition(&xi);
-//     // uint64_t end_cycle = get_cycles();
-//     // std::cout << "Cycles for each icrt iteration: " << (end_cycle-start_cycle) << std::endl;
-//   }
-
-//   (*this) %= M;
-//   this->normalize();
-//   this->set_host_updated(true);
-//   return;
-// }
-
-// uint64_t polynomial_get_cycles() {
-//   unsigned int hi, lo;
-//   asm (
-//     "cpuid\n\t"/*serialize*/
-//     "rdtsc\n\t"/*read the clock*/
-//     "mov %%edx, %0\n\t"
-//     "mov %%eax, %1\n\t" 
-//     : "=r" (hi), "=r" (lo):: "%rax", "%rbx", "%rcx", "%rdx"
-//   );
-//   return ((uint64_t) lo) | (((uint64_t) hi) << 32);
-// }
 
 void Polynomial::DivRem(Polynomial a,Polynomial b,Polynomial &quot,Polynomial &rem){
   // Returns x = a % b
