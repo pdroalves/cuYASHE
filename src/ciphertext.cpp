@@ -125,6 +125,7 @@ void Ciphertext::keyswitch(){
 
   
   for(int i = 0; i < Yashe::lwq; i ++){
+    P[i].normalize();
     Polynomial p = (P[i])*(Yashe::gamma[i]);
     *this += p;
   }
@@ -151,6 +152,7 @@ void Ciphertext::worddecomp(std::vector<Polynomial> *P){
       c = NTL::RightShift(c,conv<long>(Yashe::w));
       j++;
     }
+
   }
   #ifdef CYCLECOUNTING
   end = get_cycles();

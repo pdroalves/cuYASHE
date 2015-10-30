@@ -50,6 +50,7 @@ void Polynomial::operator delete(void *ptr){
       if(p->get_device_crt_residues() != 0x0){
         try
         {
+          // std::cout << "Delete: cudaFree" << std::endl;
           cudaError_t result = cudaFree(p->get_device_crt_residues());
           if(result != cudaSuccess)
             throw string( cudaGetErrorString(result));
@@ -120,8 +121,8 @@ void Polynomial::update_device_data(unsigned int usable_ratio){
   this->ON_COPY = true;
   // Updated CRTSPACING    
   // Verifica se o espaçamento é válido. Se não for, ajusta.
-  if(this->get_crt_spacing() < std::max(this->deg()+1,(Polynomial::global_phi->deg()+1))){
-    const int new_spacing = std::max(this->deg()+1,(Polynomial::global_phi->deg()+1));
+  if(this->get_crt_spacing() < this->deg()+1){
+    const int new_spacing = this->deg()+1;
 
     // Data on device isn't updated (we check it on begginning)
     // So, update_crt_spacing(int) will only update CRTSpacing and alloc memory
@@ -130,10 +131,12 @@ void Polynomial::update_device_data(unsigned int usable_ratio){
 
   cudaError_t result = cudaMemsetAsync( this->get_device_crt_residues(),
                                         0,
-                                        this->get_crt_spacing()*(this->polyCRT.size())*sizeof(cuyasheint_t),
+                                        this->get_crt_spacing()*(Polynomial::CRTPrimes.size())*sizeof(cuyasheint_t),
                                         this->get_stream());
+  if(result != cudaSuccess)
+    std::cout << "Opa!" << std::endl;
   assert(result == cudaSuccess);  
-  for(unsigned int i=0;i < this->polyCRT.size();i++){
+  for(unsigned int i=0;i < Polynomial::CRTPrimes.size();i++){
     cudaError_t result = cudaMemcpyAsync( this->get_device_crt_residues()+this->get_crt_spacing()*i,
                                           &(this->polyCRT[i][0]) ,
                                           (this->polyCRT[i].size())*sizeof(cuyasheint_t),

@@ -220,9 +220,6 @@ __global__ void copyAndRealignIntegerToComplex(Complex *a,cuyasheint_t *b,const 
   if(new_array_offset < newSpacing*residuesQty && old_array_offset < oldSpacing*residuesQty ){
       a[new_array_offset].x =  __ull2double_rn(b[old_array_offset]);
       a[new_array_offset].y = 0;
-  }else{
-    a[new_array_offset].x = 0;
-    a[new_array_offset].y = 0;
   }
 }
 

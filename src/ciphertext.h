@@ -41,10 +41,9 @@ class Ciphertext: public Polynomial{
         this->phi = Polynomial::global_phi; // Doesn't copy. Uses the reference.
 
         // If the irreductible polynomial have degree N, this polynomial's degree will be limited to N-1
-        this->CRTSPACING = Polynomial::global_phi->deg();
-      }else
-        // CRT Spacing not set
-        this->CRTSPACING = -1;
+        if(Polynomial::global_phi->deg() >= 0)
+          this->update_crt_spacing(Polynomial::global_phi->deg()+1);
+      }
       
 
       if(Polynomial::phi_set)
@@ -66,9 +65,9 @@ class Ciphertext: public Polynomial{
       if(Polynomial::global_phi){
       //   // If a global phi is defined, use it
         this->phi = Polynomial::global_phi; // Doesn't copy. Uses the reference.
+        if(Polynomial::global_phi->deg() >= 0)
+          this->update_crt_spacing(Polynomial::global_phi->deg()+1);
       }
-      // CRT Spacing not set
-      this->CRTSPACING = -1;
 
       if(Polynomial::phi_set){
         this->coefs.resize(this->get_phi().deg()+1);
@@ -88,8 +87,9 @@ class Ciphertext: public Polynomial{
 
       // CRT Spacing should store the expected number of coefficients
       // If the irreductible polynomial have degree N, this polynomial's degree will be limited to N-1
-      this->CRTSPACING = this->phi->deg();
-
+      if(Polynomial::global_phi->deg() >= 0)
+          this->update_crt_spacing(Polynomial::global_phi->deg()+1);
+      
       if(Polynomial::phi_set){
         this->coefs.resize(this->get_phi().deg()+1);
       }
@@ -112,7 +112,8 @@ class Ciphertext: public Polynomial{
         this->phi = Polynomial::global_phi; // Doesn't copy. Uses the reference.
       }
       // CRT Spacing set to spacing
-      this->CRTSPACING = spacing;
+      this->update_crt_spacing(spacing);
+      
       if(Polynomial::phi_set){
         this->coefs.resize(this->get_phi().deg()+1);
       }
@@ -133,7 +134,7 @@ class Ciphertext: public Polynomial{
       // std::cout << this->get_phi().to_string() << std::endl;
 
       // CRT Spacing set to spacing
-      this->CRTSPACING = spacing;
+      this->update_crt_spacing(spacing);
 
       if(Polynomial::phi_set){
         this->coefs.resize(this->get_phi().deg()+1);
@@ -151,7 +152,7 @@ class Ciphertext: public Polynomial{
       this->mod = ZZ(p);// Copy
 
       // CRT Spacing set to spacing
-      this->CRTSPACING = spacing;
+      this->update_crt_spacing(spacing);
 
       if(Polynomial::phi_set){
         this->coefs.resize(this->get_phi().deg()+1);

@@ -14,7 +14,7 @@
 
 #define BILLION  1000000000L
 #define MILLION  1000000L
-#define N 10
+#define N 100
 
 double compute_time_ms(struct timespec start,struct timespec stop){
   return (( stop.tv_sec - start.tv_sec )*BILLION + ( stop.tv_nsec - start.tv_nsec ))/MILLION;
@@ -127,7 +127,7 @@ int main(int argc, char* argv[]){
     std::cout << "Writing keyswitch data to " << keyswitch_filename << std::endl;
     ZZ_p::init(q); // Defines GF(q)
        
-    for(int d = 2048;d <= 4096;d *= 2){
+    for(int d = 4096;d <= 4096;d *= 2){
     // for(int d = 512;d <= 512;d *= 2){
       CUDAFunctions::init(2*d);
 
@@ -188,10 +188,10 @@ int main(int argc, char* argv[]){
     encrypt << d << " " << diff << std::endl;;
         
     c = cipher.encrypt(a);
-    if(!c.get_device_updated()){
-      c.crt();
+    if(!c.get_device_updated())
       c.update_device_data();
-    }
+    
+
     clock_gettime( CLOCK_REALTIME, &start);
     for(int i = 0; i < N;i++){
       cipher.decrypt(c);
