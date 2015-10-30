@@ -663,7 +663,7 @@ class Polynomial{
         this->set_device_updated(false);
         this->set_host_updated(true);
         if(this->get_crt_spacing() < (this->deg()+1))
-          this->set_crt_spacing(this->deg()+1);
+          this->update_crt_spacing(this->deg()+1);
     }
     void set_coeff(int index,int value){
 
@@ -689,7 +689,7 @@ class Polynomial{
       this->set_device_updated(false);
       this->set_host_updated(true);
       if(this->get_crt_spacing() < (this->deg()+1))
-        this->set_crt_spacing(this->deg()+1);  
+        this->update_crt_spacing(this->deg()+1);  
     }
     void set_coeffs(std::vector<ZZ> values){
 
@@ -699,7 +699,7 @@ class Polynomial{
       this->set_device_updated(false);
       this->set_host_updated(true);
       if(this->get_crt_spacing() < (this->deg()+1))
-        this->set_crt_spacing(this->deg()+1);  
+        this->update_crt_spacing(this->deg()+1);  
     }
     void set_coeffs(){
 
@@ -731,7 +731,7 @@ class Polynomial{
       this->set_device_updated(false);
       this->set_host_updated(true);
       if(this->get_crt_spacing() < (size))
-        this->set_crt_spacing(size);
+        this->update_crt_spacing(size);
     }
     std::vector<std::vector<cuyasheint_t> > get_crt_residues(){
       std::vector<std::vector<cuyasheint_t> > crt_residues_copy(this->polyCRT);

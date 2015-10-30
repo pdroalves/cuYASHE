@@ -797,19 +797,16 @@ __host__ void CUDAFunctions::init(int N){
 }
 
 __global__ void polynomialReduction(cuyasheint_t *a,const int half,const int N,const int NPolis){     
-  // This kernel must have N*Npolis/2 threads
+  // This kernel must have (N-half)*Npolis threads
 
   const int tid = threadIdx.x + blockIdx.x*blockDim.x;
-  const int residueID = tid / half; 
-  const int cid = tid % half;
+  const int residueID = tid / (N-half); 
+  const int cid = tid % (N-half);
 
   if( (cid+half+1 < N) && (residueID*N + cid + half + 1 < N*NPolis)){
     a[residueID*N + cid] -= a[residueID*N + cid + half + 1];
     __syncthreads();
-    if(residueID*N + cid == 16)
-      a[residueID*N + cid + half + 1] = tid;
-    else
-      a[residueID*N + cid + half + 1] = 0;
+    a[residueID*N + cid + half + 1] = 0;
   }
   // else{
   //   if((residueID*N + cid < N*NPolis))
@@ -847,7 +844,7 @@ __host__ void Polynomial::reduce(){
     const int half = phi->deg()-1;
     const int N = this->get_crt_spacing();
     const int NPolis = this->CRTPrimes.size();
-    const int size = half*NPolis;
+    const int size = (N-half)*NPolis;
 
     if(size > 0){
       dim3 blockDim(32);

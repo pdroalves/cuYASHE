@@ -58,6 +58,7 @@ Ciphertext Ciphertext::operator*(Ciphertext &b){
 
   start = cycles();
   Polynomial tc1 = (Yashe::t)*c1;  
+  tc1.reduce();
   end = cycles();
   // std::cout << "ciphertext t*c1 " << (end-start) << std::endl;
 
