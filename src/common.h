@@ -191,7 +191,9 @@ P common_multiplication(P *a, P *b){
   }
   start = get_cycles();
 
-  cuyasheint_t *d_result = CUDAFunctions::callPolynomialMul(a->get_stream(),
+  cuyasheint_t *d_result;
+  if(a->get_crt_spacing() > 0 && b->get_crt_spacing() > 0)
+	  d_result = CUDAFunctions::callPolynomialMul(a->get_stream(),
 															a->get_device_crt_residues(),
 															update_A_spacing,
 															a->get_crt_spacing(),
@@ -200,12 +202,16 @@ P common_multiplication(P *a, P *b){
 															b->get_crt_spacing(),
 															needed_spacing,
 															a->CRTPrimes.size());
+  else
+  	d_result = NULL;
 
   end = get_cycles();
   P c = P(a->get_mod(),a->get_phi(),needed_spacing);
-  c.set_device_crt_residues(d_result);
-  c.set_host_updated(false);
-  c.set_device_updated(true);
+  if(d_result != NULL){
+	  c.set_device_crt_residues(d_result);
+	  c.set_host_updated(false);
+	  c.set_device_updated(true);
+  }
   // cudaDeviceSynchronize();
   // std::cout << (end-start) << " cycles for polynomial x polynomial mul" << std::endl;
   return c;
