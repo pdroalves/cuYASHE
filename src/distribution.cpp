@@ -22,9 +22,9 @@ Polynomial Distribution::get_sample(int degree){
 
   p.set_coeffs(degree+1);
   for(int i = 0; i <= degree; i++)
-    // p.set_coeff(i,(rand() % mod - mod/2) - phase);
-    p.set_coeff(i,(rand() % mod) - phase);
+    p.set_coeff(i,(rand() % mod - mod/2) - phase);
   
+  p %= p.get_mod();
   p.update_crt_spacing();
   return p;
 }

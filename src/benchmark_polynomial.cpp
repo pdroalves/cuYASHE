@@ -112,8 +112,7 @@ int main(int argc,char* argv[]){
   Polynomial phi;
   phi.set_mod(Polynomial::global_mod);
 
-  for(int d = 512;d <= 4096;d *= 2){
-    CUDAFunctions::init(2*d);
+  for(int d = 2048;d <= 4096;d *= 2){
 
     std::cout << "d: " << d << std::endl;
 
@@ -136,6 +135,7 @@ int main(int argc,char* argv[]){
     std::cout << "CRT primes generated in " << diff << " ms." << std::endl;
 
     std::cout << "q: " << NTL::NumBytes(q)*8 << " bits" << std::endl;
+    CUDAFunctions::init(2*d);
 
     Polynomial a;
     Polynomial b;
@@ -209,8 +209,6 @@ int main(int argc,char* argv[]){
     // Time measured with memory copy
     Polynomial::random(&a,d-1);
     Polynomial::random(&b,d-1);
-    a.update_crt_spacing(2*d);
-    b.update_crt_spacing(2*d);
     clock_gettime( CLOCK_REALTIME, &start);
     for(int i = 0; i < N;i++){
 
@@ -228,8 +226,6 @@ int main(int argc,char* argv[]){
     // Time measured without memory copy
     Polynomial::random(&a,d-1);
     Polynomial::random(&b,d-1);
-    a.update_crt_spacing(2*d);
-    b.update_crt_spacing(2*d);
     a.update_device_data();
     b.update_device_data();
 

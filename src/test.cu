@@ -685,10 +685,10 @@ BOOST_AUTO_TEST_CASE(randomPolynomialOperations)
     c.normalize();
     c_ntl %= conv<ZZ_pEX>(ZZ_pE::modulus());
 
-    // #ifdef DEBUG
+    #ifdef DEBUG
     std::cout << "c: " << c.to_string() << " degree: " << c.deg() <<std::endl;
     std::cout << "c_ntl: " << c_ntl << " degree: " << NTL::deg(c_ntl) << std::endl << std::endl;
-    // #endif
+    #endif
 
     BOOST_REQUIRE(NTL::deg(c_ntl) == c.deg());
     for(int i = 0;i <= c.deg();i++){
@@ -812,8 +812,10 @@ BOOST_AUTO_TEST_CASE(encryptDecrypt)
     Ciphertext c = cipher.encrypt(a);
     Polynomial a_decrypted = cipher.decrypt(c);
 
+    #ifdef VERBOSE
     std::cout << "a: " << a.to_string() << std::endl;
     std::cout << "a_decrypted: " << a_decrypted.to_string() << std::endl;
+    #endif
     BOOST_REQUIRE( a_decrypted == a);
   }
 }
@@ -836,11 +838,11 @@ BOOST_AUTO_TEST_CASE(encryptandAdd)
     value.icrt();
     Polynomial value_reduced = value % t;
 
-    // #ifdef VERBOSE
+    #ifdef VERBOSE
     std::cout << "Original: " << a.to_string() << std::endl;
     std::cout << "Original *2: " << ((a+a)%t).to_string() << std::endl;
     std::cout << "Decrypted: " << a_decrypted.to_string() << std::endl;
-    // #endif
+    #endif
 
     BOOST_REQUIRE( a_decrypted == value_reduced);
   }

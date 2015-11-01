@@ -1088,6 +1088,7 @@ class Polynomial{
           a->set_coeff(i,ZZ(rand()) % a->global_mod);
       a->set_device_updated(false);
       a->set_host_updated(true);
+      a->update_crt_spacing();
     }
     cudaStream_t get_stream(){
       return this->stream;
