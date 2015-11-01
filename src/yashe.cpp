@@ -26,7 +26,7 @@ void Yashe::generate_keys(){
   delta = (q/t.get_value()); // q/t
 
   Polynomial g = this->xkey.get_sample(phi.deg()-1);
-
+  g %= q;
   #ifdef DEBUG
   std::cout << "g = " << g << std::endl;
   #endif
@@ -34,7 +34,6 @@ void Yashe::generate_keys(){
   Polynomial fInv;
   while(1==1){
     Polynomial fl = xkey.get_sample(phi.deg()-1);
-    fl.reduce();
     fl %= q;
     // Polynomial fl;
     // fl.set_coeff(0,1);
@@ -54,8 +53,8 @@ void Yashe::generate_keys(){
       #ifdef VERBOSE
       std::cout << "Computing invmod of f "<< std::endl;
       #endif
-      // fInv = Polynomial::InvMod(f,phi);
-      fInv = f;
+      fInv = Polynomial::InvMod(f,phi);
+      // fInv = f;
       #ifdef VERBOSE
       std::cout << "Done." << std::endl;
       #endif
@@ -73,7 +72,6 @@ void Yashe::generate_keys(){
   h.reduce();
   h *= g;
   h.reduce();
-  // std::cout << "h " << h.to_string() << std::endl;
   h %= q;
 
   gamma.resize(lwq);
@@ -86,7 +84,9 @@ void Yashe::generate_keys(){
     }
 
     Polynomial e = xerr.get_sample(phi.deg()-1);
+    e %= q;
     Polynomial s = xerr.get_sample(phi.deg()-1);
+    s %= q;
 
     Polynomial hs = h*s;
     gamma[k] += e;
@@ -117,17 +117,16 @@ Ciphertext Yashe::encrypt(Polynomial m){
   #endif
 
   Polynomial ps = xerr.get_sample(phi.deg()-1);
+  ps %= q;
   Polynomial e = xerr.get_sample(phi.deg()-1);
+  e %= q;
 
   #ifdef DEBUG
   std::cout << "ps: "<< ps <<std::endl;
-  #endif
-  #ifdef DEBUG
   std::cout << "e: "<< e <<std::endl;
   #endif
 
   Polynomial p;
-  h.reduce();
   p = (h*ps);
   p += e;
   Polynomial mdelta = delta*m;
@@ -165,10 +164,8 @@ Polynomial Yashe::decrypt(Ciphertext c){
 
 
   Polynomial g;
-  f.reduce();
-  
-  
-  c.reduce();
+  // f.reduce();  
+  // c.reduce();
 
   if(c.aftermul){
     #ifdef VERBOSE
@@ -187,6 +184,7 @@ Polynomial Yashe::decrypt(Ciphertext c){
     std::cout << "not  aftermul" << std::endl;
     #endif
     g = f*c;
+
   }
   g.reduce();
   

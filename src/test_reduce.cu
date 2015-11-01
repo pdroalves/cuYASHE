@@ -23,8 +23,8 @@ int main(){
   // Polynomial::gen_crt_primes(Polynomial::global_mod,degree);
 
   Polynomial::CRTPrimes.clear();
-  Polynomial::CRTMpi.clear();
-  Polynomial::CRTInvMpi.clear();
+  Polynomial::CRTMpi.clear()
+;  Polynomial::CRTInvMpi.clear();
 
   Polynomial::CRTPrimes.push_back(751);
   Polynomial::CRTPrimes.push_back(839);

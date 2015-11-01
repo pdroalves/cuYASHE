@@ -63,8 +63,13 @@ __host__ cuyasheint_t* CUDAFunctions::callRealignCRTResidues(cudaStream_t stream
   cuyasheint_t *d_new_array;
   cudaError_t result = cudaMalloc((void**)&d_new_array,newSpacing*residuesQty*sizeof(cuyasheint_t));
   assert(result == cudaSuccess);
+  result = cudaMemsetAsync( d_new_array,
+                            0,
+                            newSpacing*residuesQty*sizeof(cuyasheint_t),
+                            stream);
+  assert(result == cudaSuccess);
 
-  realignCRTResidues <<< gridDim,blockDim >>> (oldSpacing,newSpacing,array,d_new_array,residuesSize,residuesQty);
+  realignCRTResidues <<< gridDim,blockDim, 1, stream >>> (oldSpacing,newSpacing,array,d_new_array,residuesSize,residuesQty);
   result = cudaGetLastError();
   assert(result == cudaSuccess);
 
@@ -816,7 +821,7 @@ __host__ void Polynomial::reduce(){
   Polynomial *phi = (Polynomial::global_phi);
 
   // #warning "Reduce on device has a bug. Deviating to host."
-  // this->update_host_data();
+  this->update_host_data();
   // this->set_device_updated(false);
   // if(!this->get_device_updated())
     // this->update_device_data();

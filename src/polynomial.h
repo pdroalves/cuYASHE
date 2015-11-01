@@ -781,7 +781,7 @@ class Polynomial{
         cuyasheint_t n;
 
         // Get primes
-        while( (M < (2*degree)*q*q) ){
+        while( (M < (2*degree)*q*q*q) ){
             n = NTL::GenPrime_long(primes_size);
             if( std::find(P.begin(), P.end(), n) == P.end()){
               // Does not contains

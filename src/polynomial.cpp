@@ -339,14 +339,14 @@ void Polynomial::icrt(){
   // Correction on negative values
   for(unsigned int i = 0; i < this->coefs.size(); i++){
     // std::cout << "Correção: " << this->coefs[i] << " > " << Polynomial::global_mod << "?" << std::endl;
-    this->coefs[i] = (this->coefs[i] >= Polynomial::global_mod)? (this->coefs[i]-M) % Polynomial::global_mod : this->coefs[i]; 
+    // this->coefs[i] = (this->coefs[i] >= Polynomial::global_mod)? (this->coefs[i]-M) % Polynomial::global_mod : this->coefs[i]; 
     // std::cout << this->coefs[i] << std::endl;
   }
   // this->update_crt_spacing(this->deg()+1);
   
   this->set_host_updated(true);
   this->set_icrt_computed(true);
-  // Updated CRTSPACINg
+  // Updated CRTSPACING
   if(this->get_crt_spacing() < (Polynomial::global_phi->deg()))
     this->update_crt_spacing((Polynomial::global_phi->deg()));
 

@@ -292,105 +292,6 @@ BOOST_AUTO_TEST_CASE(smulTest)
 
 }
 #endif
-BOOST_AUTO_TEST_CASE(simpleMultiplication)
-{
-   // std:: cout <<  NTL::MulMod(6406262673276882058,4,9223372036854829057) << std::endl;
-  // std:: cout <<  NTL::MulMod(6406262673276882058,4,9223372036854829057) << std::endl;
-
-// cuyasheint_t integer = 9223372036854829057L;
-//     ZZ P = ZZ(integer);
-//     ZZ x = Z(6209464568650184525);
-//     ZZ inv = NTL::InvMod(x,P);
-
-//     cout << integer << "\n" << P << endl;
-
-//     cout << "PowerMod: " << inv << endl;
-
-//     cout << "Check: " << NTL::MulMod(inv, Z(6209464568650184525), P) << endl;
-//   return 0;
-  for(int N = degree;N <= 2048;N *= 2){
-    CUDAFunctions::init(N);
-
-    // const int NPOLYS = Polynomial::CRTPrimes.size();
-    const int NPOLYS = 1;
-
-
-    cuyasheint_t *h_a;
-    cuyasheint_t *d_a;
-    cuyasheint_t *h_b;
-    cuyasheint_t *d_b;
-    cuyasheint_t *h_c;
-
-    // Alloc memory
-    h_a = (cuyasheint_t*)malloc(N*NPOLYS*sizeof(cuyasheint_t));
-    h_b = (cuyasheint_t*)malloc(N*NPOLYS*sizeof(cuyasheint_t));
-    h_c = (cuyasheint_t*)malloc(N*NPOLYS*sizeof(cuyasheint_t));
-    cudaError_t result = cudaMalloc((void**)&d_a,N*NPOLYS*sizeof(cuyasheint_t));
-    assert(result == cudaSuccess);
-    result = cudaMalloc((void**)&d_b,N*NPOLYS*sizeof(cuyasheint_t));
-    assert(result == cudaSuccess);
-
-    // Generates random values
-
-    ZZ_pEX a_ntl;
-    ZZ_pEX b_ntl;
-    for(int j = 0; j < NPOLYS;j++)
-      for(int i = 0; i < N; i++){
-        if(i < N/2){
-          h_a[i+j*N] = i;
-          NTL::SetCoeff(a_ntl,i,i);
-          h_b[i+j*N] = 1;
-          NTL::SetCoeff(b_ntl,i,1);
-        }else{
-          h_a[i+j*N] = 0;
-          NTL::SetCoeff(a_ntl,i,0);
-          h_b[i+j*N] = 0;
-          NTL::SetCoeff(b_ntl,i,0);
-        }
-      }
-
-    // Copy to GPU
-    result = cudaMemcpy(d_a,h_a , N*NPOLYS*sizeof(cuyasheint_t), cudaMemcpyHostToDevice);
-    assert(result == cudaSuccess);
-
-    // result = cudaMemset((void*)d_b,1,N*NPOLYS*sizeof(cuyasheint_t));
-    // assert(result == cudaSuccess);
-    result = cudaMemcpy(d_b,h_b , N*NPOLYS*sizeof(cuyasheint_t), cudaMemcpyHostToDevice);
-    assert(result == cudaSuccess);
-
-    // Multiply
-    cudaStream_t stream;
-    cudaStreamCreate(&stream);
-    cuyasheint_t *d_c = CUDAFunctions::callPolynomialMul(stream,d_a,false,N,d_b,false,N,N, NPOLYS);
-
-    ZZ_pEX c_ntl = a_ntl*b_ntl;
-
-    result = cudaMemcpy(h_c,d_c,  N*NPOLYS*sizeof(cuyasheint_t), cudaMemcpyDeviceToHost);
-    assert(result == cudaSuccess);
-    // for(int i = 0; i < N; i++)
-      // std::cout << h_c[i] << " ";
-    // std::cout << std::endl;
-
-    for(int j = 0; j < NPOLYS;j++)
-      for(int i = 0; i < N; i++){
-        ZZ ntl_value;
-        if( NTL::IsZero(NTL::coeff(c_ntl,i)) )
-        // Without this, NTL raises an exception when we call rep()
-          ntl_value = 0L;
-        else
-          ntl_value = conv<ZZ>(NTL::rep(NTL::coeff(c_ntl,i))[0]);
-        // std::cout << "h_c " << h_c[i+j*N] << std::endl;
-        // std::cout << "ntl_value: " <<ntl_value << std::endl;
-        BOOST_REQUIRE(h_c[i+j*N] == ntl_value);
-      }
-    cudaFree(d_a);
-    cudaFree(d_b);
-    cudaFree(d_c);
-    free(h_a);
-    free(h_b);
-    free(h_c);
-  }
-}
 
 BOOST_AUTO_TEST_CASE(multiplyByZZOnCPU)
 {
@@ -665,15 +566,13 @@ BOOST_AUTO_TEST_CASE(addAndMultiplyByPolynomial)
 
     ZZ_pEX c_ntl = a_ntl*b_ntl+a_ntl;
 
-    #ifdef DEBUG
-    if(c_ntl != c){
-      std::cout << "a: " << a << " degree: " << NTL::deg(a) <<std::endl;
-      std::cout << "b: " << b << " degree: " << NTL::deg(b) <<std::endl;
-      std::cout << "c: " << c << " degree: " << NTL::deg(c) <<std::endl;
-      std::cout << "c_ntl: " << c_ntl << " degree: " << NTL::deg(c_ntl) << std::endl << std::endl;
-    }
+    #ifdef DEBUG 
+     std::cout << "a: " << a.to_string() << " ==  " << a_ntl <<std::endl;
+      std::cout << "b: " << b.to_string() << " ==  " << b_ntl <<std::endl;
+      std::cout << "c: " << c.to_string() << " ==  " << c_ntl <<std::endl;
     #endif
 
+    std::cout << NTL::deg(c_ntl) << " == " << c.deg() << std::endl;;
     BOOST_REQUIRE(NTL::deg(c_ntl) == c.deg());
     for(int i = 0;i <= c.deg();i++){
       ZZ ntl_value;
@@ -718,8 +617,8 @@ BOOST_AUTO_TEST_CASE(randomPolynomialOperations)
     int random_op_bit = rand()%2;
     int random_ab = rand()%3;
 
-    // std::cout << "random_op: " << random_op_bit << std::endl;
-    // std::cout << "random_ab: " << random_ab << std::endl;
+    std::cout << "random_op: " << random_op_bit << std::endl;
+    std::cout << "random_ab: " << random_ab << std::endl;
 
     // 0: add
     switch(random_op_bit){
@@ -735,9 +634,6 @@ BOOST_AUTO_TEST_CASE(randomPolynomialOperations)
         case 1:
         // 1: b
         // std::cout << " random *=b " << std::endl;
-        // std::cout << b.to_string() << std::endl;
-        // std::cout << b_ntl << std::endl;
-
         // std::cout << b.to_string() << std::endl;
         // std::cout << b_ntl << std::endl;
 
@@ -789,10 +685,10 @@ BOOST_AUTO_TEST_CASE(randomPolynomialOperations)
     c.normalize();
     c_ntl %= conv<ZZ_pEX>(ZZ_pE::modulus());
 
-    #ifdef DEBUG
+    // #ifdef DEBUG
     std::cout << "c: " << c.to_string() << " degree: " << c.deg() <<std::endl;
     std::cout << "c_ntl: " << c_ntl << " degree: " << NTL::deg(c_ntl) << std::endl << std::endl;
-    #endif
+    // #endif
 
     BOOST_REQUIRE(NTL::deg(c_ntl) == c.deg());
     for(int i = 0;i <= c.deg();i++){
@@ -819,12 +715,12 @@ BOOST_AUTO_TEST_CASE(modularInversion)
   
   Polynomial result = a*aInv;
   
-  std::cout << "a: " << a.to_string() << std::endl;
-  std::cout << "aInv: " << aInv.to_string() << std::endl;
-  std::cout << "result before reduce: " << result.to_string() << std::endl;
+  // std::cout << "a: " << a.to_string() << std::endl;
+  // std::cout << "aInv: " << aInv.to_string() << std::endl;
+  // std::cout << "result before reduce: " << result.to_string() << std::endl;
   result.reduce();
   result %= a.get_mod();
-  std::cout << "result after reduce: " << result.to_string() << std::endl;
+  // std::cout << "result after reduce: " << result.to_string() << std::endl;
 
   Polynomial one = Polynomial();
   one.set_coeff(0,1);

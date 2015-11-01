@@ -28,8 +28,8 @@ P common_addition(P *a,P *b){
 		std::cout << "Operator+ on GPU" << std::endl;
 		#endif
 			// Check align
+		  int new_spacing = std::max(a->CRTSPACING,b->CRTSPACING);
 			if(a->CRTSPACING != b->CRTSPACING){
-			  int new_spacing = std::max(a->CRTSPACING,b->CRTSPACING);
 			  a->update_crt_spacing(new_spacing);
 			  b->update_crt_spacing(new_spacing);
 			}
@@ -66,7 +66,7 @@ P common_addition(P *a,P *b){
 
 			cuyasheint_t *d_result = CUDAFunctions::callPolynomialAddSub(a->get_stream(),a->get_device_crt_residues(),b->get_device_crt_residues(),(int)(a->CRTSPACING*P::CRTPrimes.size()),ADD);
 
-			P c = P(a->get_mod(),a->get_phi(),a->CRTSPACING);
+			P c = P(a->get_mod(),a->get_phi(),new_spacing);
 			c.set_device_crt_residues(d_result);
 			c.set_host_updated(false);
 			c.set_device_updated(true);
