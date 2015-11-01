@@ -94,7 +94,7 @@ __global__ void polynomialAddSub(const int OP,const cuyasheint_t *a,const cuyash
         a_value -= b_value;
 
       c[tid] = a_value;
-      // c[tid] = a_value %= CRTPrimesConstant[rid*N];
+      // c[tid] = a_value % CRTPrimesConstant[rid];
   }
 }
 
@@ -136,7 +136,7 @@ __global__ void polynomialAddSubInPlace(const int OP, cuyasheint_t *a,const cuya
         a_value -= b_value;
 
       a[tid] = a_value;
-      // c[tid] = a_value %= CRTPrimesConstant[rid*N];
+      // a[tid] = a_value % CRTPrimesConstant[rid];
   }
 }
 
@@ -226,7 +226,7 @@ __global__ void copyAndRealignIntegerToComplex(Complex *a,cuyasheint_t *b,const 
 __global__ void copyAndNormalizeComplexRealPartToInteger(cuyasheint_t *b,const Complex *a,const int size,const double scale,const int N){
   const int tid = threadIdx.x + blockDim.x*blockIdx.x;
   const int rid = tid / N; // Residue id
-  int value;
+  cuyasheint_t value;
   double fvalue;
   // double frac;
   if(tid < size ){
@@ -234,6 +234,7 @@ __global__ void copyAndNormalizeComplexRealPartToInteger(cuyasheint_t *b,const C
       value = rint(fvalue);
 
       b[tid] = value;
+      // b[tid] = value % CRTPrimesConstant[rid];
   }
 }
 ////////////////////////////////////////////////////////////////////////////////
@@ -425,29 +426,24 @@ __global__ void polynomialOPInteger(const int opcode,
   const int cid = tid % N; // Coefficient id
   const int rid = tid / N; // Residue id
 
-  if(tid < size )
+  if(tid < size ){
       // Coalesced access to global memory. Doing this way we reduce required bandwich.
 
     switch(opcode)
     {
     case ADD:
-      if(cid == 0){
+      if(cid == 0)
         output[tid] = a[tid] + integer_array[rid];
-        // output[tid] = a[tid] % CRTPrimesConstant[rid];
-      }
       break;
     case SUB:
-      if(cid == 0){
+      if(cid == 0)
         output[tid] = a[tid] - integer_array[rid];
-        // output[tid] = a[tid] % CRTPrimesConstant[rid];
-      }
       break;
     case DIV:
         output[tid] = a[tid] / integer_array[rid];
       break;
     case MUL:
         output[tid] = a[tid] * integer_array[rid];
-        // output[tid] = a[tid] % CRTPrimesConstant[rid];
       break;
     case MOD:
         output[tid] = a[tid] % integer_array[rid];
@@ -457,6 +453,8 @@ __global__ void polynomialOPInteger(const int opcode,
       output[tid] = 42;
       break;
     }
+    // output[tid] %= CRTPrimesConstant[rid];
+  }
 
 }
 
@@ -802,6 +800,7 @@ __global__ void polynomialReduction(cuyasheint_t *a,const int half,const int N,c
 
   if( (cid+half+1 < N) && (residueID*N + cid + half + 1 < N*NPolis)){
     a[residueID*N + cid] -= a[residueID*N + cid + half + 1];
+    // a[residueID*N + cid] %= CRTPrimesConstant[residueID];
     __syncthreads();
     a[residueID*N + cid + half + 1] = 0;
   }
@@ -847,7 +846,7 @@ __host__ void Polynomial::reduce(){
       dim3 blockDim(32);
       dim3 gridDim(size/32 + (size % 32 == 0? 0:1));
 
-      polynomialReduction<<< gridDim,blockDim >>>( this->get_device_crt_residues(),
+      polynomialReduction<<< gridDim,blockDim, 1, this->get_stream()>>>( this->get_device_crt_residues(),
                                                                         half,
                                                                         N,
                                                                         NPolis);

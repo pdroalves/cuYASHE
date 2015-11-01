@@ -818,8 +818,6 @@ BOOST_AUTO_TEST_CASE(modularInversion)
   Polynomial aInv = Polynomial::InvMod(a,Polynomial::global_phi);
   
   Polynomial result = a*aInv;
-  std::cout << result.to_string() << std::endl;
-  // result %= Polynomial::global_mod;
   
   std::cout << "a: " << a.to_string() << std::endl;
   std::cout << "aInv: " << aInv.to_string() << std::endl;
