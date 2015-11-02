@@ -47,6 +47,7 @@ int main(int argc,char* argv[]){
   ofstream gpu_mult_with_memcopy;
   ofstream gpu_reduce;
   ofstream cpu_reduce;
+  ofstream modq;
   std::string copyHtD_filename;
   std::string copyDtH_filename;
   std::string crt_filename;
@@ -57,6 +58,7 @@ int main(int argc,char* argv[]){
   std::string gpu_mult_with_memcopy_filename;
   std::string gpu_reduce_filename;
   std::string cpu_reduce_filename;
+  std::string modq_filename;
 
   if(argc == 2){
     char* suffix = argv[1];
@@ -71,6 +73,7 @@ int main(int argc,char* argv[]){
     gpu_mult_with_memcopy_filename = "gpu_mult_with_memcopy_"+current_date_time()+"_"+suffix+".dat";
     gpu_reduce_filename = "gpu_reduce_"+current_date_time()+"_"+suffix+".dat";
     cpu_reduce_filename = "cpu_reduce_"+current_date_time()+"_"+suffix+".dat";
+    modq_filename = "modq_"+current_date_time()+"_"+suffix+".dat";
   }else{
 
     copyHtD_filename = "copyHtD_"+current_date_time()+".dat";
@@ -83,6 +86,7 @@ int main(int argc,char* argv[]){
     gpu_mult_with_memcopy_filename = "gpu_mult_with_memcopy_"+current_date_time()+".dat";
     gpu_reduce_filename = "gpu_reduce_"+current_date_time()+".dat";
     cpu_reduce_filename = "cpu_reduce_"+current_date_time()+".dat";
+    modq_filename = "modq_"+current_date_time()+".dat";
   }
   copyHtD.open (copyHtD_filename);
   copyDtH.open (copyDtH_filename);
@@ -94,6 +98,7 @@ int main(int argc,char* argv[]){
   gpu_mult_with_memcopy.open (gpu_mult_with_memcopy_filename);
   gpu_reduce.open (gpu_reduce_filename);
   cpu_reduce.open (cpu_reduce_filename);
+  modq.open (modq_filename);
 
   std::cout << "Writing copyHtD data to " << copyHtD_filename << std::endl;
   std::cout << "Writing copyDtH data to " << copyDtH_filename << std::endl;
@@ -105,6 +110,7 @@ int main(int argc,char* argv[]){
   std::cout << "Writing gpu_mult_with_memcopy data to " << gpu_mult_with_memcopy_filename << std::endl;
   std::cout << "Writing gpu_reduce data to " << gpu_reduce_filename << std::endl;
   std::cout << "Writing cpu_reduce data to " << cpu_reduce_filename << std::endl;
+  std::cout << "Writing modq data to " << modq_filename << std::endl;
 
   ZZ_pX NTL_Phi;
   ZZ q;
@@ -202,6 +208,18 @@ int main(int argc,char* argv[]){
     std::cout << "Reduce) CPU: " << diff << " ms" << std::endl;
     cpu_reduce << d << " " << diff  << std::endl;
 
+    clock_gettime( CLOCK_REALTIME, &start);
+    a.update_host_data();
+    a.set_device_updated(false);
+    for(int i = 0; i < N;i++){
+      a %= q;
+    }
+    clock_gettime( CLOCK_REALTIME, &stop);
+    diff = compute_time_ms(start,stop)/N;
+    std::cout << "%q): " << diff << " ms" << std::endl;
+    modq << d << " " << diff  << std::endl;
+
+    
     
     ///////////////////////////////////////////////
     // ADD
