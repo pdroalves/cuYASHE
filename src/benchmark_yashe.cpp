@@ -46,7 +46,6 @@ int main(int argc, char* argv[]){
 
 
     // Polynomial R;
-    Yashe cipher;
     uint64_t t;
     t = 1024;
     Polynomial phi;
@@ -68,8 +67,6 @@ int main(int argc, char* argv[]){
       NTL::SetCoeff(NTL_Phi,i,conv<ZZ_p>(phi.get_coeff(i)));
     ZZ_pE::init(NTL_Phi);
 
-    // Yashe
-    cipher = Yashe();
 
     Polynomial::gen_crt_primes(Polynomial::global_mod,8);
     CUDAFunctions::init(64);// Warming cuda api
@@ -128,8 +125,6 @@ int main(int argc, char* argv[]){
     ZZ_p::init(q); // Defines GF(q)
        
     for(int d = 4096;d <= 4096;d *= 2){
-    // for(int d = 512;d <= 512;d *= 2){
-      CUDAFunctions::init(2*d);
 
       std::cout << "d: " << d << std::endl;
 
@@ -149,13 +144,14 @@ int main(int argc, char* argv[]){
 
       
       Polynomial::gen_crt_primes(Polynomial::global_mod,d);
+      CUDAFunctions::init(2*d);
       
       
       std::cout << "CRT primes generated in " << diff << " ms." << std::endl;
 
       std::cout << "q: " << NTL::NumBytes(q)*8 << " bits" << std::endl;
 
-      cipher = Yashe();
+    Yashe cipher = Yashe();
 
       Yashe::d = d;
       Yashe::phi = phi;

@@ -206,8 +206,8 @@ class Polynomial{
         this->polyCRT = b.get_crt_residues();
       
       if(b.get_device_updated())
-        // this->copy_device_crt_residues(b);
-        this->d_polyCRT = b.d_polyCRT;
+        this->copy_device_crt_residues(b);
+        // this->d_polyCRT = b.d_polyCRT;
       
       this->set_host_updated(b.get_host_updated());
       this->set_device_updated(b.get_device_updated());
@@ -781,7 +781,7 @@ class Polynomial{
         cuyasheint_t n;
 
         // Get primes
-        while( (M < (2*degree)*q*q*q) ){
+        while( (M < (2*degree)*q*q) ){
             n = NTL::GenPrime_long(primes_size);
             if( std::find(P.begin(), P.end(), n) == P.end()){
               // Does not contains

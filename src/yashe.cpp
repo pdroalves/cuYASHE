@@ -11,6 +11,7 @@ int Yashe::lwq = 0;
 Polynomial Yashe::h = Polynomial();
 std::vector<Polynomial> Yashe::gamma;
 Polynomial Yashe::f = Polynomial();
+Polynomial Yashe::ff = Polynomial();
 ZZ Yashe::WDMasking = ZZ(0);
 void Yashe::generate_keys(){
   #ifdef DEBUG
@@ -66,10 +67,17 @@ void Yashe::generate_keys(){
     }
   }
 
-  h = t*fInv;
-  h *= g;
+  // Pre-computed value
+  ff = f*f;
+  ff.reduce();
+
+  // #warning Bug. Without this, decrypts f*c operation fails.
+  // f.set_device_updated(false);
+
+  h = t*fInv*g;
   h.reduce();
   h %= q;
+  h.update_device_data();
 
   gamma.resize(lwq);
   for(int k = 0 ; k < lwq; k ++){
@@ -120,12 +128,10 @@ Ciphertext Yashe::encrypt(Polynomial m){
   #endif
 
   Polynomial p;
-  p = (h*ps);
-  p += e;
+  p = (h*ps) + e;
   Polynomial mdelta = delta*m;
   p += mdelta;
-  p.reduce();
-  
+  p.reduce();  
   p %= q;
   // uint64_t pModq = get_cycles()-start;
 
@@ -157,18 +163,12 @@ Polynomial Yashe::decrypt(Ciphertext c){
 
 
   Polynomial g;
-  // f.reduce();  
-  // c.reduce();
 
   if(c.aftermul){
     #ifdef VERBOSE
     std::cout << "aftermul" << std::endl;
     #endif
-    g = f*f;
-    g.reduce();
-    // g %= Yashe::q;
-    g *= c;
-    
+    g = ff*c;    
     // std::cout << "f*f:" << g.to_string() << std::endl;
     // std::cout << "f*f*c:" << g.to_string() << std::endl;
 
@@ -176,6 +176,7 @@ Polynomial Yashe::decrypt(Ciphertext c){
     #ifdef VERBOSE
     std::cout << "not  aftermul" << std::endl;
     #endif
+    // f.set_device_updated(false);
     g = f*c;
 
   }

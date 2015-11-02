@@ -112,7 +112,7 @@ int main(int argc,char* argv[]){
   Polynomial phi;
   phi.set_mod(Polynomial::global_mod);
 
-  for(int d = 2048;d <= 4096;d *= 2){
+  for(int d = 1024;d <= 4096;d *= 2){
 
     std::cout << "d: " << d << std::endl;
 

@@ -74,31 +74,29 @@ void Polynomial::copy_device_crt_residues(Polynomial &b){
         return;
 
       // std::cout << "Will copy residues on device memory" << std::endl;
-      // Discards the existing values
-      cudaError_t result;
-      if(d_polyCRT != 0x0){
-        result = cudaFree(d_polyCRT);
-        assert(result == cudaSuccess);
-      }
+
 
       // Adjusts CRTSPACING
       // Here we don't use update_crt_spacing(). The reason
       // is: speed and context.
-      // update_crt_spacing() won't just update the spacing, but
+      // update_crt_spacing() may not just update the spacing, but
       // also update device data. And in this context, we know
       // that there is no relevant data to update.
+      cuyasheint_t *aux;
       this->CRTSPACING = b.get_crt_spacing();
 
-      result = cudaMalloc((void**)&d_polyCRT,
+      cudaError_t result = cudaMalloc((void**)&aux,
                           this->get_crt_spacing()*(Polynomial::CRTPrimes.size())*sizeof(cuyasheint_t));
       assert(result == cudaSuccess);
-      result = cudaMemcpy(d_polyCRT,
+      result = cudaMemcpyAsync(aux,
                           b.get_device_crt_residues(),
                           this->get_crt_spacing()*(Polynomial::CRTPrimes.size())*sizeof(cuyasheint_t),
                           cudaMemcpyDeviceToDevice);      
       assert(result == cudaSuccess);
+
+      this->set_device_crt_residues(aux);
       end = get_cycles();
-      std::cout << (end-start) << " cycles" << std::endl;
+      // std::cout << (end-start) << " cycles" << std::endl;
     }
 
 void Polynomial::update_device_data(unsigned int usable_ratio){

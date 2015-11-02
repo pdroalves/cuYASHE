@@ -674,7 +674,7 @@ __host__ cuyasheint_t* CUDAFunctions::callPolynomialMul(cudaStream_t stream,
   if(realign_B){
     int size;
     const int newSpacing = N;
-    const int oldSpacing = A_N;
+    const int oldSpacing = B_N;
 
     if(newSpacing < oldSpacing)
       size = newSpacing*NPolis;
@@ -810,7 +810,7 @@ __global__ void polynomialReduction(cuyasheint_t *a,const int half,const int N,c
     a[residueID*N + cid + half + 1] = 0;
   }
   // else{
-  //   if((residueID*N + cid < N*NPolis))
+  //   if((reisdueID*N + cid < N*NPolis))
   //   a[residueID*N + cid] = 0;
   // }
 

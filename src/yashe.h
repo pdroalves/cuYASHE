@@ -22,6 +22,7 @@ class Yashe{
     static std::vector<Polynomial> gamma;
     static Polynomial h;
     static Polynomial f;
+    static Polynomial ff;
     static int lwq;
     static ZZ WDMasking;
     Yashe(){
