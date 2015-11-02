@@ -52,8 +52,8 @@ void Yashe::generate_keys(){
       #ifdef VERBOSE
       std::cout << "Computing invmod of f "<< std::endl;
       #endif
-      fInv = Polynomial::InvMod(f,phi);
-      // fInv = f;
+      // fInv = Polynomial::InvMod(f,phi);
+      fInv = f;
       #ifdef VERBOSE
       std::cout << "Done." << std::endl;
       #endif
@@ -191,7 +191,7 @@ Polynomial Yashe::decrypt(Ciphertext c){
   NTL::DivRem(quot,rem,coeff,q);
 
   quot %= q;
-  rem %= q;
+  // rem %= q;
   #ifdef VERBOSE
   std::cout << "rem: " << rem << std::endl;
   std::cout << "coeff: " << coeff << std::endl;
