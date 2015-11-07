@@ -309,7 +309,8 @@ void Polynomial::icrt(){
 
     // Iteration over coefficients
     for(unsigned int j = 0; j < this->polyCRT[i].size();j++){
-      this->coefs[j] += Mpi*( invMpi*(this->polyCRT[i][j]) % pi);
+      int64_t value = this->polyCRT[i][j];
+      this->coefs[j] += Mpi*( invMpi*(value) % pi);
     }
     #ifdef CYCLECOUNTING
     end_iteration = get_cycles();
