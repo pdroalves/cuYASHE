@@ -127,12 +127,22 @@ Ciphertext Yashe::encrypt(Polynomial m){
   std::cout << "e: "<< e <<std::endl;
   #endif
 
+  struct timespec start, stop;
+
+  clock_gettime( CLOCK_REALTIME, &start);  
   Polynomial p;
   p = (h*ps) + e;
   Polynomial mdelta = delta*m;
   p += mdelta;
+  clock_gettime( CLOCK_REALTIME, &stop);
+  // std::cout << "Encrypt A: " << compute_time_ms(start,stop) << std::endl;
+    
+  clock_gettime( CLOCK_REALTIME, &start);  
   p.reduce();  
+  clock_gettime( CLOCK_REALTIME, &stop);
   p %= q;
+  // std::cout << "Encrypt B: " << compute_time_ms(start,stop) << std::endl;
+    
   // uint64_t pModq = get_cycles()-start;
 
   // std::cout << "phi.deg() " << phi.deg() << std::endl;

@@ -171,6 +171,7 @@ void Polynomial::update_host_data(){
     if(this->polyCRT.size() != Polynomial::CRTPrimes.size())
       this->polyCRT.resize(Polynomial::CRTPrimes.size());
 
+
     for(unsigned int i=0;i < Polynomial::CRTPrimes.size();i++){
       if(this->polyCRT[i].size() < (unsigned int)(this->get_crt_spacing)())
         this->polyCRT[i].resize(this->get_crt_spacing());
@@ -187,7 +188,7 @@ void Polynomial::update_host_data(){
     assert(result == cudaSuccess);
     this->set_host_updated(true);
     this->icrt();
-    
+  
     #ifdef VERBOSEMEMORYCOPY
     uint64_t end = get_cycles();
     std::cout << "Cycles needed: " << (end-start) <<std::endl;
@@ -280,8 +281,8 @@ void Polynomial::icrt(){
   uint64_t start_iteration,end_iteration;
   start = get_cycles();
   #endif
+
   // Iteration over all primes
-  // #pragma omp parallel for
   for(unsigned int i = 0; i < primes.size();i++){
     // Get a prime
     #ifdef CYCLECOUNTING
@@ -299,15 +300,8 @@ void Polynomial::icrt(){
     start_iteration = get_cycles();
     #endif
 
-    if(&this->polyCRT[i] == NULL)
-      std::cout << &this->polyCRT[i] << std::endl;
-
-    // Remove last 0-coefficients
-    while(this->polyCRT[i].size() >= 0 &&
-          this->polyCRT[i][this->polyCRT[i].size()-1] == ZZ(0))
-      this->polyCRT[i].pop_back();
-
     // Iteration over coefficients
+    #pragma omp parallel for
     for(unsigned int j = 0; j < this->polyCRT[i].size();j++){
       int64_t value = this->polyCRT[i][j];
       this->coefs[j] += Mpi*( invMpi*(value) % pi);
@@ -318,7 +312,9 @@ void Polynomial::icrt(){
     #endif
     
   }
+
   #ifdef CYCLECOUNTING
+
   end = get_cycles();
   std::cout << "Cycles in iterations: " << (end-start) << std::endl;
  
@@ -382,8 +378,11 @@ void Polynomial::DivRem(Polynomial a,Polynomial b,Polynomial &quot,Polynomial &r
 
       const unsigned int half = b.deg()-1;     
 
+      rem.set_coeffs(half+1);
+      #pragma omp parallel for
       for(unsigned int i = 0;i <= half;i++)
         rem.set_coeff(i,a.get_coeff(i)-a.get_coeff(i+half+1));
+
     }else{
       throw "DivRem: I don't know how to div this!";
     }

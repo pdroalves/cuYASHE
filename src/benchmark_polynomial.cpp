@@ -11,27 +11,12 @@
 #include <NTL/ZZ_pEX.h>
 #include <iomanip>
  #include <stdint.h>
+#include "common.h"
 
 #define BILLION  1000000000L
 #define MILLION  1000000L
 #define N 100
 
-double compute_time_ms(struct timespec start,struct timespec stop){
-  return (( stop.tv_sec - start.tv_sec )*BILLION + ( stop.tv_nsec - start.tv_nsec ))/MILLION;
-}
-
-// Get current date/time, format is YYYYMMDDHHmmss
-const std::string current_date_time() {
-    time_t     now = time(0);
-    struct tm  tstruct;
-    char       buf[80];
-    tstruct = *localtime(&now);
-    // Visit http://en.cppreference.com/w/cpp/chrono/c/strftime
-    // for more information about date/time format
-    strftime(buf, sizeof(buf), "%Y%m%d%H%M%S", &tstruct);
-
-    return buf;
-}
 
 int main(int argc,char* argv[]){
   cout << fixed;

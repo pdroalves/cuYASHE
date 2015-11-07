@@ -617,8 +617,8 @@ BOOST_AUTO_TEST_CASE(randomPolynomialOperations)
     int random_op_bit = rand()%2;
     int random_ab = rand()%3;
 
-    std::cout << "random_op: " << random_op_bit << std::endl;
-    std::cout << "random_ab: " << random_ab << std::endl;
+    // std::cout << "random_op: " << random_op_bit << std::endl;
+    // std::cout << "random_ab: " << random_ab << std::endl;
 
     // 0: add
     switch(random_op_bit){

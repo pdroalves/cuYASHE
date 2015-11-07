@@ -7,8 +7,13 @@
 #include <NTL/ZZ.h>
 #include <NTL/ZZ_pEX.h>
 #include <NTL/ZZ_pXFactoring.h>
+#include <iomanip>
+#include <time.h>
 
 uint64_t get_cycles();
+double compute_time_ms(struct timespec start,struct timespec stop);
+const std::string current_date_time() ;
+
 
 template <class P>
 P common_addition(P *a,P *b){

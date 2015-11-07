@@ -821,7 +821,8 @@ __host__ void Polynomial::reduce(){
   Polynomial *phi = (Polynomial::global_phi);
 
   // #warning "Reduce on device has a bug. Deviating to host."
-  this->update_host_data();
+      this->update_host_data();
+      
   // this->set_device_updated(false);
   // if(!this->get_device_updated())
     // this->update_device_data();
