@@ -374,6 +374,13 @@ __host__ __device__ int expand(int idxL, int N1, int N2){
 	return (idxL/N1)*N1*N2 + (idxL%N1);
 }
 
+__global__ void NTTScale(cuyasheint_t *data,const int size,const int scale){
+  const int tid = threadIdx.x + blockIdx.x*blockDim.x;
+
+  if( tid < size )
+    data[tid] /= scale;
+} 
+
 __device__ __host__ void NTTIteration(cuyasheint_t *W,
                                       cuyasheint_t *WInv,
                                       const int residue_index,
@@ -613,6 +620,7 @@ __host__ cuyasheint_t* CUDAFunctions::callPolynomialMul(cudaStream_t stream,
     std::swap(aux,d_a);
   }
   
+
   result = cudaMemsetAsync(aux,0,size*sizeof(cuyasheint_t),stream);
   assert(result == cudaSuccess);
 
@@ -622,11 +630,33 @@ __host__ cuyasheint_t* CUDAFunctions::callPolynomialMul(cudaStream_t stream,
     std::swap(aux,d_b);
   }
 
+  cuyasheint_t *h_a;
+  h_a = (cuyasheint_t*)malloc(N*sizeof(cuyasheint_t));
+  cudaMemcpy(h_a,d_a,N*sizeof(cuyasheint_t),cudaMemcpyDeviceToHost);
+  std::cout << "h_a = ";
+  for(unsigned int i = 0; i < N; i++)
+    std::cout << h_a[i] << " ";
+  std::cout << std::endl;
+
+  cuyasheint_t *h_b;
+  h_b = (cuyasheint_t*)malloc(N*sizeof(cuyasheint_t));
+  cudaMemcpy(h_b,d_b,N*sizeof(cuyasheint_t),cudaMemcpyDeviceToHost);
+  std::cout << "h_b = ";
+  for(unsigned int i = 0; i < N; i++)
+    std::cout << h_b[i] << " ";
+  std::cout << std::endl;
+
   // Multiply
   dim3 blockDimMul(ADDBLOCKXDIM);
   dim3 gridDimMul((size)/ADDBLOCKXDIM+1); // We expect that ADDBLOCKXDIM always divide size
   polynomialNTTMul<<<gridDimMul,blockDimMul,1,stream>>>(d_a,d_b,size);
   assert(cudaGetLastError() == cudaSuccess);
+
+  cudaMemcpy(h_a,d_a,N*sizeof(cuyasheint_t),cudaMemcpyDeviceToHost);
+  std::cout << "h_a = ";
+  for(unsigned int i = 0; i < N; i++)
+    std::cout << h_a[i] << " ";
+  std::cout << std::endl;
 
   // // Inverse
   for(int Ns=1; Ns<N; Ns*=RADIX){
@@ -634,7 +664,10 @@ __host__ cuyasheint_t* CUDAFunctions::callPolynomialMul(cudaStream_t stream,
     assert(cudaGetLastError() == cudaSuccess);
     std::swap(d_a,d_result);
   }
+
   std::swap(d_a,d_result);
+
+  NTTScale<<< gridDim,blockDim,1,stream >>>(d_result,size,N);
   // cudaFree(d_a);
   // cudaFree(d_b);
   
