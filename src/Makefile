@@ -1,4 +1,4 @@
-OPT = -O3
+OPT = -O0
 
 CUDA_CC = nvcc $(OPT) -G -g -std=c++11
 CC = g++ -std=c++11 -g -Wall -Wfatal-errors -m64 $(OPT)
@@ -23,13 +23,14 @@ BENCHMARKYASHEBIN= $(INSTALL)/benchmark_yashe
 
 all: tests benchmarks
 
-tests:  polynomial.o cuda_functions.o test.o test_ctpt.o test_ct_mul.o test_mul.o test_crt.o test_reduce.o ciphertext.o distribution.o yashe.o common.o integer.o
+tests:  polynomial.o cuda_functions.o test.o test_ctpt.o test_ct_mul.o test_ntt.o test_mul.o test_crt.o test_reduce.o ciphertext.o distribution.o yashe.o common.o integer.o
 	$(CUDA_CC) $(CUDA_ARCH) $(LCUDA) $(ICUDA) -o $(TESTBIN) test.o polynomial.o cuda_functions.o ciphertext.o distribution.o yashe.o common.o integer.o -lcufft -Xcompiler $(OPENMP) $(NTL) -lboost_unit_test_framework
 	# $(CUDA_CC) $(CUDA_ARCH) $(LCUDA) $(ICUDA) -o $(TESTBIN)_ctpt test_ctpt.o polynomial.o cuda_functions.o ciphertext.o distribution.o yashe.o common.o integer.o -lcufft -Xcompiler $(OPENMP) $(NTL)
 	# $(CUDA_CC) $(CUDA_ARCH) $(LCUDA) $(ICUDA) -o $(TESTBIN)_crt test_crt.o polynomial.o cuda_functions.o ciphertext.o distribution.o yashe.o common.o integer.o -lcufft -Xcompiler $(OPENMP) $(NTL)
 	$(CUDA_CC) $(CUDA_ARCH) $(LCUDA) $(ICUDA) -o $(TESTBIN)_reduce test_reduce.o polynomial.o cuda_functions.o ciphertext.o distribution.o yashe.o common.o integer.o -lcufft -Xcompiler $(OPENMP) $(NTL)
 	$(CUDA_CC) $(CUDA_ARCH) $(LCUDA) $(ICUDA) -o $(TESTBIN)_ct_mul test_ct_mul.o polynomial.o cuda_functions.o ciphertext.o distribution.o yashe.o common.o integer.o -lcufft -Xcompiler $(OPENMP) $(NTL)
 	$(CUDA_CC) $(CUDA_ARCH) $(LCUDA) $(ICUDA) -o $(TESTBIN)_mul test_mul.o polynomial.o cuda_functions.o ciphertext.o distribution.o yashe.o common.o integer.o -lcufft -Xcompiler $(OPENMP) $(NTL)
+	$(CUDA_CC) $(CUDA_ARCH) $(LCUDA) $(ICUDA) -o $(TESTBIN)_ntt test_ntt.o  polynomial.o cuda_functions.o ciphertext.o distribution.o yashe.o common.o integer.o -lcufft -Xcompiler $(OPENMP) $(NTL)
 	
 test_fft:
 	$(CUDA_CC) $(CUDA_ARCH) $(LCUDA) $(ICUDA) -o $(TESTBIN)_fft test_fft.cu -lcufft
@@ -80,6 +81,11 @@ test_reduce.o:
 
 test_ct_mul.o:
 	$(CUDA_CC) -c test_ct_mul.cu -o test_ct_mul.o  $(NTL)
+
+
+test_ntt.o:test_ntt.cu
+	$(CUDA_CC) -c test_ntt.cu -o test_ntt.o  $(NTL)
+
 
 test.o:test.cu
 	$(CUDA_CC) -c test.cu -o test.o  -lboost_unit_test_framework $(NTL)

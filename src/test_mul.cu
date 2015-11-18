@@ -12,7 +12,7 @@ int main(){
   Polynomial phi;
   ZZ_pX NTL_Phi;
 
-  degree = 2048;
+  degree = 8;
 
   Polynomial::global_mod = conv<ZZ>("1171313591017775093490277364417"); // Defines default GF(q)
   Polynomial::BuildNthCyclotomic(&phi,degree);
@@ -29,26 +29,16 @@ int main(){
   }
   ZZ_pE::init(NTL_Phi);
 
-  
   Polynomial a,b;
-  Polynomial::random(&a,Polynomial::global_phi->deg()-1);
-  Polynomial::random(&b,Polynomial::global_phi->deg()-1);
+  Polynomial::random(&a,8);
+  Polynomial::random(&b,8);
+
+  std::cout << "a: " << a.to_string() << std::endl;
+  std::cout << "b: " << b.to_string() << std::endl;
+
   Polynomial c = a*b;
-
-  uint64_t start,end;
-  std::cout << std::endl << std::endl;
-  start = get_cycles();
-  for(unsigned int i = 0; i < 10; i++)
-    c = a*b;
-  end = get_cycles();
-  std::cout << "Mul Cycles: " << (end-start)/10 << std::endl;
-
-  ZZ value = to_ZZ(439881456);
-  start = get_cycles();
-  for(unsigned int i = 0; i < 10; i++)
-    Polynomial mod_poly = c%(Polynomial::global_mod);
-  end = get_cycles();
-
-  std::cout << "%ZZ Cycles: " << (end-start)/10 << std::endl;
-
+  
+  std::cout << "a: " << a.to_string() << std::endl;
+  std::cout << "b: " << b.to_string() << std::endl;
+  std::cout << "a*b: " <<c.to_string() << std::endl;
 }

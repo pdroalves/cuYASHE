@@ -273,7 +273,7 @@ BOOST_AUTO_TEST_CASE(wNTest)
 //   }
 
 // }
-#ifdef NTTMul
+#ifdef NTTMUL
 BOOST_AUTO_TEST_CASE(smulTest)
 {
   const uint64_t P = 18446744069414584321L;

@@ -144,13 +144,19 @@ P common_multiplication(P *a, P *b){
   
   if(needed_spacing < CUDAFunctions::N)
 	needed_spacing = CUDAFunctions::N;
-	else if(needed_spacing != CUDAFunctions::N){
+  else if(needed_spacing != CUDAFunctions::N)
 	// Re-compute W matrix
 	CUDAFunctions::init(needed_spacing);
-  }
-
+  
+  
   bool update_A_spacing = false; 
   bool update_B_spacing = false;
+  #ifdef NTTMUL
+	if(a->CRTSPACING != needed_spacing)
+	  a->update_crt_spacing(needed_spacing);
+	if(b->CRTSPACING != needed_spacing)
+	  b->update_crt_spacing(needed_spacing);
+  #elif defined(CUFFTMUL)
   if(a->get_crt_spacing() != needed_spacing){
   	// if(!a->get_device_updated())
   		// a->update_crt_spacing(needed_spacing);
@@ -164,6 +170,7 @@ P common_multiplication(P *a, P *b){
   	// else
 	  	update_B_spacing = true;
   }
+  #endif
 
   #ifdef VERBOSE
   std::cout << "Mul with CRTSPACING " << needed_spacing << std::endl;

@@ -10,6 +10,8 @@
 
 
 #ifdef NTTMUL
+ ZZ PZZ = conv<ZZ>("18446744069414584321");
+
 cuyasheint_t CUDAFunctions::wN = 0;
 cuyasheint_t *CUDAFunctions::d_W = NULL;
 cuyasheint_t *CUDAFunctions::d_WInv = NULL;
@@ -289,7 +291,7 @@ __device__ __host__ uint64_t s_rem (uint64_t a)
   return res;
 }
 
-__device__ __host__  uint64_t s_mul(uint64_t a,uint64_t b){
+__device__ __host__  uint64_t s_mul(volatile uint64_t a,volatile uint64_t b){
   // Multiply and reduce a and b by prime 2^64-2^32+1
   const uint64_t P = 18446744069414584321;
 
@@ -338,18 +340,34 @@ __device__ __host__  uint64_t s_mul(uint64_t a,uint64_t b){
 }
 
 __device__ __host__  uint64_t s_add(volatile uint64_t a,volatile uint64_t b){
-  // Multiply and reduce a and b by prime 2^64-2^32+1
+  // Add and reduce a and b by prime 2^64-2^32+1
   uint64_t res = a+b;
   res += (res < a)*4294967295L;
   res = s_rem(res);
   return res;
 }
 
+
+__device__ __host__ uint64_t s_sub(volatile uint64_t a,volatile uint64_t b){
+  // Computes a-b % P
+  const uint64_t P = 18446744069414584321;
+
+  uint64_t c = a-b;
+  if(c > a)
+    // Overflow
+    c = P - (UINT64_MAX-c)-1;
+  
+  return c;
+}
+
 __host__ __device__ void butterfly(uint64_t *v){
-	// Butterfly
+  // Butterfly
+  const uint64_t P = 18446744069414584321;
+  
+
   uint64_t v0 = v[0];
   v[0] = s_add(v0,v[1]);
-  v[1] = v0 - v[1];
+  v[1] = s_sub(v0,v[1]);
 }
 
 __host__ __device__ int expand(int idxL, int N1, int N2){
@@ -366,7 +384,7 @@ __device__ __host__ void NTTIteration(cuyasheint_t *W,
                                       const cuyasheint_t* data0,
                                       cuyasheint_t *data1,
                                       const int type){
-	uint64_t v[2];
+	uint64_t v[2] = {0,0};
 	int idxS = j+i;
 	// int wIndex;
 	cuyasheint_t *w;
@@ -374,19 +392,21 @@ __device__ __host__ void NTTIteration(cuyasheint_t *W,
 		w = W;
 	else
 		w = WInv;
+  int w_index = ((j%Ns)*N)/(Ns*R);
 
-	for(int r=0; r<R; r++){
-    v[r] = s_mul(data0[idxS+r*N/R],w[i]);
-  }
+  for(int r=0; r<R; r++)
+    v[r] = s_mul(data0[idxS+r*N/R],w[w_index*r]);
 
 	butterfly(v);
 	int idxD = expand(j,Ns,R);
 	for(int r=0; r<R;r++){
-
     if(type == FORWARD)
   		data1[idxD+r*Ns] = v[r];
     else
       data1[idxD+r*Ns] = v[r];
+    #ifdef __CUDA_ARCH__
+    __syncthreads();
+    #endif
   }
 }
 
@@ -398,6 +418,20 @@ __global__ void NTT(cuyasheint_t *d_W,cuyasheint_t *d_WInv,const int N, const in
     const int j = (threadIdx.x+i);
     if( j < N*gridDim.x)
       NTTIteration(d_W,d_WInv,ntt_index,j, N, R, Ns, dataI, dataO,type);
+    __syncthreads();
+  }
+}
+
+__host__ void CUDAFunctions::callNTT(const int N, cuyasheint_t* dataI, cuyasheint_t* dataO,const int type){
+
+  const int RADIX = 2;
+  dim3 blockDim(std::min(N/RADIX,1024));
+  dim3 gridDim(1);
+
+  for(int Ns=1; Ns<N; Ns*=RADIX){
+    NTT<<<gridDim,blockDim>>>(CUDAFunctions::d_W,CUDAFunctions::d_WInv,N,RADIX,Ns,dataI,dataO,type);
+    assert(cudaGetLastError() == cudaSuccess);
+    std::swap(dataI,dataO);
   }
 }
 
@@ -545,15 +579,26 @@ __host__ cuyasheint_t* CUDAFunctions::callPolynomialMul(cudaStream_t stream,
   const int size = N*NPolis;
   cuyasheint_t *d_a;
   cuyasheint_t *d_b;
-  cudaError_t result = cudaMalloc((void**)&d_result,size*sizeof(cuyasheint_t));
+  cuyasheint_t *aux;
+
+  cudaError_t result;
+  result = cudaMalloc((void**)&d_result,size*sizeof(cuyasheint_t));
   assert(result == cudaSuccess);
   result = cudaMalloc((void**)&d_a,size*sizeof(cuyasheint_t));
   assert(result == cudaSuccess);
-  result = cudaMemset(d_a,0,size*sizeof(cuyasheint_t));
-  assert(result == cudaSuccess);
   result = cudaMalloc((void**)&d_b,size*sizeof(cuyasheint_t));
   assert(result == cudaSuccess);
-  result = cudaMemset(d_b,0,size*sizeof(cuyasheint_t));
+  result = cudaMalloc((void**)&aux,size*sizeof(cuyasheint_t));
+  assert(result == cudaSuccess);
+
+  result = cudaMemsetAsync(aux,0,size*sizeof(cuyasheint_t),stream);
+  assert(result == cudaSuccess);
+  result = cudaMemsetAsync(d_result,0,size*sizeof(cuyasheint_t),stream);
+  assert(result == cudaSuccess);
+
+  result = cudaMemcpyAsync(d_a,a,size*sizeof(cuyasheint_t),cudaMemcpyDeviceToDevice,stream);
+  assert(result == cudaSuccess);
+  result = cudaMemcpyAsync(d_b,b,size*sizeof(cuyasheint_t),cudaMemcpyDeviceToDevice,stream);
   assert(result == cudaSuccess);
 
   const int RADIX = 2;
@@ -562,21 +607,24 @@ __host__ cuyasheint_t* CUDAFunctions::callPolynomialMul(cudaStream_t stream,
 
   // Forward
   for(int Ns=1; Ns<N; Ns*=RADIX){
-    NTT<<<gridDim,blockDim,1,stream >>>(CUDAFunctions::d_W,CUDAFunctions::d_WInv,N,RADIX,Ns,a,d_a,FORWARD);
+    NTT<<<gridDim,blockDim,1,stream >>>(CUDAFunctions::d_W,CUDAFunctions::d_WInv,N,RADIX,Ns,d_a,aux,FORWARD);
     assert(cudaGetLastError() == cudaSuccess);
-    std::swap(a,d_a);
+    std::swap(aux,d_a);
   }
-  std::swap(a,d_a);
+  
+  result = cudaMemsetAsync(aux,0,size*sizeof(cuyasheint_t),stream);
+  assert(result == cudaSuccess);
 
   for(int Ns=1; Ns<N; Ns*=RADIX){
-    NTT<<<gridDim,blockDim,1,stream >>>(CUDAFunctions::d_W,CUDAFunctions::d_WInv,N,RADIX,Ns,b,d_b,FORWARD);
+    NTT<<<gridDim,blockDim,1,stream >>>(CUDAFunctions::d_W,CUDAFunctions::d_WInv,N,RADIX,Ns,d_b,aux,FORWARD);
     assert(cudaGetLastError() == cudaSuccess);
-    std::swap(b,d_b);
+    std::swap(aux,d_b);
   }
+
   // Multiply
   dim3 blockDimMul(ADDBLOCKXDIM);
   dim3 gridDimMul((size)/ADDBLOCKXDIM+1); // We expect that ADDBLOCKXDIM always divide size
-  polynomialNTTMul<<<gridDimMul,blockDimMul>>>(d_a,d_b,size);
+  polynomialNTTMul<<<gridDimMul,blockDimMul,1,stream>>>(d_a,d_b,size);
   assert(cudaGetLastError() == cudaSuccess);
 
   // // Inverse
@@ -585,6 +633,7 @@ __host__ cuyasheint_t* CUDAFunctions::callPolynomialMul(cudaStream_t stream,
     assert(cudaGetLastError() == cudaSuccess);
     std::swap(d_a,d_result);
   }
+  std::swap(d_a,d_result);
   // cudaFree(d_a);
   // cudaFree(d_b);
   
@@ -737,13 +786,13 @@ __host__ void CUDAFunctions::init(int N){
   cuyasheint_t *h_W;
   cuyasheint_t *h_WInv;
 
-  ZZ PZZ = conv<ZZ>("18446744069414584321");
   cuyasheint_t k = conv<cuyasheint_t>(PZZ-1)/N;
   ZZ wNZZ = NTL::PowerMod(ZZ(7),k,PZZ);
   assert((PZZ-1)%(N) == 0);
-  // const cuyasheint_t k = (P-1)/N;
+
   wN = conv<cuyasheint_t>(wNZZ);
   std::cout << wN << std::endl;;
+  std::cout << wNZZ << std::endl;;
 
   cudaError_t result;
   h_W = (cuyasheint_t*)malloc(N*sizeof(cuyasheint_t));
@@ -761,9 +810,9 @@ __host__ void CUDAFunctions::init(int N){
   for(int j = 0; j < N; j++)
       h_WInv[j] = conv<cuyasheint_t>(NTL::InvMod(conv<ZZ>(h_W[j]),PZZ ));
 
-  result = cudaMemcpy (d_W,h_W , N*sizeof(cuyasheint_t),cudaMemcpyHostToDevice);
+  result = cudaMemcpyAsync (d_W,h_W , N*sizeof(cuyasheint_t),cudaMemcpyHostToDevice);
   assert(result == cudaSuccess);
-  result = cudaMemcpy(d_WInv,h_WInv , N*sizeof(cuyasheint_t),cudaMemcpyHostToDevice);
+  result = cudaMemcpyAsync(d_WInv,h_WInv , N*sizeof(cuyasheint_t),cudaMemcpyHostToDevice);
   assert(result == cudaSuccess);
 
   free(h_W);
