@@ -376,7 +376,7 @@ __host__ __device__ int expand(int idxL, int N1, int N2){
 
 __device__ __host__ void NTTIteration(cuyasheint_t *W,
                                       cuyasheint_t *WInv,
-                                      const int i,
+                                      const int residue_index,
                                       const int j,
                                       const int N,
                                       const int R,
@@ -385,7 +385,7 @@ __device__ __host__ void NTTIteration(cuyasheint_t *W,
                                       cuyasheint_t *data1,
                                       const int type){
 	uint64_t v[2] = {0,0};
-	int idxS = j+i;
+	const int idxS = j+residue_index;
 	// int wIndex;
 	cuyasheint_t *w;
 	if(type == FORWARD)
@@ -398,7 +398,8 @@ __device__ __host__ void NTTIteration(cuyasheint_t *W,
     v[r] = s_mul(data0[idxS+r*N/R],w[w_index*r]);
 
 	butterfly(v);
-	int idxD = expand(j,Ns,R);
+
+	const int idxD = expand(j,Ns,R)+residue_index;
 	for(int r=0; r<R;r++){
     if(type == FORWARD)
   		data1[idxD+r*Ns] = v[r];
@@ -412,21 +413,21 @@ __device__ __host__ void NTTIteration(cuyasheint_t *W,
 
 __global__ void NTT(cuyasheint_t *d_W,cuyasheint_t *d_WInv,const int N, const int R, const int Ns, cuyasheint_t* dataI, cuyasheint_t* dataO,const int type){
 
-  const int ntt_index = (blockIdx.x)*N;
+  const int residue_index = (blockIdx.x)*N;
   for(int i = 0; i < N/R; i += 1024){
     // " Threads virtuais "
     const int j = (threadIdx.x+i);
-    if( j < N*gridDim.x)
-      NTTIteration(d_W,d_WInv,ntt_index,j, N, R, Ns, dataI, dataO,type);
+    if( j < N)
+      NTTIteration(d_W,d_WInv,residue_index,j, N, R, Ns, dataI, dataO,type);
     __syncthreads();
   }
 }
 
-__host__ void CUDAFunctions::callNTT(const int N, cuyasheint_t* dataI, cuyasheint_t* dataO,const int type){
+__host__ void CUDAFunctions::callNTT(const int N, const int NPolis,cuyasheint_t* dataI, cuyasheint_t* dataO,const int type){
 
   const int RADIX = 2;
   dim3 blockDim(std::min(N/RADIX,1024));
-  dim3 gridDim(1);
+  dim3 gridDim(NPolis);
 
   for(int Ns=1; Ns<N; Ns*=RADIX){
     NTT<<<gridDim,blockDim>>>(CUDAFunctions::d_W,CUDAFunctions::d_WInv,N,RADIX,Ns,dataI,dataO,type);

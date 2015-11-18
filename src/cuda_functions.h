@@ -53,7 +53,7 @@ class CUDAFunctions{
                                             cuyasheint_t *array,
                                             int residuesSize,
                                             int residuesQty);
-    static void callNTT(const int N, cuyasheint_t* dataI, cuyasheint_t* dataO,const int type);
+    static void callNTT(const int N, const int NPolis,cuyasheint_t* dataI, cuyasheint_t* dataO,const int type);
 
     static void init(int N);
     static void write_crt_primes();
