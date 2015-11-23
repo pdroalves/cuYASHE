@@ -21,7 +21,7 @@ int main(){
 
   srand (36251);
 
-  Polynomial::gen_crt_primes(Polynomial::global_mod,degree);
+  Polynomial::gen_crt_primes(Polynomial::global_mod,2*degree);
   
   ZZ_p::init(Polynomial::global_mod);
   for(int i = 0; i <= phi.deg();i++){
@@ -32,9 +32,6 @@ int main(){
   Polynomial a,b;
   Polynomial::random(&a,8);
   Polynomial::random(&b,8);
-
-  std::cout << "a: " << a.to_string() << std::endl;
-  std::cout << "b: " << b.to_string() << std::endl;
 
   Polynomial c = a*b;
   

@@ -630,21 +630,21 @@ __host__ cuyasheint_t* CUDAFunctions::callPolynomialMul(cudaStream_t stream,
     std::swap(aux,d_b);
   }
 
-  cuyasheint_t *h_a;
-  h_a = (cuyasheint_t*)malloc(N*sizeof(cuyasheint_t));
-  cudaMemcpy(h_a,d_a,N*sizeof(cuyasheint_t),cudaMemcpyDeviceToHost);
-  std::cout << "h_a = ";
-  for(unsigned int i = 0; i < N; i++)
-    std::cout << h_a[i] << " ";
-  std::cout << std::endl;
+  // cuyasheint_t *h_a;
+  // h_a = (cuyasheint_t*)malloc(N*sizeof(cuyasheint_t));
+  // cudaMemcpy(h_a,d_a+6*N,N*sizeof(cuyasheint_t),cudaMemcpyDeviceToHost);
+  // std::cout << "h_a = ";
+  // for(unsigned int i = 0; i < N; i++)
+  //   std::cout << h_a[i] << " ";
+  // std::cout << std::endl;
 
-  cuyasheint_t *h_b;
-  h_b = (cuyasheint_t*)malloc(N*sizeof(cuyasheint_t));
-  cudaMemcpy(h_b,d_b,N*sizeof(cuyasheint_t),cudaMemcpyDeviceToHost);
-  std::cout << "h_b = ";
-  for(unsigned int i = 0; i < N; i++)
-    std::cout << h_b[i] << " ";
-  std::cout << std::endl;
+  // cuyasheint_t *h_b;
+  // h_b = (cuyasheint_t*)malloc(N*sizeof(cuyasheint_t));
+  // cudaMemcpy(h_b,d_b+6*N,N*sizeof(cuyasheint_t),cudaMemcpyDeviceToHost);
+  // std::cout << "h_b = ";
+  // for(unsigned int i = 0; i < N; i++)
+  //   std::cout << h_b[i] << " ";
+  // std::cout << std::endl;
 
   // Multiply
   dim3 blockDimMul(ADDBLOCKXDIM);
@@ -652,11 +652,11 @@ __host__ cuyasheint_t* CUDAFunctions::callPolynomialMul(cudaStream_t stream,
   polynomialNTTMul<<<gridDimMul,blockDimMul,1,stream>>>(d_a,d_b,size);
   assert(cudaGetLastError() == cudaSuccess);
 
-  cudaMemcpy(h_a,d_a,N*sizeof(cuyasheint_t),cudaMemcpyDeviceToHost);
-  std::cout << "h_a = ";
-  for(unsigned int i = 0; i < N; i++)
-    std::cout << h_a[i] << " ";
-  std::cout << std::endl;
+  // cudaMemcpy(h_a,d_a+6*N,N*sizeof(cuyasheint_t),cudaMemcpyDeviceToHost);
+  // std::cout << "h_a = ";
+  // for(unsigned int i = 0; i < N; i++)
+  //   std::cout << h_a[i] << " ";
+  // std::cout << std::endl;
 
   // // Inverse
   for(int Ns=1; Ns<N; Ns*=RADIX){
@@ -667,7 +667,7 @@ __host__ cuyasheint_t* CUDAFunctions::callPolynomialMul(cudaStream_t stream,
 
   std::swap(d_a,d_result);
 
-  NTTScale<<< gridDim,blockDim,1,stream >>>(d_result,size,N);
+  NTTScale<<< gridDimMul,blockDimMul,1,stream >>>(d_result,size,N);
   // cudaFree(d_a);
   // cudaFree(d_b);
   
@@ -813,9 +813,9 @@ __host__ void CUDAFunctions::init(int N){
   CUDAFunctions::N = N;
 
   #ifdef NTTMUL
-  // #ifdef VERBOSE
+  #ifdef VERBOSE
   std::cout << "Will compute W." << std::endl;
-  // #endif
+  #endif
 
   cuyasheint_t *h_W;
   cuyasheint_t *h_WInv;
@@ -825,8 +825,6 @@ __host__ void CUDAFunctions::init(int N){
   assert((PZZ-1)%(N) == 0);
 
   wN = conv<cuyasheint_t>(wNZZ);
-  std::cout << wN << std::endl;;
-  std::cout << wNZZ << std::endl;;
 
   cudaError_t result;
   h_W = (cuyasheint_t*)malloc(N*sizeof(cuyasheint_t));
@@ -906,7 +904,7 @@ __host__ void Polynomial::reduce(){
   // #warning "Reduce on device has a bug. Deviating to host."
       this->update_host_data();
       
-  // this->set_device_updated(false);
+  this->set_device_updated(false);
   // if(!this->get_device_updated())
     // this->update_device_data();
 

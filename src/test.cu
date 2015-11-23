@@ -377,15 +377,10 @@ BOOST_AUTO_TEST_CASE(simpleMultiplyByPolynomial)
 
   CUDAFunctions::init(2*degree);
 
-
-  a.set_device_updated(false);
-  b.set_device_updated(false);
   for(int i = 0; i < degree;i++){
     a.set_coeff(i,i);
     b.set_coeff(i,1);
   }
-  a.set_host_updated(true);
-  b.set_host_updated(true);
 
   ZZ_pEX b_ntl;
   ZZ_pEX a_ntl;
@@ -395,21 +390,16 @@ BOOST_AUTO_TEST_CASE(simpleMultiplyByPolynomial)
     NTL::SetCoeff(b_ntl,i,conv<ZZ_p>(b.get_coeff(i)));
 
   Polynomial c = a*b;
-  c.icrt();
+  // c.normalize();
 
   ZZ_pEX c_ntl = a_ntl*b_ntl;
 
-  #ifdef DEBUG
-  if(c_ntl != c){
-    std::cout << "a: " << a << " degree: " << NTL::deg(a) <<std::endl;
-    std::cout << "b: " << b << " degree: " << NTL::deg(b) <<std::endl;
-    std::cout << "c: " << c << " degree: " << NTL::deg(c) <<std::endl;
+  // #ifdef DEBUG
+    std::cout << "a: " << a.to_string() << " degree: " << a.deg() <<std::endl;
+    std::cout << "b: " << b.to_string() << " degree: " << b.deg() <<std::endl;
+    std::cout << "c: " << c.to_string() << " degree: " << c.deg() <<std::endl;
     std::cout << "c_ntl: " << c_ntl << " degree: " << NTL::deg(c_ntl) << std::endl << std::endl;
-  }
-  std::cout << "count: " << count << std::endl;
-  #endif
-    // std::cout << "c: " << c.to_string() << " degree: " << c.deg() <<std::endl;
-    // std::cout << "c_ntl: " << c_ntl << " degree: " << NTL::deg(c_ntl) << std::endl << std::endl;
+  // #endif
 
   BOOST_REQUIRE(NTL::deg(c_ntl) == c.deg());
   for(int i = 0;i <= c.deg();i++){

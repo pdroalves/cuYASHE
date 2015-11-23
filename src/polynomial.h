@@ -781,14 +781,17 @@ class Polynomial{
         cuyasheint_t n;
 
         // Get primes
+        // std::cout << "Primes: " << std::endl;
         while( (M < (2*degree)*q*q) ){
             n = NTL::GenPrime_long(primes_size);
             if( std::find(P.begin(), P.end(), n) == P.end()){
               // Does not contains
+              // std::cout << n << std::endl;
               P.push_back(n);
               M *=(n);
             }
         }
+        // std::cout << std::endl;
         // Compute M/pi and it's inverse
         for(unsigned int i = 0; i < P.size();i++){
           ZZ pi = to_ZZ(P[i]);

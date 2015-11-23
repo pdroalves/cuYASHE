@@ -10,7 +10,7 @@
 #ifdef CUFFTMUL
 #define CRTPRIMESIZE 10
 #else
-#define CRTPRIMESIZE 31
+#define CRTPRIMESIZE 28
 #endif
 // #define CYCLECOUNTING
 // #define VERBOSE
