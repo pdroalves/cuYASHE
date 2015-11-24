@@ -739,11 +739,12 @@ class Polynomial{
     }
     cuyasheint_t* get_device_crt_residues(){
       // Returns the address of crt residues at device memory
-      // if(this->d_polyCRT == NULL){
-        // cudaError_t result = cudaMalloc((void**)&this->d_polyCRT,std::max(this->CRTSPACING,1)*(Polynomial::CRTPrimes.size())*sizeof(cuyasheint_t));
-        // assert(result == cudaSuccess);
-      // }
-      // this->update_device_data();
+      if(this->d_polyCRT == NULL){
+        this->CRTSPACING = std::max(this->get_crt_spacing(),1);
+        cudaError_t result = cudaMalloc((void**)&this->d_polyCRT,this->get_crt_spacing()*(Polynomial::CRTPrimes.size())*sizeof(cuyasheint_t));
+        assert(result == cudaSuccess);
+      }
+      // this->update_crt_spacing(this->get_crt_spacing());
       return this->d_polyCRT;
     }
     void set_device_crt_residues(cuyasheint_t *residues){
@@ -782,7 +783,7 @@ class Polynomial{
 
         // Get primes
         // std::cout << "Primes: " << std::endl;
-        while( (M < (2*degree)*q*q) ){
+        while( (M < (2*degree)*q*q*q) ){
             n = NTL::GenPrime_long(primes_size);
             if( std::find(P.begin(), P.end(), n) == P.end()){
               // Does not contains
@@ -931,12 +932,8 @@ class Polynomial{
 
     int deg(){
       if(!this->get_host_updated())
-        this->icrt();
+        this->update_host_data();
       return this->coefs.size()-1;
-      // if(!this->get_host_updated())
-        // return this->expected_degree;        
-      // else
-        // return this->coefs.size()-1;
     }
     ZZ lead_coeff(){
       if(this->deg() >= 0){
@@ -977,10 +974,9 @@ class Polynomial{
       }else if(!get_device_updated()){
         // Data isn't updated on GPU's global memory
         // Just set the spacing and update gpu
-        this->CRTSPACING = new_spacing;
+        if(this->get_crt_spacing() != new_spacing)
+          this->CRTSPACING = new_spacing;
 
-        // if(this->deg() >= 0)
-          // update_device_data();
         cuyasheint_t *d_pointer;
         cudaError_t result = cudaMalloc((void**)&d_pointer,new_spacing*(CRTPrimes.size())*sizeof(cuyasheint_t));        
         assert(result == cudaSuccess);

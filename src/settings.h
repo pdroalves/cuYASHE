@@ -2,16 +2,17 @@
 #define SETTINGS_H
 
 // #define PLAINMUL
-#define NTTMUL
+// #define NTTMUL
 // #define FFTMUL
-// #define CUFFTMUL
+#define CUFFTMUL
 
 #define ADDBLOCKXDIM 32
 #ifdef CUFFTMUL
 #define CRTPRIMESIZE 10
 #else
-#define CRTPRIMESIZE 28
+#define CRTPRIMESIZE 10
 #endif
+// #define DEBUG
 // #define CYCLECOUNTING
 // #define VERBOSE
 // #define VERBOSEMEMORYCOPY

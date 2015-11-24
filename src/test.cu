@@ -30,8 +30,10 @@ struct CUDASuite
 struct PolySuite
 {
   // Test polynomial functions
-    int degree;
-    Polynomial phi;
+  ZZ q;
+  int degree;
+  Polynomial phi;
+  ZZ_pX NTL_Phi;
 
 
     PolySuite(){
@@ -39,7 +41,8 @@ struct PolySuite
 
         degree = 8;
 
-        Polynomial::global_mod = conv<ZZ>("1171313591017775093490277364417L"); // Defines default GF(q)
+        q = conv<ZZ>("1171313591017775093490277364417L");
+        Polynomial::global_mod = q; // Defines default GF(q)
         Polynomial::BuildNthCyclotomic(&phi,degree);
         phi.set_mod(Polynomial::global_mod);
         Polynomial::global_phi = &phi;
@@ -47,7 +50,6 @@ struct PolySuite
         srand (36251);
 
         ZZ_p::init(Polynomial::global_mod);
-        ZZ_pX NTL_Phi;
         for(int i = 0; i <= phi.deg();i++){
           NTL::SetCoeff(NTL_Phi,i,conv<ZZ_p>(phi.get_coeff(i)));
         }
@@ -393,6 +395,7 @@ BOOST_AUTO_TEST_CASE(simpleMultiplyByPolynomial)
   // c.normalize();
 
   ZZ_pEX c_ntl = a_ntl*b_ntl;
+  c_ntl %= conv<ZZ_pEX>(NTL_Phi);
 
   // #ifdef DEBUG
     std::cout << "a: " << a.to_string() << " degree: " << a.deg() <<std::endl;
@@ -444,6 +447,7 @@ BOOST_AUTO_TEST_CASE(multiplyByPolynomial)
     c %= Polynomial::global_mod;
 
     ZZ_pEX c_ntl = a_ntl*b_ntl;
+    c_ntl %= conv<ZZ_pEX>(NTL_Phi);
 
     #ifdef DEBUG
     if(c_ntl != c){
@@ -500,6 +504,7 @@ BOOST_AUTO_TEST_CASE(multiplyAndAddByPolynomial)
     Polynomial c = a*b+a;
 
     ZZ_pEX c_ntl = a_ntl*b_ntl+a_ntl;
+    c_ntl %= conv<ZZ_pEX>(NTL_Phi);
 
     #ifdef DEBUG
     if(c_ntl != c){
@@ -555,6 +560,7 @@ BOOST_AUTO_TEST_CASE(addAndMultiplyByPolynomial)
     Polynomial c = a*b+a;
 
     ZZ_pEX c_ntl = a_ntl*b_ntl+a_ntl;
+    c_ntl %= conv<ZZ_pEX>(NTL_Phi);
 
     #ifdef DEBUG 
      std::cout << "a: " << a.to_string() << " ==  " << a_ntl <<std::endl;
@@ -721,7 +727,70 @@ BOOST_AUTO_TEST_CASE(modularInversion)
 
 }
 
+BOOST_AUTO_TEST_CASE(severalMultiplications)
+{
+  Polynomial a;
+  Polynomial b;
 
+  CUDAFunctions::init(2*degree);
+
+  Polynomial::random(&a,degree-1);
+  Polynomial::random(&b,degree-1);
+
+  ZZ_pEX a_ntl;
+  ZZ_pEX b_ntl;
+  
+  for(int i = 0;i <= a.deg();i++)
+    NTL::SetCoeff(a_ntl,i,conv<ZZ_p>(a.get_coeff(i)));
+  for(int i = 0;i <= b.deg();i++)
+    NTL::SetCoeff(b_ntl,i,conv<ZZ_p>(b.get_coeff(i)));
+
+  std::cout << "Iteration "<< 0 << std::endl;
+
+  Polynomial c = a*b;
+  ZZ_pEX c_ntl = a_ntl*b_ntl;
+  c_ntl %= conv<ZZ_pEX>(NTL_Phi);
+
+  BOOST_REQUIRE(NTL::deg(c_ntl) == c.deg());
+  for(int i = 0;i <= c.deg();i++){
+
+    ZZ ntl_value;
+    if( NTL::IsZero(NTL::coeff(c_ntl,i)) )
+    // Without this, NTL raises an exception when we call rep()
+    ntl_value = 0L;
+    else
+    ntl_value = conv<ZZ>(NTL::rep(NTL::coeff(c_ntl,i))[0]);
+
+    BOOST_REQUIRE(c.get_coeff(i) == ntl_value);
+  }
+  for(unsigned int i = 1; i < 10; i++){
+    std::cout << "Iteration "<< i << std::endl;
+    c = c*a;
+
+    c_ntl = c_ntl*a_ntl;
+    c_ntl %= conv<ZZ_pEX>(NTL_Phi);
+
+    #ifdef DEBUG
+    std::cout << "a: " << a.to_string() << " degree: " << a.deg() <<std::endl;
+    std::cout << "b: " << b.to_string() << " degree: " << b.deg() <<std::endl;
+    std::cout << "c: " << c.to_string() << " degree: " << c.deg() <<std::endl;
+    std::cout << "c_ntl: " << c_ntl << " degree: " << NTL::deg(c_ntl) << std::endl << std::endl;
+    #endif
+
+    BOOST_REQUIRE(NTL::deg(c_ntl) == c.deg());
+    for(int i = 0;i <= c.deg();i++){
+
+      ZZ ntl_value;
+      if( NTL::IsZero(NTL::coeff(c_ntl,i)) )
+      // Without this, NTL raises an exception when we call rep()
+      ntl_value = 0L;
+      else
+      ntl_value = conv<ZZ>(NTL::rep(NTL::coeff(c_ntl,i))[0]);
+
+      BOOST_REQUIRE(c.get_coeff(i) == ntl_value);
+    }
+  }
+}
 BOOST_AUTO_TEST_CASE(phiReduceCPU)
 {
   //CPU
@@ -802,10 +871,10 @@ BOOST_AUTO_TEST_CASE(encryptDecrypt)
     Ciphertext c = cipher.encrypt(a);
     Polynomial a_decrypted = cipher.decrypt(c);
 
-    #ifdef VERBOSE
+    // #ifdef VERBOSE
     std::cout << "a: " << a.to_string() << std::endl;
     std::cout << "a_decrypted: " << a_decrypted.to_string() << std::endl;
-    #endif
+    // #endif
     BOOST_REQUIRE( a_decrypted == a);
   }
 }
@@ -853,12 +922,12 @@ BOOST_AUTO_TEST_CASE(encryptandMul)
     Polynomial a_decrypted = cipher.decrypt(c);
 
     Polynomial value = (a*a);
-    value.icrt();
     Polynomial value_reduced = value % t;
 
     #ifdef VERBOSE
     std::cout << "Original: " << a.to_string() << std::endl;
     std::cout << "Original *2: " << ((a*a)%t).to_string() << std::endl;
+    std::cout << "value: " << value.to_string() << std::endl;
     std::cout << "value_reduced: " << value_reduced.to_string() << std::endl;
     std::cout << "Decrypted: " << a_decrypted.to_string() << std::endl;
     #endif

@@ -56,27 +56,8 @@ Ciphertext Ciphertext::operator*(Ciphertext &b){
   
   #endif
 
-  // start = cycles();
-  // Polynomial tc1 = (Yashe::t)*c1;  
-  // tc1.reduce();
-  // end = cycles();
-  // // std::cout << "ciphertext t*c1 " << (end-start) << std::endl;
-  // std::cout << "ciphertext t*c1 " << tc1.to_string() << std::endl;
-
-  // start = cycles();
-  // Polynomial g = common_multiplication<Polynomial>(&tc1,&c2);
-  // end = cycles();
-  // // std::cout << "ciphertext tc1*c2 " << (end-start) << std::endl;
-
   Polynomial g = common_multiplication<Polynomial>(&c1,&c2);
   g *= (Yashe::t.get_value());
-  // std::cout << "ciphertext tc1*c2 " << g.to_string() << std::endl;
-  start = cycles();
-  g.reduce();
-  // g %= Yashe::q;
-  // Ciphertext p = g / Yashe::q;
-  end = cycles();
-  // std::cout << "ciphertext reduce " << (end-start) << std::endl;
   
   Ciphertext p;
   p.set_coeffs(g.deg()+1);
@@ -134,7 +115,6 @@ void Ciphertext::keyswitch(){
     Polynomial p = (P[i])*(Yashe::gamma[i]);
     *this += p;
   }
-  this->reduce();
 
   #ifdef CYCLECOUNTING
   end = get_cycles();

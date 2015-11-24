@@ -180,8 +180,6 @@ void Polynomial::update_host_data(){
                                 this->get_crt_spacing()*sizeof(cuyasheint_t),
                                 cudaMemcpyDeviceToHost,
                                 this->get_stream());
-      if(result != cudaSuccess)
-        std::cout << this->get_crt_spacing() << std::endl;
       assert(result == cudaSuccess);
     }
     result = cudaDeviceSynchronize();

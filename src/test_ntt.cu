@@ -6,7 +6,7 @@
 #include "polynomial.h"
 
 int main(){
-
+  #ifdef NTTMUL
   // Plan settings
   const int N = 8;
   const int batch = 2;
@@ -69,4 +69,5 @@ int main(){
   cudaFree(d_a1);
   cudaFree(d_a2);
   cudaFree(aux);
+  #endif
 }

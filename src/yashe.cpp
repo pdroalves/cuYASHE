@@ -17,9 +17,9 @@ void Yashe::generate_keys(){
   #ifdef DEBUG
   std::cout << "generate_keys:" << std::endl;
   std::cout << "d: " << d << std::endl;
-  std::cout << "phi: " << phi << std::endl;
+  std::cout << "phi: " << phi.to_string() << std::endl;
   std::cout << "q: " << Polynomial::global_mod << std::endl;
-  std::cout << "t: " << t << std::endl;
+  std::cout << "t: " << t.get_value() << std::endl;
   std::cout << "w: " << w << std::endl;
   std::cout << "R: " << Polynomial::global_mod << std::endl;
   #endif
@@ -27,33 +27,30 @@ void Yashe::generate_keys(){
   delta = (q/t.get_value()); // q/t
 
   Polynomial g = this->xkey.get_sample(phi.deg()-1);
-  #ifdef DEBUG
-  std::cout << "g = " << g << std::endl;
-  #endif
+  // #ifdef DEBUG
+  std::cout << "g = " << g.to_string() << std::endl;
+  // #endif
   // Computes a polynomial f with inverse
   Polynomial fInv;
   while(1==1){
     Polynomial fl = xkey.get_sample(phi.deg()-1);
-    // Polynomial fl;
-    // fl.set_coeff(0,1);
-    // fl.set_coeff(3,1);
 
     f = t*fl + 1;
-
-    // std::cout << "phi " << this->phi << std::endl;
-    f.reduce();
     f %= q;
 
-    #ifdef DEBUG
-    std::cout << "fl: " << fl << std::endl;
-    std::cout << "f: " << f << std::endl;
-    #endif
+    // #ifdef DEBUG
+    std::cout << "fl: " << fl.to_string() << std::endl;
+    std::cout << "f: " << f.to_string() << std::endl;
+    // #endif
     try{
       #ifdef VERBOSE
       std::cout << "Computing invmod of f "<< std::endl;
       #endif
-      // fInv = Polynomial::InvMod(f,phi);
-      fInv = f;
+      fInv = Polynomial::InvMod(f,phi);
+      // fInv = f;
+      // #ifdef DEBUG
+      std::cout << "fInv = " << fInv.to_string() << std::endl;
+      // #endif
       #ifdef VERBOSE
       std::cout << "Done." << std::endl;
       #endif
@@ -68,15 +65,13 @@ void Yashe::generate_keys(){
   }
 
   // Pre-computed value
-  ff = f*f;
-  ff.reduce();
+  // ff = f*f;
+  // ff.reduce();
 
-  // #warning Bug. Without this, decrypts f*c operation fails.
-  // f.set_device_updated(false);
-
-  h = t*fInv*g;
-  h.reduce();
-  h %= q;
+  Polynomial fInvG = (fInv*g);
+  std::cout << "fInvG = " << fInvG.to_string() << std::endl;
+  h = t*fInvG;
+  std::cout << "h = " << h.to_string() << std::endl;
   h.update_device_data();
 
   gamma.resize(lwq);
@@ -85,7 +80,6 @@ void Yashe::generate_keys(){
 
     for(int j = 0; j < k;j ++){
       gamma[k] *= w;
-      gamma[k].reduce();
     }
 
     Polynomial e = xerr.get_sample(phi.deg()-1);
@@ -94,13 +88,12 @@ void Yashe::generate_keys(){
     Polynomial hs = h*s;
     gamma[k] += e;
     gamma[k] += hs;
-    gamma[k].reduce();
     gamma[k] %= q;
     gamma[k].update_device_data();
     #ifdef DEBUG
-    std::cout << "e = " << e << std::endl;
-    std::cout << "s = " << s << std::endl;
-    std::cout << "gamma[" << k << "] = " << gamma[k] << std::endl;
+    std::cout << "e = " << e.to_string() << std::endl;
+    std::cout << "s = " << s.to_string() << std::endl;
+    std::cout << "gamma[" << k << "] = " << gamma[k].to_string() << std::endl;
     #endif
   }
 
@@ -123,8 +116,8 @@ Ciphertext Yashe::encrypt(Polynomial m){
   Polynomial e = xerr.get_sample(phi.deg()-1);
 
   #ifdef DEBUG
-  std::cout << "ps: "<< ps <<std::endl;
-  std::cout << "e: "<< e <<std::endl;
+  std::cout << "ps: "<< ps.to_string() <<std::endl;
+  std::cout << "e: "<< e.to_string() <<std::endl;
   #endif
 
   struct timespec start, stop;
@@ -134,26 +127,23 @@ Ciphertext Yashe::encrypt(Polynomial m){
   p = (h*ps) + e;
   Polynomial mdelta = delta*m;
   p += mdelta;
+  p %= q;
   clock_gettime( CLOCK_REALTIME, &stop);
   // std::cout << "Encrypt A: " << compute_time_ms(start,stop) << std::endl;
     
-  clock_gettime( CLOCK_REALTIME, &start);  
-  p.reduce();  
-  clock_gettime( CLOCK_REALTIME, &stop);
-  p %= q;
   // std::cout << "Encrypt B: " << compute_time_ms(start,stop) << std::endl;
     
   // uint64_t pModq = get_cycles()-start;
 
-  // std::cout << "phi.deg() " << phi.deg() << std::endl;
-  // std::cout << "h " << h.to_string() << std::endl;
-  // std::cout << "ps " << ps.to_string() << std::endl;
-  // std::cout << "e " << e.to_string() << std::endl;
-  // std::cout << "mdelta " << mdelta.to_string() << std::endl;
-  // std::cout << "p " << p.to_string() << std::endl;
+  std::cout << "phi.deg() " << phi.deg() << std::endl;
+  std::cout << "h " << h.to_string() << std::endl;
+  std::cout << "ps " << ps.to_string() << std::endl;
+  std::cout << "e " << e.to_string() << std::endl;
+  std::cout << "mdelta " << mdelta.to_string() << std::endl;
+  std::cout << "p " << p.to_string() << std::endl;
 
   #ifdef DEBUG
-  std::cout << "ciphertext: "<< p <<std::endl;
+  std::cout << "ciphertext: "<< p.to_string() <<std::endl;
   #endif
   Ciphertext c(p);
 
@@ -167,8 +157,8 @@ Polynomial Yashe::decrypt(Ciphertext c){
   #ifdef VERBOSE
   std::cout << "Yashe decrypt" << std::endl;
   #endif
-  // std::cout << "f " << f.to_string() << std::endl;
-  // std::cout << "c " << c.to_string() << std::endl;
+  std::cout << "f " << f.to_string() << std::endl;
+  std::cout << "c " << c.to_string() << std::endl;
   // uint64_t start,end;
 
 
@@ -190,10 +180,8 @@ Polynomial Yashe::decrypt(Ciphertext c){
     g = f*c;
 
   }
-  g.reduce();
   
   ZZ g_value = g.get_coeff(0);
-  g_value %= q;
 
   ZZ coeff = g_value*t.get_value();
   ZZ quot;
@@ -201,8 +189,8 @@ Polynomial Yashe::decrypt(Ciphertext c){
   NTL::DivRem(quot,rem,coeff,q);
 
   quot %= q;
-  // rem %= q;
   #ifdef VERBOSE
+  std::cout << "g_value: " << g_value << std::endl;
   std::cout << "rem: " << rem << std::endl;
   std::cout << "coeff: " << coeff << std::endl;
   std::cout << "q: " << q << std::endl;

@@ -374,11 +374,14 @@ __host__ __device__ int expand(int idxL, int N1, int N2){
 	return (idxL/N1)*N1*N2 + (idxL%N1);
 }
 
-__global__ void NTTScale(cuyasheint_t *data,const int size,const int scale){
-  const int tid = threadIdx.x + blockIdx.x*blockDim.x;
-
+__global__ void NTTScale(cuyasheint_t *data,const int size,const int N){
+  const unsigned int tid = threadIdx.x + blockIdx.x*blockDim.x;
+  // const unsigned int cid = (tid/N)*N + (tid%N); // residueId*resideSize + coefficient 
   if( tid < size )
-    data[tid] /= scale;
+  {
+    data[tid] /= N;
+    // data[tid] %= CRTPrimesConstant[cid];
+  }
 } 
 
 __device__ __host__ void NTTIteration(cuyasheint_t *W,
@@ -630,33 +633,11 @@ __host__ cuyasheint_t* CUDAFunctions::callPolynomialMul(cudaStream_t stream,
     std::swap(aux,d_b);
   }
 
-  // cuyasheint_t *h_a;
-  // h_a = (cuyasheint_t*)malloc(N*sizeof(cuyasheint_t));
-  // cudaMemcpy(h_a,d_a+6*N,N*sizeof(cuyasheint_t),cudaMemcpyDeviceToHost);
-  // std::cout << "h_a = ";
-  // for(unsigned int i = 0; i < N; i++)
-  //   std::cout << h_a[i] << " ";
-  // std::cout << std::endl;
-
-  // cuyasheint_t *h_b;
-  // h_b = (cuyasheint_t*)malloc(N*sizeof(cuyasheint_t));
-  // cudaMemcpy(h_b,d_b+6*N,N*sizeof(cuyasheint_t),cudaMemcpyDeviceToHost);
-  // std::cout << "h_b = ";
-  // for(unsigned int i = 0; i < N; i++)
-  //   std::cout << h_b[i] << " ";
-  // std::cout << std::endl;
-
   // Multiply
   dim3 blockDimMul(ADDBLOCKXDIM);
   dim3 gridDimMul((size)/ADDBLOCKXDIM+1); // We expect that ADDBLOCKXDIM always divide size
   polynomialNTTMul<<<gridDimMul,blockDimMul,1,stream>>>(d_a,d_b,size);
   assert(cudaGetLastError() == cudaSuccess);
-
-  // cudaMemcpy(h_a,d_a+6*N,N*sizeof(cuyasheint_t),cudaMemcpyDeviceToHost);
-  // std::cout << "h_a = ";
-  // for(unsigned int i = 0; i < N; i++)
-  //   std::cout << h_a[i] << " ";
-  // std::cout << std::endl;
 
   // // Inverse
   for(int Ns=1; Ns<N; Ns*=RADIX){
@@ -668,9 +649,11 @@ __host__ cuyasheint_t* CUDAFunctions::callPolynomialMul(cudaStream_t stream,
   std::swap(d_a,d_result);
 
   NTTScale<<< gridDimMul,blockDimMul,1,stream >>>(d_result,size,N);
-  // cudaFree(d_a);
-  // cudaFree(d_b);
   
+  cudaFree(d_a);
+  cudaFree(d_b);
+  cudaFree(aux);
+
   #elif defined(FFTMUL)
 
   // Allocates memory for temporary arrays on device
@@ -814,7 +797,7 @@ __host__ void CUDAFunctions::init(int N){
 
   #ifdef NTTMUL
   #ifdef VERBOSE
-  std::cout << "Will compute W." << std::endl;
+  std::cout << "Will compute W -- N = " << N << std::endl;
   #endif
 
   cuyasheint_t *h_W;
