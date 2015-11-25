@@ -2,15 +2,15 @@
 #define SETTINGS_H
 
 // #define PLAINMUL
-// #define NTTMUL
+#define NTTMUL
 // #define FFTMUL
-#define CUFFTMUL
+// #define CUFFTMUL
 
 #define ADDBLOCKXDIM 32
 #ifdef CUFFTMUL
 #define CRTPRIMESIZE 10
 #else
-#define CRTPRIMESIZE 10
+#define CRTPRIMESIZE 29
 #endif
 // #define DEBUG
 // #define CYCLECOUNTING

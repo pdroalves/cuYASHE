@@ -47,6 +47,7 @@ void Yashe::generate_keys(){
       std::cout << "Computing invmod of f "<< std::endl;
       #endif
       fInv = Polynomial::InvMod(f,phi);
+      fInv.normalize();
       // fInv = f;
       // #ifdef DEBUG
       std::cout << "fInv = " << fInv.to_string() << std::endl;
@@ -68,9 +69,10 @@ void Yashe::generate_keys(){
   // ff = f*f;
   // ff.reduce();
 
-  Polynomial fInvG = (fInv*g);
-  std::cout << "fInvG = " << fInvG.to_string() << std::endl;
-  h = t*fInvG;
+  Polynomial TfInv = t*fInv;
+
+  std::cout << "TfInv = " << TfInv.to_string() << std::endl;
+  h = TfInv*g;
   std::cout << "h = " << h.to_string() << std::endl;
   h.update_device_data();
 

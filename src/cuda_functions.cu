@@ -341,8 +341,11 @@ __device__ __host__  uint64_t s_mul(volatile uint64_t a,volatile uint64_t b){
 
 __device__ __host__  uint64_t s_add(volatile uint64_t a,volatile uint64_t b){
   // Add and reduce a and b by prime 2^64-2^32+1
+  // 4294967295L == UINT64_MAX - P
   uint64_t res = a+b;
-  res += (res < a)*4294967295L;
+  // res += (res < a)*4294967295L;
+  if(res < a)
+    res += 4294967295L;
   res = s_rem(res);
   return res;
 }
@@ -350,14 +353,14 @@ __device__ __host__  uint64_t s_add(volatile uint64_t a,volatile uint64_t b){
 
 __device__ __host__ uint64_t s_sub(volatile uint64_t a,volatile uint64_t b){
   // Computes a-b % P
+  // 4294967295L == UINT64_MAX - P
   const uint64_t P = 18446744069414584321;
 
-  uint64_t c = a-b;
-  if(c > a)
-    // Overflow
-    c = P - (UINT64_MAX-c)-1;
-  
-  return c;
+  uint64_t res = a-b;
+  // res -= (res > a)*4294967295L; 
+  if(res > a)
+    res -= 4294967295L;
+  return res;
 }
 
 __host__ __device__ void butterfly(uint64_t *v){
@@ -396,25 +399,19 @@ __device__ __host__ void NTTIteration(cuyasheint_t *W,
                                       const int type){
 	uint64_t v[2] = {0,0};
 	const int idxS = j+residue_index;
-	// int wIndex;
-	cuyasheint_t *w;
-	if(type == FORWARD)
-		w = W;
-	else
-		w = WInv;
   int w_index = ((j%Ns)*N)/(Ns*R);
 
   for(int r=0; r<R; r++)
-    v[r] = s_mul(data0[idxS+r*N/R],w[w_index*r]);
+    if(type == FORWARD)
+      v[r] = s_mul(data0[idxS+r*N/R],W[w_index*r]);
+    else
+      v[r] = s_mul(data0[idxS+r*N/R],WInv[w_index*r]);
 
 	butterfly(v);
 
 	const int idxD = expand(j,Ns,R)+residue_index;
 	for(int r=0; r<R;r++){
-    if(type == FORWARD)
   		data1[idxD+r*Ns] = v[r];
-    else
-      data1[idxD+r*Ns] = v[r];
     #ifdef __CUDA_ARCH__
     __syncthreads();
     #endif
@@ -825,9 +822,9 @@ __host__ void CUDAFunctions::init(int N){
   for(int j = 0; j < N; j++)
       h_WInv[j] = conv<cuyasheint_t>(NTL::InvMod(conv<ZZ>(h_W[j]),PZZ ));
 
-  result = cudaMemcpyAsync (d_W,h_W , N*sizeof(cuyasheint_t),cudaMemcpyHostToDevice);
+  result = cudaMemcpy (d_W,h_W , N*sizeof(cuyasheint_t),cudaMemcpyHostToDevice);
   assert(result == cudaSuccess);
-  result = cudaMemcpyAsync(d_WInv,h_WInv , N*sizeof(cuyasheint_t),cudaMemcpyHostToDevice);
+  result = cudaMemcpy(d_WInv,h_WInv , N*sizeof(cuyasheint_t),cudaMemcpyHostToDevice);
   assert(result == cudaSuccess);
 
   free(h_W);

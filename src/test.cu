@@ -379,6 +379,8 @@ BOOST_AUTO_TEST_CASE(simpleMultiplyByPolynomial)
 
   CUDAFunctions::init(2*degree);
 
+  a.set_coeffs(degree);
+  b.set_coeffs(degree);
   for(int i = 0; i < degree;i++){
     a.set_coeff(i,i);
     b.set_coeff(i,1);
@@ -398,6 +400,8 @@ BOOST_AUTO_TEST_CASE(simpleMultiplyByPolynomial)
   c_ntl %= conv<ZZ_pEX>(NTL_Phi);
 
   // #ifdef DEBUG
+  std::cout << "degree = " << degree << std::endl;
+  std::cout << "CUDAFunctions::N = " << CUDAFunctions::N << std::endl;
     std::cout << "a: " << a.to_string() << " degree: " << a.deg() <<std::endl;
     std::cout << "b: " << b.to_string() << " degree: " << b.deg() <<std::endl;
     std::cout << "c: " << c.to_string() << " degree: " << c.deg() <<std::endl;

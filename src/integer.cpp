@@ -145,5 +145,7 @@ Polynomial Integer::operator*(Polynomial &a){
 
   p->set_host_updated(false);
   p->set_device_updated(true);
+
+  *(p) %= a.get_mod();
   return p;
 }

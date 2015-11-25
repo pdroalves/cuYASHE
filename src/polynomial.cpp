@@ -219,12 +219,12 @@ void Polynomial::crt(){
     }
 
 
-    // for(unsigned int j = 0; j < polyCRT.size();j++){
-    //   std::cout << "CRT Polynomial residue "<< j << ":" << std::endl; 
-    //   for(unsigned int i = 0; i < polyCRT[j].size() ;i++)
-    //     std::cout << polyCRT[j][i] << ", ";
-    //   std::cout << std::endl << std::endl;
-    // }
+    for(unsigned int j = 0; j < polyCRT.size();j++){
+      std::cout << "CRT Polynomial residue "<< j << ":" << std::endl; 
+      for(unsigned int i = 0; i < polyCRT[j].size() ;i++)
+        std::cout << polyCRT[j][i] << ", ";
+      std::cout << std::endl << std::endl;
+    }
     this->set_host_updated(true);
     this->set_device_updated(false);
     this->set_crt_computed(true);
@@ -250,12 +250,12 @@ void Polynomial::icrt(){
   end = get_cycles();
   std::cout << "Cycles for host update: " << (end-start) << std::endl;
   #endif
-    // for(unsigned int j = 0; j < polyCRT.size();j++){
-    //   std::cout << "ICRT Polynomial residue"<< j << ":" << std::endl; 
-    //   for(unsigned int i = 0; i < polyCRT[j].size() ;i++)
-    //     std::cout << polyCRT[j][i] << ", ";
-    //   std::cout << std::endl << std::endl;
-    // }
+    for(unsigned int j = 0; j < polyCRT.size();j++){
+      std::cout << "ICRT Polynomial residue"<< j << ":" << std::endl; 
+      for(unsigned int i = 0; i < polyCRT[j].size() ;i++)
+        std::cout << polyCRT[j][i] << ", ";
+      std::cout << std::endl << std::endl;
+    }
   #ifdef CYCLECOUNTING
   start = get_cycles();
   #endif

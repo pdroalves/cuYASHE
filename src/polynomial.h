@@ -729,9 +729,8 @@ class Polynomial{
       #endif
 
       this->set_device_updated(false);
-      this->set_host_updated(true);
-      if(this->get_crt_spacing() < (size))
-        this->update_crt_spacing(size);
+      this->set_host_updated(true);      
+      this->update_crt_spacing(size);
     }
     std::vector<std::vector<cuyasheint_t> > get_crt_residues(){
       std::vector<std::vector<cuyasheint_t> > crt_residues_copy(this->polyCRT);
