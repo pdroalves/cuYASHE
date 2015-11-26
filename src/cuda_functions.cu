@@ -378,10 +378,6 @@ __device__ __host__  uint64_t s_add(volatile uint64_t a,volatile uint64_t b){
   if(res < a)
     res += 4294967295L;
   res = s_rem(res);  
-  while(res >= P){
-    res -= P;
-    res = s_rem(res);
-  }
   
   #ifdef __CUDA_ARCH__
   __syncthreads();
