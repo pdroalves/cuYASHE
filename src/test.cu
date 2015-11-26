@@ -399,14 +399,14 @@ BOOST_AUTO_TEST_CASE(simpleMultiplyByPolynomial)
   ZZ_pEX c_ntl = a_ntl*b_ntl;
   c_ntl %= conv<ZZ_pEX>(NTL_Phi);
 
-  // #ifdef DEBUG
+  #ifdef DEBUG
   std::cout << "degree = " << degree << std::endl;
   std::cout << "CUDAFunctions::N = " << CUDAFunctions::N << std::endl;
     std::cout << "a: " << a.to_string() << " degree: " << a.deg() <<std::endl;
     std::cout << "b: " << b.to_string() << " degree: " << b.deg() <<std::endl;
     std::cout << "c: " << c.to_string() << " degree: " << c.deg() <<std::endl;
     std::cout << "c_ntl: " << c_ntl << " degree: " << NTL::deg(c_ntl) << std::endl << std::endl;
-  // #endif
+  #endif
 
   BOOST_REQUIRE(NTL::deg(c_ntl) == c.deg());
   for(int i = 0;i <= c.deg();i++){
@@ -572,7 +572,7 @@ BOOST_AUTO_TEST_CASE(addAndMultiplyByPolynomial)
       std::cout << "c: " << c.to_string() << " ==  " << c_ntl <<std::endl;
     #endif
 
-    std::cout << NTL::deg(c_ntl) << " == " << c.deg() << std::endl;;
+    // std::cout << NTL::deg(c_ntl) << " == " << c.deg() << std::endl;;
     BOOST_REQUIRE(NTL::deg(c_ntl) == c.deg());
     for(int i = 0;i <= c.deg();i++){
       ZZ ntl_value;
@@ -749,7 +749,7 @@ BOOST_AUTO_TEST_CASE(severalMultiplications)
   for(int i = 0;i <= b.deg();i++)
     NTL::SetCoeff(b_ntl,i,conv<ZZ_p>(b.get_coeff(i)));
 
-  std::cout << "Iteration "<< 0 << std::endl;
+  // std::cout << "Iteration "<< 0 << std::endl;
 
   Polynomial c = a*b;
   ZZ_pEX c_ntl = a_ntl*b_ntl;
@@ -768,7 +768,7 @@ BOOST_AUTO_TEST_CASE(severalMultiplications)
     BOOST_REQUIRE(c.get_coeff(i) == ntl_value);
   }
   for(unsigned int i = 1; i < 10; i++){
-    std::cout << "Iteration "<< i << std::endl;
+    // std::cout << "Iteration "<< i << std::endl;
     c = c*a;
 
     c_ntl = c_ntl*a_ntl;
@@ -875,10 +875,10 @@ BOOST_AUTO_TEST_CASE(encryptDecrypt)
     Ciphertext c = cipher.encrypt(a);
     Polynomial a_decrypted = cipher.decrypt(c);
 
-    // #ifdef VERBOSE
+    #ifdef VERBOSE
     std::cout << "a: " << a.to_string() << std::endl;
     std::cout << "a_decrypted: " << a_decrypted.to_string() << std::endl;
-    // #endif
+    #endif
     BOOST_REQUIRE( a_decrypted == a);
   }
 }

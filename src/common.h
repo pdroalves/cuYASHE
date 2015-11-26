@@ -228,7 +228,7 @@ P common_multiplication(P *a_input, P *b_input){
 	  c.set_host_updated(false);
 	  c.set_device_updated(true);
 
-	  std::cout << " resultado da multiplicação: " << c.to_string() << std::endl;
+	  // std::cout << " resultado da multiplicação: " << c.to_string() << std::endl;
 	  c.reduce();
 	  c %= a.get_mod();
   }

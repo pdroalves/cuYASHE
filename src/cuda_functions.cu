@@ -271,8 +271,14 @@ static __global__ void polynomialcuFFTMul(const Complex *a, const Complex *b,Com
     }
 }
 #elif defined(NTTMUL)
+
+__device__ __host__ bool overflow(const uint64_t a, const uint64_t b){
+  // True if a+b will result in a integer overflow.
+  return (a+b) < a;
+}
 __device__ __host__ uint64_t s_rem (uint64_t a)
 {
+  const uint64_t P = 0xffffffff00000001;
   // Special reduction for prime 2^64-2^32+1
   //
   // x3 * 2^96 + x2 * 2^64 + x1 * 2^32 + x0 \equiv
@@ -282,42 +288,64 @@ __device__ __host__ uint64_t s_rem (uint64_t a)
   // const uint64_t p = 0xffffffff00000001;
   // uint64_t x3 = 0;
   // uint64_t x2 = 0;
+
   uint64_t x1 = (a >> 32);
   uint64_t x0 = (a & UINT32_MAX);
 
   // uint64_t res = ((x1+x2)<<32 + x0-x3-x2);
   uint64_t res = ((x1<<32) + x0);
 
+  if(res >= P){
+    res -= P;
+    x1 = (res >> 32);
+    x0 = (res & UINT32_MAX);
+    res = ((x1<<32) + x0);
+  }
+
   return res;
 }
 
 __device__ __host__  uint64_t s_mul(volatile uint64_t a,volatile uint64_t b){
   // Multiply and reduce a and b by prime 2^64-2^32+1
-  const uint64_t P = 18446744069414584321;
+  const uint64_t P = 0xffffffff00000001;
+  const uint64_t GAP = (UINT64_MAX-P+1);
 
   // Multiply
   #ifdef __CUDA_ARCH__
-  uint64_t cHi = __umul64hi(a,b);
-  uint64_t cLo = a*b;
+  const uint64_t cHi = __umul64hi(a,b);
+  const uint64_t cLo = a*b;
 
 
   // Reduce
-  uint64_t x3 = (cHi >> 32);
-  uint64_t x2 = (cHi & UINT32_MAX);
-  uint64_t x1 = (cLo >> 32);
-  uint64_t x0 = (cLo & UINT32_MAX);
+  const uint64_t x3 = (cHi >> 32);
+  const uint64_t x2 = (cHi & UINT32_MAX);
+  const uint64_t x1 = (cLo >> 32);
+  const uint64_t x0 = (cLo & UINT32_MAX);
 
-  uint64_t X1 = (x1<<32);
-  uint64_t X2 = (x2<<32);
+  const uint64_t X1 = (x1<<32);
+  const uint64_t X2 = (x2<<32);
 
+  ///////////////////////////////
+  //
+  // Here we can see three kinds of overflows:
+  //
+  // * Negative overflow: Result is negative. 
+  // Since uint64_t uses mod UINT64_MAX, we need to translate to the correct value mod P.
+  // * Simple overflow: Result is bigger than P but not enough to exceed UINT64_MAX.
+  //  We solve this in the same way we solve negative overflow, just translate to the correct value mod P.
+  // * Double overflow
 
-  uint64_t res = (X1+X2+x0-x2-x3);
-  bool testA = (((x2+x3) > X1+X2+x0) && !((X1+X2 < X1) ||  ((X1+X2)+x0 < x0)));
-  bool testB = ((res >= P) );
-  bool testC = ((X1+X2 < X1) ||  ((X1+X2)+x0 < x0));
+  uint64_t res = X1+X2+x0-x2-x3;
+  const bool testA = (x2+x3 > X1+X2+x0) && !( overflow(X1,X2) ||  overflow(X1+X2,x0) ); // Negative overflow
+  const bool testB = ( res >= P ); // Simple overflow
+  const bool testC = (overflow(X1,X2) || overflow(X1+X2,x0)) && (X1+X2+x0 > x2+x3); // Double overflow
 
   // This avoids conditional branchs
-  res = (P-res)*(testA) + (res-P)*(!testA && testB) + (res+4294967295L)*(!testA && !testB && testC) + (res)*(!testA && !testB && !testC);
+  // res = (P-res)*(testA) + (res-P)*(!testA && testB) + (P - (UINT64_MAX-res))*(!testA && !testB && testC) + (res)*(!testA && !testB && !testC);
+  res =   (P-res)*(testA) 
+        + (res-P)*(!testA && testB) 
+        + (res+GAP)*(!testA && !testB && testC) 
+        + (res)*(!testA && !testB && !testC);
 
 
   // if(((x2+x3) > X1+X2+x0) && !((X1+X2 < X1) ||  ((X1+X2)+x0 < x0))) {
@@ -326,10 +354,11 @@ __device__ __host__  uint64_t s_mul(volatile uint64_t a,volatile uint64_t b){
   //  }else if ((res >= P) ){
   //   // printf(" Overflow!\n");
   //   res -= P;
-  //  }else if((X1+X2 < X1) ||  ((X1+X2)+x0 < x0)){
+  //  }else if(((X1+X2 < X1) ||  ((X1+X2)+x0 < x0))){
   //   // printf(" Double Overflow\n");
   //   res += 4294967295L;
   // }
+
    #else
   uint64_t res = (((__uint128_t)a) * ((__uint128_t)b) )%P;
   // __uint128_t c = ((__uint128_t)a) * ((__uint128_t)b);
@@ -340,37 +369,54 @@ __device__ __host__  uint64_t s_mul(volatile uint64_t a,volatile uint64_t b){
 }
 
 __device__ __host__  uint64_t s_add(volatile uint64_t a,volatile uint64_t b){
+  const uint64_t P = 0xffffffff00000001;
+
   // Add and reduce a and b by prime 2^64-2^32+1
   // 4294967295L == UINT64_MAX - P
   uint64_t res = a+b;
   // res += (res < a)*4294967295L;
   if(res < a)
     res += 4294967295L;
-  res = s_rem(res);
+  res = s_rem(res);  
+  while(res >= P){
+    res -= P;
+    res = s_rem(res);
+  }
+  
+  #ifdef __CUDA_ARCH__
+  __syncthreads();
+  #endif
   return res;
 }
 
 
 __device__ __host__ uint64_t s_sub(volatile uint64_t a,volatile uint64_t b){
+  const uint64_t P = 0xffffffff00000001;
   // Computes a-b % P
   // 4294967295L == UINT64_MAX - P
-  const uint64_t P = 18446744069414584321;
 
-  uint64_t res = a-b;
-  // res -= (res > a)*4294967295L; 
-  if(res > a)
-    res -= 4294967295L;
+  uint64_t res;
+  if(b > a){
+    res = P;
+    res -= b;
+    res += a;
+  }
+  else
+    res = a-b;
+  // res = (a-b) + (b > a)*P; 
+
+  #ifdef __CUDA_ARCH__
+  __syncthreads();
+  #endif
   return res;
 }
 
 __host__ __device__ void butterfly(uint64_t *v){
   // Butterfly
-  const uint64_t P = 18446744069414584321;
-  
-
-  uint64_t v0 = v[0];
-  v[0] = s_add(v0,v[1]);
-  v[1] = s_sub(v0,v[1]);
+  const uint64_t v0 = s_rem(v[0]);
+  const uint64_t v1 = s_rem(v[1]);
+  v[0] = s_add(v0,v1);
+  v[1] = s_sub(v0,v1);
 }
 
 __host__ __device__ int expand(int idxL, int N1, int N2){
