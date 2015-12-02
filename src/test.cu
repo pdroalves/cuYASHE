@@ -397,7 +397,7 @@ BOOST_AUTO_TEST_CASE(simpleMultiplyByPolynomial)
   // c.normalize();
 
   ZZ_pEX c_ntl = a_ntl*b_ntl;
-  c_ntl %= conv<ZZ_pEX>(NTL_Phi);
+  // c_ntl %= conv<ZZ_pEX>(NTL_Phi);
 
   #ifdef DEBUG
   std::cout << "degree = " << degree << std::endl;
@@ -448,6 +448,7 @@ BOOST_AUTO_TEST_CASE(multiplyByPolynomial)
       NTL::SetCoeff(b_ntl,i,conv<ZZ_p>(b.get_coeff(i)));
 
     Polynomial c = a*b;
+    c.reduce();
     c %= Polynomial::global_mod;
 
     ZZ_pEX c_ntl = a_ntl*b_ntl;
@@ -506,6 +507,8 @@ BOOST_AUTO_TEST_CASE(multiplyAndAddByPolynomial)
       NTL::SetCoeff(b_ntl,i,conv<ZZ_p>(b.get_coeff(i)));
 
     Polynomial c = a*b+a;
+    c.reduce();
+    c %= q;
 
     ZZ_pEX c_ntl = a_ntl*b_ntl+a_ntl;
     c_ntl %= conv<ZZ_pEX>(NTL_Phi);
@@ -562,6 +565,8 @@ BOOST_AUTO_TEST_CASE(addAndMultiplyByPolynomial)
       NTL::SetCoeff(b_ntl,i,conv<ZZ_p>(b.get_coeff(i)));
 
     Polynomial c = a*b+a;
+    c.reduce();
+    c %= q;
 
     ZZ_pEX c_ntl = a_ntl*b_ntl+a_ntl;
     c_ntl %= conv<ZZ_pEX>(NTL_Phi);
@@ -752,6 +757,9 @@ BOOST_AUTO_TEST_CASE(severalMultiplications)
   // std::cout << "Iteration "<< 0 << std::endl;
 
   Polynomial c = a*b;
+  c.reduce();
+  c %= q;
+    
   ZZ_pEX c_ntl = a_ntl*b_ntl;
   c_ntl %= conv<ZZ_pEX>(NTL_Phi);
 
@@ -770,6 +778,8 @@ BOOST_AUTO_TEST_CASE(severalMultiplications)
   for(unsigned int i = 1; i < 10; i++){
     // std::cout << "Iteration "<< i << std::endl;
     c = c*a;
+    c.reduce();
+    c %= q;
 
     c_ntl = c_ntl*a_ntl;
     c_ntl %= conv<ZZ_pEX>(NTL_Phi);

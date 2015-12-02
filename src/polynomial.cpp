@@ -299,7 +299,7 @@ void Polynomial::icrt(){
     #endif
 
     // Iteration over coefficients
-    // #pragma omp parallel for
+    #pragma omp parallel for
     for(unsigned int j = 0; j < this->polyCRT[i].size();j++){
       uint64_t value = this->polyCRT[i][j] % pi;
 

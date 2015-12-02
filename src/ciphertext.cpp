@@ -58,7 +58,8 @@ Ciphertext Ciphertext::operator*(Ciphertext &b){
 
   Polynomial g = common_multiplication<Polynomial>(&c1,&c2);
   g *= (Yashe::t.get_value());
-  
+  g.reduce();
+
   Ciphertext p;
   p.set_coeffs(g.deg()+1);
   end = cycles();
@@ -115,6 +116,7 @@ void Ciphertext::keyswitch(){
     Polynomial p = (P[i])*(Yashe::gamma[i]);
     *this += p;
   }
+  this->reduce();
 
   #ifdef CYCLECOUNTING
   end = get_cycles();

@@ -231,8 +231,8 @@ P common_multiplication(P *a_input, P *b_input){
 	  c.set_device_updated(true);
 
 	  // std::cout << " resultado da multiplicação: " << c.to_string() << std::endl;
-	  c.reduce();
-	  c %= a.get_mod();
+	  // c.reduce();
+	  // c %= a.get_mod();
   }
   // cudaDeviceSynchronize();
   // std::cout << (end-start) << " cycles for polynomial x polynomial mul" << std::endl;
