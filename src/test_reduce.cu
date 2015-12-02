@@ -39,7 +39,7 @@ int main(){
   for(unsigned int i = 0; i < Polynomial::CRTPrimes.size();i++){
     ZZ pi = to_ZZ(Polynomial::CRTPrimes[i]);
     Polynomial::CRTMpi.push_back(Polynomial::CRTProduct/pi);
-    Polynomial::CRTInvMpi.push_back(NTL::InvMod(Polynomial::CRTMpi[i]%pi,pi));
+    Polynomial::CRTInvMpi.push_back(conv<cuyasheint_t>(NTL::InvMod(Polynomial::CRTMpi[i]%pi,pi)));
   }
   
   CUDAFunctions::write_crt_primes();

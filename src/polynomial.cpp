@@ -9,7 +9,7 @@
 ZZ Polynomial::CRTProduct = ZZ(1);
 std::vector<cuyasheint_t> Polynomial::CRTPrimes(0);
 std::vector<ZZ> Polynomial::CRTMpi;
-std::vector<ZZ> Polynomial::CRTInvMpi;
+std::vector<cuyasheint_t> Polynomial::CRTInvMpi;
 ZZ Polynomial::global_mod = ZZ(0);
 Polynomial *(Polynomial::global_phi) = NULL;
 bool Polynomial::phi_set = false;
@@ -229,7 +229,7 @@ void Polynomial::crt(){
     this->set_device_updated(false);
     this->set_crt_computed(true);
 }
-
+ 
 void Polynomial::icrt(){
 
   #ifdef CYCLECOUNTING
@@ -263,7 +263,7 @@ void Polynomial::icrt(){
   ZZ M = Polynomial::CRTProduct;
   std::vector<cuyasheint_t> primes = Polynomial::CRTPrimes;
   std::vector<ZZ> Mpis = Polynomial::CRTMpi;
-  std::vector<ZZ> invMpis = Polynomial::CRTInvMpi;
+  std::vector<cuyasheint_t> invMpis = Polynomial::CRTInvMpi;
  
   #ifdef CYCLECOUNTING
   end = get_cycles();
@@ -287,9 +287,9 @@ void Polynomial::icrt(){
     start_iteration = get_cycles();
     #endif
   
-    ZZ pi = to_ZZ(primes[i]);
+    cuyasheint_t pi = primes[i];
     ZZ Mpi = Mpis[i];
-    ZZ invMpi = invMpis[i];
+    cuyasheint_t invMpi = invMpis[i];
   
     #ifdef CYCLECOUNTING
     end_iteration = get_cycles();
@@ -299,9 +299,10 @@ void Polynomial::icrt(){
     #endif
 
     // Iteration over coefficients
-    #pragma omp parallel for
+    // #pragma omp parallel for
     for(unsigned int j = 0; j < this->polyCRT[i].size();j++){
-      int64_t value = this->polyCRT[i][j];
+      uint64_t value = this->polyCRT[i][j] % pi;
+
       this->coefs[j] += Mpi*( invMpi*(value) % pi);
     }
     #ifdef CYCLECOUNTING

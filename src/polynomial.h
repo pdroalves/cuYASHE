@@ -26,7 +26,7 @@ class Polynomial{
     static ZZ CRTProduct;
     static std::vector<cuyasheint_t> CRTPrimes;
     static std::vector<ZZ> CRTMpi;
-    static std::vector<ZZ> CRTInvMpi;
+    static std::vector<cuyasheint_t> CRTInvMpi;
     static Polynomial *global_phi;
     static ZZ global_mod;
     static bool phi_set;
@@ -775,7 +775,7 @@ class Polynomial{
         ZZ M = ZZ(1);
         std::vector<cuyasheint_t> P;
         std::vector<ZZ> Mpi;
-        std::vector<ZZ> InvMpi;
+        std::vector<cuyasheint_t> InvMpi;
 
         int primes_size = CRTPRIMESIZE;
         cuyasheint_t n;
@@ -796,7 +796,7 @@ class Polynomial{
         for(unsigned int i = 0; i < P.size();i++){
           ZZ pi = to_ZZ(P[i]);
           Mpi.push_back(M/pi);
-          InvMpi.push_back(NTL::InvMod(Mpi[i]%pi,pi));
+          InvMpi.push_back(conv<cuyasheint_t>(NTL::InvMod(Mpi[i]%pi,pi)));
         }
 
         Polynomial::CRTProduct = M;
@@ -807,8 +807,8 @@ class Polynomial{
         #ifdef VERBOSE
         std::cout << "Primes size: " << primes_size << std::endl;
         std::cout << "Primes set - M:" << Polynomial::CRTProduct << std::endl;
-        #endif
         std::cout << P.size() << " primes generated." << std::endl;
+        #endif
 
         // Send primes to GPU
         CUDAFunctions::write_crt_primes();

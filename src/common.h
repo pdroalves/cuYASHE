@@ -13,7 +13,9 @@
 uint64_t get_cycles();
 double compute_time_ms(struct timespec start,struct timespec stop);
 const std::string current_date_time() ;
+int bitCount(unsigned int n);
 
+bool check_overflow(uint64_t a,uint64_t b);
 
 template <class P>
 P common_addition(P *a,P *b){

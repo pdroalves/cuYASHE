@@ -71,17 +71,17 @@ void Integer::icrt(){
   ZZ M = Polynomial::CRTProduct;
   std::vector<cuyasheint_t> primes = Polynomial::CRTPrimes;
   std::vector<ZZ> Mpis = Polynomial::CRTMpi;
-  std::vector<ZZ> invMpis = Polynomial::CRTInvMpi;
+  std::vector<cuyasheint_t> invMpis = Polynomial::CRTInvMpi;
  
   // Discards all coefficients and prepare to receive new this->CRTSPACING coefficients
 
   // Iteration over all primes
   for(unsigned int i = 0; i < primes.size();i++){
     // Get a prime 
-    ZZ pi = to_ZZ(primes[i]);
+    cuyasheint_t pi = primes[i];
     ZZ Mpi = Mpis[i];
-    ZZ invMpi = invMpis[i];
-
+    cuyasheint_t invMpi = invMpis[i];
+    
     this->value += Mpi*( invMpi*(this->crt_values[i]) % pi);
   }
  

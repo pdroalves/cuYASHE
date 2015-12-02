@@ -37,3 +37,20 @@ const std::string current_date_time() {
 
     return buf;
 }
+
+ int bitCount(unsigned int n) {
+
+    int counter = 0;
+    while(n) {
+        counter += n % 2;
+        n >>= 1;
+    }
+    return counter;
+ }
+
+ bool check_overflow(uint64_t a,uint64_t b){
+  if( a*b < a)
+    return true;
+  else 
+    return false;
+}
