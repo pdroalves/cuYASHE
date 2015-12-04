@@ -1,5 +1,9 @@
 #include <stdio.h>
 #include "common.h"
+#include <cuda.h>
+#include <cuda_runtime_api.h>
+#include <cuda_runtime.h>
+
 // #include "cuda_functions.h"
 // #include "polynomial.h"
 // #include "ciphertext.h"

@@ -13,20 +13,20 @@ int main(){
 
   CUDAFunctions::init(2*N);
   // Memory alloc
-  uint64_t *h_a;
-  uint64_t *h_b;
-  uint64_t *d_a1;
-  uint64_t *aux;
-  uint64_t *d_a2;
+  cuyasheint_t *h_a;
+  cuyasheint_t *h_b;
+  cuyasheint_t *d_a1;
+  cuyasheint_t *aux;
+  cuyasheint_t *d_a2;
 
-  h_a = (uint64_t*)malloc(2*N*batch*sizeof(uint64_t));
-  h_b = (uint64_t*)malloc(2*N*batch*sizeof(uint64_t));
+  h_a = (cuyasheint_t*)malloc(2*N*batch*sizeof(cuyasheint_t));
+  h_b = (cuyasheint_t*)malloc(2*N*batch*sizeof(cuyasheint_t));
 
-  cudaError_t result = cudaMalloc((void**)&d_a1,2*N*batch*sizeof(uint64_t));
+  cudaError_t result = cudaMalloc((void**)&d_a1,2*N*batch*sizeof(cuyasheint_t));
   assert(result == cudaSuccess);
-  result = cudaMalloc((void**)&d_a2,2*N*batch*sizeof(uint64_t));
+  result = cudaMalloc((void**)&d_a2,2*N*batch*sizeof(cuyasheint_t));
   assert(result == cudaSuccess);
-  result = cudaMalloc((void**)&aux,2*N*batch*sizeof(uint64_t));
+  result = cudaMalloc((void**)&aux,2*N*batch*sizeof(cuyasheint_t));
   assert(result == cudaSuccess);
 
   // Data load
@@ -41,23 +41,23 @@ int main(){
       std::cout << h_a[pol*N + coeff] << std::endl;
     }
   // Memcpy
-  result = cudaMemcpy(d_a1,h_a,2*N*batch*sizeof(uint64_t),cudaMemcpyHostToDevice);
+  result = cudaMemcpy(d_a1,h_a,2*N*batch*sizeof(cuyasheint_t),cudaMemcpyHostToDevice);
   assert(result == cudaSuccess);
 
   // NTT
-  result = cudaMemset((void*)aux,0,(2*N)*batch*sizeof(uint64_t));
+  result = cudaMemset((void*)aux,0,(2*N)*batch*sizeof(cuyasheint_t));
   assert(result == cudaSuccess);
   CUDAFunctions::callNTT(2*N, batch, d_a1, aux,FORWARD);
 
-  result = cudaMemcpy(d_a2,d_a1,2*N*batch*sizeof(uint64_t),cudaMemcpyDeviceToDevice);
+  result = cudaMemcpy(d_a2,d_a1,2*N*batch*sizeof(cuyasheint_t),cudaMemcpyDeviceToDevice);
   assert(result == cudaSuccess);
 
-  result = cudaMemset((void*)aux,0,(2*N)*batch*sizeof(uint64_t));
+  result = cudaMemset((void*)aux,0,(2*N)*batch*sizeof(cuyasheint_t));
   assert(result == cudaSuccess);
   CUDAFunctions::callNTT(2*N, batch,d_a2,aux,INVERSE);
 
   // Memcpy
-  result = cudaMemcpy(h_b,d_a2,2*N*batch*sizeof(uint64_t),cudaMemcpyDeviceToHost);
+  result = cudaMemcpy(h_b,d_a2,2*N*batch*sizeof(cuyasheint_t),cudaMemcpyDeviceToHost);
 
   for(unsigned int pol = 0; pol < batch;pol++){
     std::cout << "residue " << pol << std::endl;

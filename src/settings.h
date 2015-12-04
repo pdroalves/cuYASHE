@@ -17,9 +17,13 @@
 // #define VERBOSE
 // #define VERBOSEMEMORYCOPY
 // #define MAYADDONCPU
+
 // typedef uint32_t cuyasheint_t;
 typedef uint64_t cuyasheint_t;
 // typedef int64_t cuyasheint_t;
+
+#define DIGIT 64 
+
 enum add_mode_t {ADD,SUB,MUL,DIV,MOD};
 enum ntt_mode_t {INVERSE,FORWARD};
 

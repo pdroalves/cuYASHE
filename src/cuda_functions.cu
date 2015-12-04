@@ -79,14 +79,97 @@ __host__ cuyasheint_t* CUDAFunctions::callRealignCRTResidues(cudaStream_t stream
 }
 
 ///////////////////////////////////////
+// Big Integers Operations
+///////////////////////////////////////
+__device__ cuyashe2int_t add_cuyashe2int (cuyashe2int_t a, cuyashe2int_t b)
+{
+  cuyashe2int_t res;
+  res.lo = a.lo + b.lo;
+  res.hi = a.hi + b.hi + (res.lo < a.lo);
+  return res;
+} 
+
+__device__ cuyashe2int_t mul_cuyashe2int (cuyashe2int_t a, cuyashe2int_t b)
+{
+    cuyashe2int_t res;
+
+    #if DIGIT == 64
+    res.hi = __umul64hi(a,b);
+    res.lo = a*b;
+    #else
+    #warning mul_cuyashe2int not implemented for this word size
+    #endif
+
+    return res;
+}
+
+__device__ cuyasheint_t bn_mul1_low(cuyasheint_t *c, const cuyasheint_t *a, cuyasheint_t digit, int size) {
+  // Multiply a big integer and a integer
+
+  // c: output
+  // a: big integer operand
+  // digit: integer operand
+  // size: quantity of words in a
+
+  // output: last word
+
+  int i;
+  cuyasheint_t carry;
+  cuyashe2int_t r;
+
+  carry = 0;
+  for (i = 0; i < size; i++, a++, c++) {
+    /* Multiply the digit *tmpa by b and accumulate with the previous
+     * result in the same columns and the propagated carry. */
+    r = (cuyashe2int_t)(carry) + (cuyashe2int_t)(*a) * (cuyashe2int_t)(digit);
+    /* Increment the column and assign the result. */
+    *c = (cuyasheint_t)r;
+    /* Update the carry. */
+    carry = (cuyasheint_t)(r >> (cuyashe2int_t)DIGIT);
+  }
+  return carry;
+}
+
+__device__ cuyasheint_t bn_addn_low(cuyasheint_t *c, const cuyasheint_t *a, const cuyasheint_t *b, int size) {
+    // cuyasheint_t bn_addn_low(cuyasheint_t *c, const cuyasheint_t *a, const cuyasheint_t *b, int size);
+
+  // c: output
+  // a: first big integer operand
+  // b: second big integer operand
+  // size: quantity of words
+
+  // output: last word
+
+  int i;
+  register cuyasheint_t carry, c0, c1, r0, r1;
+
+  carry = 0;
+  for (i = 0; i < size; i++, a++, b++, c++) {
+    r0 = (*a) + (*b);
+    c0 = (r0 < (*a));
+    r1 = r0 + carry;
+    c1 = (r1 < r0);
+    carry = c0 | c1;
+    (*c) = r1;
+  }
+  return carry;
+}
+
+
+///////////////////////////////////////
+// CRT/ICRT
+///////////////////////////////////////
+
 
 ///////////////////////////////////////
 /// ADD
+///////////////////////////////////////
+
 __global__ void polynomialAddSub(const int OP,const cuyasheint_t *a,const cuyasheint_t *b,cuyasheint_t *c,const int size,const int N){
   // We have one thread per polynomial coefficient on 32 threads-block.
   // For CRT polynomial adding, all representations should be concatenated aligned
   const int tid = threadIdx.x + blockDim.x*blockIdx.x;
-  const int rid = tid / N; // Residue id
+  // const int rid = tid / N; // Residue id
   cuyasheint_t a_value;
   cuyasheint_t b_value;
 
@@ -128,7 +211,7 @@ __global__ void polynomialAddSubInPlace(const int OP, cuyasheint_t *a,const cuya
   // We have one thread per polynomial coefficient on 32 threads-block.
   // For CRT polynomial adding, all representations should be concatenated aligned
   const int tid = threadIdx.x + blockDim.x*blockIdx.x;
-  const int rid = tid / N; // Residue id
+  // const int rid = tid / N; // Residue id
   cuyasheint_t a_value;
   cuyasheint_t b_value;
 
@@ -259,8 +342,7 @@ static __device__ inline Complex ComplexMul(Complex a, Complex b)
 
 
 // Complex pointwise multiplication
-static __global__ void polynomialcuFFTMul(const Complex *a, const Complex *b,Complex *c,int size_c,int size)
-{
+static __global__ void polynomialcuFFTMul(const Complex *a, const Complex *b,Complex *c,int size_c,int size){
     const int tid = threadIdx.x + blockDim.x*blockIdx.x;
 
     if(tid < size  ){
@@ -276,8 +358,8 @@ __device__ __host__ bool overflow(const uint64_t a, const uint64_t b){
   // True if a+b will result in a integer overflow.
   return (a+b) < a;
 }
-__device__ __host__ uint64_t s_rem (uint64_t a)
-{
+
+__device__ __host__ uint64_t s_rem (uint64_t a){
   const uint64_t P = 0xffffffff00000001;
   // Special reduction for prime 2^64-2^32+1
   //
@@ -308,13 +390,13 @@ __device__ __host__ uint64_t s_rem (uint64_t a)
 __device__ __host__  uint64_t s_mul(volatile uint64_t a,volatile uint64_t b){
   // Multiply and reduce a and b by prime 2^64-2^32+1
   const uint64_t P = 0xffffffff00000001;
-  const uint64_t GAP = (UINT64_MAX-P+1);
 
   // Multiply
   #ifdef __CUDA_ARCH__
+  const uint64_t GAP = (UINT64_MAX-P+1);
+
   const uint64_t cHi = __umul64hi(a,b);
   const uint64_t cLo = a*b;
-
 
   // Reduce
   const uint64_t x3 = (cHi >> 32);
@@ -368,8 +450,8 @@ __device__ __host__  uint64_t s_mul(volatile uint64_t a,volatile uint64_t b){
   return res;
 }
 
-__device__ __host__  uint64_t s_add(volatile uint64_t a,volatile uint64_t b){
-  const uint64_t P = 0xffffffff00000001;
+__device__ __host__  uint64_t s_add( uint64_t a, uint64_t b){
+  // const uint64_t P = 0xffffffff00000001;
 
   // Add and reduce a and b by prime 2^64-2^32+1
   // 4294967295L == UINT64_MAX - P
@@ -386,7 +468,7 @@ __device__ __host__  uint64_t s_add(volatile uint64_t a,volatile uint64_t b){
 }
 
 
-__device__ __host__ uint64_t s_sub(volatile uint64_t a,volatile uint64_t b){
+__device__ __host__ uint64_t s_sub( uint64_t a, uint64_t b){
   const uint64_t P = 0xffffffff00000001;
   // Computes a-b % P
   // 4294967295L == UINT64_MAX - P

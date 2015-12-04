@@ -10,6 +10,8 @@
 #include <iomanip>
 #include <time.h>
 
+/////////////////////
+// Auxiliar functions
 uint64_t get_cycles();
 double compute_time_ms(struct timespec start,struct timespec stop);
 const std::string current_date_time() ;
@@ -17,6 +19,48 @@ int bitCount(unsigned int n);
 
 bool check_overflow(uint64_t a,uint64_t b);
 
+/////////////////////
+// Double precision type
+struct cuyashe2int_t;
+
+__device__ cuyashe2int_t add_cuyashe2int (cuyashe2int_t a, cuyashe2int_t b);
+__device__ cuyashe2int_t mul_cuyashe2int (cuyashe2int_t a, cuyashe2int_t b);
+
+typedef struct cuyashe2int_t{
+  uint64_t lo;
+  uint64_t hi;
+
+  __device__ struct cuyashe2int_t operator=(cuyasheint_t a){
+  	this->lo = a;
+  	this->hi = 0;
+  	return *this;
+  }
+
+  __device__ cuyashe2int_t operator+(cuyashe2int_t b){
+  	return add_cuyashe2int(*this,b);
+  }
+  __device__ cuyashe2int_t operator*(cuyashe2int_t b){
+  	return mul_cuyashe2int(*this,b);
+  }
+  
+  __device__ operator cuyasheint_t(){
+  	return this->lo;
+  }
+
+  __device__ cuyashe2int_t(){
+  	this->lo = 0;
+  	this->hi = 0;
+  }
+  __device__ cuyashe2int_t(cuyasheint_t a){
+  	this->lo = a;
+  	this->hi = 0;
+  }
+
+} cuyashe2int_t;
+
+
+/////////////////////
+// Common functions
 template <class P>
 P common_addition(P *a,P *b){
 	// P should be Polynomial or Ciphertext
@@ -139,7 +183,7 @@ void common_addition_inplace(P *a,P *b){
 template <class P>
 P common_multiplication(P *a_input, P *b_input){
   
-  uint64_t start,end;
+  // uint64_t start,end;
 
   P a,b;
   a.copy(a_input);
@@ -206,7 +250,7 @@ P common_multiplication(P *a_input, P *b_input){
 		}
       }
   }
-  start = get_cycles();
+  // start = get_cycles();
 
   cuyasheint_t *d_result;
   if(a.get_crt_spacing() > 0 && b.get_crt_spacing() > 0)
@@ -222,7 +266,7 @@ P common_multiplication(P *a_input, P *b_input){
   else
   	d_result = NULL;
 
-  end = get_cycles();
+  // end = get_cycles();
   // std::cout << (end-start) << " cycles to multiply" << std::endl;
   P c = P(a.get_mod(),a.get_phi(),needed_spacing);
   if(d_result != NULL){

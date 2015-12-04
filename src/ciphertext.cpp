@@ -36,19 +36,19 @@ uint64_t cycles() {
 
 
 Ciphertext Ciphertext::operator*(Ciphertext &b){
-  uint64_t start,end;
-  uint64_t start_total,end_total;
+  // uint64_t start,end;
+  // uint64_t start_total,end_total;
 
-  start_total = get_cycles();
+  // start_total = get_cycles();
   Ciphertext c1(*this);
   Ciphertext c2(b);
 
-  start = cycles();
+  // start = cycles();
   if(c1.aftermul)
     c1.convert();
   if(c2.aftermul)
     c2.convert();
-  end = cycles();
+  // end = cycles();
   // std::cout << "ciphertext convert " << (end-start) << std::endl;
 
   #ifdef VERBOSE
@@ -62,9 +62,9 @@ Ciphertext Ciphertext::operator*(Ciphertext &b){
 
   Ciphertext p;
   p.set_coeffs(g.deg()+1);
-  end = cycles();
+  // end = cycles();
 
-  start = cycles();
+  // start = cycles();
   for(int i = 0; i <= g.deg();i++){
     ZZ quot = g.get_coeff(i)/Yashe::q;
     ZZ diff = g.get_coeff(i)%Yashe::q;
@@ -75,7 +75,7 @@ Ciphertext Ciphertext::operator*(Ciphertext &b){
     else
       p.set_coeff(i,quot % Yashe::q);
   } 
-  end = cycles();
+  // end = cycles();
   // std::cout << "ciphertext mult loop " << (end-start) << std::endl;
 
   p.aftermul = true;
@@ -83,7 +83,7 @@ Ciphertext Ciphertext::operator*(Ciphertext &b){
   p.set_device_updated(false);
   p.set_host_updated(true);
 
-  end_total = get_cycles();
+  // end_total = get_cycles();
   // std::cout << "ciphertext mult " << (end_total-start_total) << std::endl;
 
   return p;

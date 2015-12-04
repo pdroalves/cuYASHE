@@ -60,7 +60,7 @@ class CUDAFunctions{
   private:
 };
 #ifdef NTTMUL
-__device__ __host__ inline cuyasheint_t s_rem (uint64_t a);
+__device__ __host__ inline uint64_t s_rem (uint64_t a);
 __device__ __host__  uint64_t s_mul(uint64_t a,
                                     uint64_t b);
 #endif

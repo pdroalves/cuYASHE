@@ -67,9 +67,9 @@ void Polynomial::operator delete(void *ptr){
     }
 
 void Polynomial::copy_device_crt_residues(Polynomial &b){
-      uint64_t start,end;
+      // uint64_t start,end;
 
-      start = get_cycles();
+      // start = get_cycles();
       if(!b.get_device_updated())
         return;
 
@@ -95,7 +95,7 @@ void Polynomial::copy_device_crt_residues(Polynomial &b){
       assert(result == cudaSuccess);
 
       this->set_device_crt_residues(aux);
-      end = get_cycles();
+      // end = get_cycles();
       // std::cout << (end-start) << " cycles" << std::endl;
     }
 
