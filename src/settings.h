@@ -1,6 +1,8 @@
 #ifndef SETTINGS_H
 #define SETTINGS_H
 
+#include <cstdint>
+
 // #define PLAINMUL
 #define NTTMUL
 // #define FFTMUL
@@ -18,11 +20,10 @@
 // #define VERBOSEMEMORYCOPY
 // #define MAYADDONCPU
 
-// typedef uint32_t cuyasheint_t;
+// CRT cannot use primes bigger than 32 bits
+#define WORD 32
+// We use cuyasheint_t as uint64_t to simplify operations
 typedef uint64_t cuyasheint_t;
-// typedef int64_t cuyasheint_t;
-
-#define DIGIT 64 
 
 enum add_mode_t {ADD,SUB,MUL,DIV,MOD};
 enum ntt_mode_t {INVERSE,FORWARD};

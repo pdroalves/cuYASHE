@@ -19,11 +19,6 @@ cuyasheint_t *CUDAFunctions::d_WInv = NULL;
 cufftHandle CUDAFunctions::plan;
 typedef double2 Complex;
 #endif
-// __constant__ int PrimesL;
-#define MAX_PRIMES_ON_C_MEMORY 4096
-// cuyasheint_t *CRTPrimesGlobal;
-__constant__ cuyasheint_t CRTPrimesConstant[MAX_PRIMES_ON_C_MEMORY];
-
 int CUDAFunctions::N = 0;
 
 ///////////////////////////////////////

@@ -20,46 +20,6 @@ int bitCount(unsigned int n);
 bool check_overflow(uint64_t a,uint64_t b);
 
 /////////////////////
-// Double precision type
-struct cuyashe2int_t;
-
-__device__ cuyashe2int_t add_cuyashe2int (cuyashe2int_t a, cuyashe2int_t b);
-__device__ cuyashe2int_t mul_cuyashe2int (cuyashe2int_t a, cuyashe2int_t b);
-
-typedef struct cuyashe2int_t{
-  uint64_t lo;
-  uint64_t hi;
-
-  __device__ struct cuyashe2int_t operator=(cuyasheint_t a){
-  	this->lo = a;
-  	this->hi = 0;
-  	return *this;
-  }
-
-  __device__ cuyashe2int_t operator+(cuyashe2int_t b){
-  	return add_cuyashe2int(*this,b);
-  }
-  __device__ cuyashe2int_t operator*(cuyashe2int_t b){
-  	return mul_cuyashe2int(*this,b);
-  }
-  
-  __device__ operator cuyasheint_t(){
-  	return this->lo;
-  }
-
-  __device__ cuyashe2int_t(){
-  	this->lo = 0;
-  	this->hi = 0;
-  }
-  __device__ cuyashe2int_t(cuyasheint_t a){
-  	this->lo = a;
-  	this->hi = 0;
-  }
-
-} cuyashe2int_t;
-
-
-/////////////////////
 // Common functions
 template <class P>
 P common_addition(P *a,P *b){
