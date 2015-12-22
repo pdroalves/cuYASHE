@@ -58,7 +58,7 @@ cuda_functions.o:cuda_functions.cu
 	$(CUDA_CC) $(CUDA_ARCH) -c cuda_functions.cu $(LCUDA) $(ICUDA) -lcufft -Xcompiler $(OPENMP)
 
 cuda_bn.o:cuda_bn.cu
-	$(CUDA_CC) $(CUDA_ARCH) -c cuda_bn.cu $(LCUDA) $(ICUDA)
+	$(CUDA_CC) $(CUDA_ARCH) -c cuda_bn.cu $(LCUDA) $(ICUDA) -Xcompiler $(NTL)
 
 
 distribution.o:distribution.cpp

@@ -19,7 +19,8 @@ cuyasheint_t *CUDAFunctions::d_WInv = NULL;
 cufftHandle CUDAFunctions::plan;
 typedef double2 Complex;
 #endif
-int CUDAFunctions::N = 0;
+
+unsigned int CUDAFunctions::N = 0;
 
 ///////////////////////////////////////
 /// Memory operations

@@ -1105,6 +1105,7 @@ class Polynomial{
     //Functions and methods
   protected:
     std::vector<ZZ> coefs;
+    std::vector<bn_t> bn_coefs;
     std::vector<std::vector<cuyasheint_t> > polyCRT; // Must be initialized by crt()
     cuyasheint_t *aux_polyCRT = 0x0; // Must be initialized on CRTSPACING definition and updated by crt(), if needed
     

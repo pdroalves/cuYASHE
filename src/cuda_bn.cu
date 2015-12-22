@@ -13,16 +13,110 @@
 // CRT global variables //
 //////////////////////////
 
-bn_t* M;
-bn_t* Mpis;
-cuyasheint_t *invMpis;
+__device__ bn_t* M;
+__device__ bn_t* Mpis;
+__device__ cuyasheint_t *invMpis;
+
+////////////////////////
+// Auxiliar functions //
+////////////////////////
+
+/**
+ * Initiates a new bn_t object
+ * @param a input: operand
+ */
+__host__ void bn_new(bn_t a){
+	a->used = 0;
+	a->alloc = STD_BNT_ALLOC;
+	a->sign = BN_POS;
+	cudaMallocManaged(&a->dp,a->alloc*sizeof(cuyasheint_t));
+}
+
+__host__ void bn_free(bn_t a){
+	a->used = 0;
+	a->alloc = 0;
+	
+	cudaError_t result = cudaDeviceSynchronize();
+	assert(result == cudaSuccess);
+	result = cudaFree(a->dp);
+	assert(result == cudaSuccess);
+
+}
+/**
+ * Increase the allocated memory for a bn_t object.
+ * @param a        input/output:operand
+ * @param new_size input: new_size for dp
+ */
+__host__ void bn_grow(bn_t a,const unsigned int new_size){
+	// We expect that a->alloc <= new_size
+	assert(a->alloc <= new_size);
+	cudaMallocManaged(&a->dp+a->alloc,new_size*sizeof(cuyasheint_t));
+	a->alloc = new_size;
+
+}
+__device__ void dv_zero(cuyasheint_t *a, int digits) {
+	int i;
+ 
+	// if (digits > DV_DIGS) {
+	// 	std::cout << "ERR_NO_VALID" << std::endl;
+	// 	exit(1);
+	// }
+
+	for (i = 0; i < digits; i++, a++)
+		(*a) = 0;
+
+	return;
+}
+
+/**
+ * Set a big number struct to zero
+ * @param a operand
+ */
+__device__ void bn_zero(bn_t a) {
+	a->sign = BN_POS;
+	a->used = 1;
+	dv_zero(a->dp, a->alloc);
+}
+
+
+/**
+ * get_words converts a NTL big integer
+ * in our bn_t format
+ * @param b output: word representation
+ * @param a input: operand
+ */
+__host__ void get_words(bn_t *b,ZZ a){
+	bn_new(*b);
+
+	for(ZZ x = a; x > 0; x=(x>>WORD),(*b)->used++){
+		if((*b)->used >= (*b)->alloc)
+			bn_grow(*b,STD_BNT_ALLOC);
+		(*b)->dp[(*b)->used] = conv<uint32_t>(x&WORD);
+	}
+}
+
+/**
+ * Convert an array of words into a NTL ZZ
+ * @param  a input:array of words
+ * @return   output: NTL ZZ
+ */
+__host__ ZZ get_ZZ(bn_t a){
+	ZZ b = conv<ZZ>(0);
+	for(unsigned int i = a->used-1; i <= 0;i--){
+			b = b<<WORD;
+			b += a->dp[i];
+		}
+	return b;
+}
 
 ////////////////
 // Operators //
 //////////////
 
 // Mod
-__device__ cuyasheint_t bn_mod1_low(const cuyasheint_t *a, const int size, const cuyasheint_t b) {
+__device__ cuyasheint_t bn_mod1_low(const cuyasheint_t *a,
+									const int size,
+									const cuyasheint_t b) {
 	// Computes a % b
 	
 	dcuyasheint_t w;
@@ -53,7 +147,10 @@ __device__ cuyasheint_t bn_mod1_low(const cuyasheint_t *a, const int size, const
  * @param  size  input: number of words in a
  * @return       output: result's last word
  */
-__device__ cuyasheint_t bn_mul1_low(cuyasheint_t *c, const cuyasheint_t *a, cuyasheint_t digit, int size) {
+__device__ cuyasheint_t bn_mul1_low(cuyasheint_t *c,
+									const cuyasheint_t *a,
+									cuyasheint_t digit,
+									int size) {
 	int i;
 	cuyasheint_t carry;
 	dcuyasheint_t r;
@@ -83,7 +180,11 @@ __device__ cuyasheint_t bn_mul1_low(cuyasheint_t *c, const cuyasheint_t *a, cuya
  * @param b            input: second 64 bits operand 
  * @param c 		   input: module
  */
-__device__ void bn_64bits_mulmod(cuyasheint_t *result,cuyasheint_t a,cuyasheint_t b,cuyasheint_t c){
+__device__ void bn_64bits_mulmod(cuyasheint_t *result,
+									cuyasheint_t a,
+									cuyasheint_t b,
+									cuyasheint_t c
+									){
 
 	uint64_t w;
 	uint64_t r;
@@ -122,7 +223,11 @@ __device__ void bn_64bits_mulmod(cuyasheint_t *result,cuyasheint_t a,cuyasheint_
  * @param  size input: number of words to add
  * @return      output: result's last word
  */
-__device__ cuyasheint_t bn_addn_low(cuyasheint_t *c, const cuyasheint_t *a, const cuyasheint_t *b, int size) {
+__device__ cuyasheint_t bn_addn_low(cuyasheint_t *c,
+									const cuyasheint_t *a,
+									const cuyasheint_t *b,
+									int size
+									) {
 	int i;
 	register cuyasheint_t carry, c0, c1, r0, r1;
 
@@ -138,26 +243,6 @@ __device__ cuyasheint_t bn_addn_low(cuyasheint_t *c, const cuyasheint_t *a, cons
 	return carry;
 }
 
-__device__ void dv_zero(cuyasheint_t *a, int digits) {
-	int i;
- 
-	// if (digits > DV_DIGS) {
-	// 	std::cout << "ERR_NO_VALID" << std::endl;
-	// 	exit(1);
-	// }
-
-	for (i = 0; i < digits; i++, a++)
-		(*a) = 0;
-
-	return;
-}
-
-__device__ void bn_zero(bn_t a) {
-	a->sign = BN_POS;
-	a->used = 1;
-	dv_zero(a->dp, a->alloc);
-}
-
 /////////
 // CRT //
 /////////
@@ -168,7 +253,11 @@ __device__ void bn_zero(bn_t a) {
  * @ N - input: qty of coefficients
  * @NPolis - input: qty of primes/residual polynomials
  */
-__global__ void cuCRT(cuyasheint_t *d_polyCRT, const bn_t *x,const int unsigned N,const unsigned int NPolis){
+__global__ void cuCRT(	cuyasheint_t *d_polyCRT,
+						const bn_t *x,
+						const int unsigned N,
+						const unsigned int NPolis
+						){
 	/**
 	 * This function should be executed with N*Npolis threads. 
 	 * Each thread computes one coefficient of each residue of d_polyCRT
@@ -197,7 +286,11 @@ __global__ void cuCRT(cuyasheint_t *d_polyCRT, const bn_t *x,const int unsigned 
  * @param N         input: Number of coefficients
  * @param NPolis    input: Number of residues
  */
-__global__ void cuICRT(bn_t *poly, const cuyasheint_t *d_polyCRT,const int unsigned N,const unsigned int NPolis,const bn_t M, const bn_t *Mpis,const cuyasheint_t *invMpis){
+__global__ void cuICRT(	bn_t *poly,
+						const cuyasheint_t *d_polyCRT,
+						const int unsigned N,
+						const unsigned int NPolis
+						){
 	/**
 	 * This function should be executed with N threads.
 	 * Each thread j computes a Mpi*( invMpi*(value) % pi) and adds to poly[j]

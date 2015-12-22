@@ -5,6 +5,7 @@
 #include "integer.h"
 #include "settings.h"
 #include "common.h"
+#include "cuda_bn.h"
 
 ZZ Polynomial::CRTProduct = ZZ(1);
 std::vector<cuyasheint_t> Polynomial::CRTPrimes(0);
@@ -99,17 +100,15 @@ void Polynomial::copy_device_crt_residues(Polynomial &b){
       // std::cout << (end-start) << " cycles" << std::endl;
     }
 
-void Polynomial::update_device_data(unsigned int usable_ratio){
- 
 
-  // "usable_ratio" could be used to avoid unnecessary copies
+void Polynomial::update_device_data(){
+  /**
+   * This function copy the polynomial to GPU's memory in bn_t format
+   */
+
   if(this->get_device_updated())
     return;
-  else if(!this->get_crt_computed())
-    this->crt();
 
-   // #ifdef VERBOSEMEMORYCOPY
-  // #endif
 
   #if defined(VERBOSE) || defined(VERBOSEMEMORYCOPY) 
   std::cout << "Copying data to GPU." << std::endl;
@@ -127,22 +126,13 @@ void Polynomial::update_device_data(unsigned int usable_ratio){
     this->update_crt_spacing(new_spacing);
   }
 
-  cudaError_t result = cudaMemsetAsync( this->get_device_crt_residues(),
-                                        0,
-                                        this->get_crt_spacing()*(Polynomial::CRTPrimes.size())*sizeof(cuyasheint_t),
-                                        this->get_stream());
-  if(result != cudaSuccess)
-    std::cout << "Opa!" << std::endl;
-  assert(result == cudaSuccess);  
-  for(unsigned int i=0;i < Polynomial::CRTPrimes.size();i++){
-    cudaError_t result = cudaMemcpyAsync( this->get_device_crt_residues()+this->get_crt_spacing()*i,
-                                          &(this->polyCRT[i][0]) ,
-                                          (this->polyCRT[i].size())*sizeof(cuyasheint_t),
-                                          cudaMemcpyHostToDevice,
-                                          this->get_stream());
-    assert(result == cudaSuccess);
+  /**
+   * Converts ZZs to bn_t
+   */
+  for(unsigned int i = 0; i < this->deg(); i++){
+    bn_t coef = get_words(this->get_coeff(i));
+    bn_coefs.push_back(coef);
   }
-
 
   this->ON_COPY = false;
   this->set_device_updated(true);

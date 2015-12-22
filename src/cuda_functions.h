@@ -19,6 +19,7 @@ __constant__ cuyasheint_t CRTPrimesConstant[MAX_PRIMES_ON_C_MEMORY];
 class CUDAFunctions{
   public:
   	static int N;
+    static int std_bn_t_alloc;
     #ifdef NTTMUL
     static cuyasheint_t wN;
     static cuyasheint_t *d_W;
