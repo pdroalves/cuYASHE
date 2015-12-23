@@ -67,7 +67,7 @@ int main(void){
     std::cout << "Starting..." << std::endl << std::endl;
     clock_gettime( CLOCK_REALTIME, &start);
     for(unsigned int i = 0; i < 100;i++){
-      pA.crt();
+      pA.update_device_data();
       cudaError_t result = cudaDeviceSynchronize();
       assert(result == cudaSuccess);
       pA.set_crt_computed(false);
@@ -103,7 +103,7 @@ int main(void){
 
     clock_gettime( CLOCK_REALTIME, &start);
     for(unsigned int i = 0; i < 100;i++){
-      pA.icrt();
+      pA.update_host_data();
       cudaError_t result = cudaDeviceSynchronize();
       assert(result == cudaSuccess);
       pA.set_icrt_computed(false);

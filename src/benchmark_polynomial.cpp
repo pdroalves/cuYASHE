@@ -149,7 +149,7 @@ int main(int argc,char* argv[]){
     clock_gettime( CLOCK_REALTIME, &start);
     for(int i = 0; i < N;i++){
       a.set_crt_computed(false);
-      a.crt();
+      a.update_device_data();
       cudaDeviceSynchronize();
     }
     clock_gettime( CLOCK_REALTIME, &stop);
@@ -161,7 +161,7 @@ int main(int argc,char* argv[]){
     a.update_host_data();
     for(int i = 0; i < N;i++){
       a.set_icrt_computed(false);
-      a.icrt();
+      a.update_host_data();
       cudaDeviceSynchronize();
     }
     clock_gettime( CLOCK_REALTIME, &stop);

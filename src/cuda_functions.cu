@@ -20,7 +20,7 @@ cufftHandle CUDAFunctions::plan;
 typedef double2 Complex;
 #endif
 
-unsigned int CUDAFunctions::N = 0;
+int CUDAFunctions::N = 0;
 
 ///////////////////////////////////////
 /// Memory operations

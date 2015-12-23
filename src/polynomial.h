@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <cuda_runtime.h>
 #include "cuda_functions.h"
+#include "cuda_bn.h"
 #include "settings.h"
 #include "common.h"
 // #include "integer.h"
@@ -236,9 +237,9 @@ class Polynomial{
       #ifdef VERBOSE
       std::cout << "Will generate a string" << std::endl;
       #endif
-      if(!this->get_icrt_computed()){
-        this->icrt();
-      }
+      if(!get_host_updated())
+        update_host_data();
+      
 
       stringstream ss;
       for(int i = 0; i <=  this->deg();i++)
@@ -277,18 +278,13 @@ class Polynomial{
           // #pragma omp section
           {
 
-              if(!this->get_device_updated()){
-                this->crt();
+              if(!this->get_device_updated())
                 this->update_device_data();
-              }
-
           }
           // #pragma omp section
           {
-              if(!b.get_device_updated()){
-                  b.crt();
+              if(!b.get_device_updated())
                   b.update_device_data();
-              }
           }
       }
 
@@ -320,12 +316,12 @@ class Polynomial{
       //     #pragma omp section
       //     {
       //       if(!this->get_host_updated())
-      //         this->icrt();
+      //         this->update_host_data();
       //     }
       //     #pragma omp section
       //     {
       //       if(!b.get_host_updated())
-      //         b.icrt();
+      //         b.update_host_data();
       //     }
       // }
 
@@ -345,17 +341,17 @@ class Polynomial{
       //     #pragma omp section
       //     {
       //       if(!this->get_host_updated())
-      //         this->icrt();
+      //         this->update_host_data();
       //     }
       //     #pragma omp section
       //     {
       //       if(!b.get_host_updated())
-      //         b.icrt();
+      //         b.update_host_data();
       //     }
       // }
 
       Polynomial::DivRem((*this),b,(*quot), (*rem));
-      // rem.icrt();
+      // rem.update_host_data();
       // std::cout << rem.to_string() << std::endl;
       return rem;
     }
@@ -489,7 +485,7 @@ class Polynomial{
       Polynomial p(*this);
       if(!p.get_host_updated()){
         #warning "Polynomial division on device not implemented!";
-        p.icrt();
+        p.update_host_data();
       }
 
       // #pragma omp parallel for
@@ -541,10 +537,10 @@ class Polynomial{
 
     bool operator==(Polynomial b){
       if(!this->get_host_updated()){
-          this->icrt();
+          this->update_host_data();
       }
       if(!b.get_host_updated()){
-        b.icrt();
+        b.update_host_data();
       }
       this->normalize();
       b.normalize();
@@ -566,7 +562,7 @@ class Polynomial{
     void MulMod(ZZ b,ZZ mod){
       if(!this->get_host_updated())
         // We cannot store ZZ integers in device's memory
-        this->icrt();
+        this->update_host_data();
 
       // #pragma omp parallel for
       for(int i = 0; i <= this->deg();i++)
@@ -644,7 +640,7 @@ class Polynomial{
     void set_coeff(int index,ZZ value){
 
       if(!this->get_host_updated()){
-        this->icrt();
+        this->update_host_data();
       }
 
       if((unsigned int)(index) >= this->coefs.size()){
@@ -672,7 +668,7 @@ class Polynomial{
     std::vector<ZZ> get_coeffs(){
 
       if(!this->get_host_updated()){
-        this->icrt();
+        this->update_host_data();
       }
 
       // Returns a copy of all coefficients
@@ -720,7 +716,7 @@ class Polynomial{
 
     }
      void set_coeffs(int size){
-      // Prepare this polynomial to receive size coefficientes
+      // Prepare this polynomial to receive size coefficients
       this->coefs.clear();
       this->coefs.resize(size);
       
@@ -764,8 +760,6 @@ class Polynomial{
       d_polyCRT = residues;
     }
 
-    void crt();
-    void icrt();
     int get_crt_spacing(){
       return this->CRTSPACING;
     }
@@ -814,7 +808,7 @@ class Polynomial{
         CUDAFunctions::write_crt_primes();
     }
 
-    void update_device_data(unsigned int usable_ratio=1);
+    void update_device_data();
     void set_device_updated(bool b){
       this->DEVICE_IS_UPDATE = b;
       if(b){
@@ -930,9 +924,10 @@ class Polynomial{
     }
 
     int deg(){
-      if(!this->get_host_updated())
-        this->update_host_data();
-      return this->coefs.size()-1;
+      if(!get_host_updated())
+        return bn_coefs.size()-1;
+      else
+        return coefs.size()-1;
     }
     ZZ lead_coeff(){
       if(this->deg() >= 0){
