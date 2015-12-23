@@ -196,7 +196,7 @@ P common_multiplication(P *a_input, P *b_input){
 		std::cout << "a" << std::endl;
 		#endif
 		if(!a.get_device_updated()){
-			a.update_device_data(2);
+			a.update_device_data();
 		}
 
       }
@@ -206,7 +206,7 @@ P common_multiplication(P *a_input, P *b_input){
 		std::cout << "b" << std::endl;
 		#endif
 		if(!b.get_device_updated()){
-			b.update_device_data(2);
+			b.update_device_data();
 		}
       }
   }

@@ -25,14 +25,14 @@ __device__ cuyasheint_t *invMpis;
  * Initiates a new bn_t object
  * @param a input: operand
  */
-__host__ void bn_new(bn_t a){
+__host__ void bn_new(bn_t *a){
 	a->used = 0;
 	a->alloc = STD_BNT_ALLOC;
 	a->sign = BN_POS;
 	cudaMallocManaged(&a->dp,a->alloc*sizeof(cuyasheint_t));
 }
 
-__host__ void bn_free(bn_t a){
+__host__ void bn_free(bn_t *a){
 	a->used = 0;
 	a->alloc = 0;
 	
@@ -47,7 +47,7 @@ __host__ void bn_free(bn_t a){
  * @param a        input/output:operand
  * @param new_size input: new_size for dp
  */
-__host__ void bn_grow(bn_t a,const unsigned int new_size){
+__host__ void bn_grow(bn_t *a,const unsigned int new_size){
 	// We expect that a->alloc <= new_size
 	assert(a->alloc <= new_size);
 	cudaMallocManaged(&a->dp+a->alloc,new_size*sizeof(cuyasheint_t));
@@ -72,7 +72,7 @@ __device__ void dv_zero(cuyasheint_t *a, int digits) {
  * Set a big number struct to zero
  * @param a operand
  */
-__device__ void bn_zero(bn_t a) {
+__device__ void bn_zero(bn_t *a) {
 	a->sign = BN_POS;
 	a->used = 1;
 	dv_zero(a->dp, a->alloc);
@@ -86,12 +86,12 @@ __device__ void bn_zero(bn_t a) {
  * @param a input: operand
  */
 __host__ void get_words(bn_t *b,ZZ a){
-	bn_new(*b);
+	bn_new(b);
 
-	for(ZZ x = a; x > 0; x=(x>>WORD),(*b)->used++){
-		if((*b)->used >= (*b)->alloc)
-			bn_grow(*b,STD_BNT_ALLOC);
-		(*b)->dp[(*b)->used] = conv<uint32_t>(x&WORD);
+	for(ZZ x = a; x > 0; x=(x>>WORD),b->used++){
+		if(b->used >= b->alloc)
+			bn_grow(b,STD_BNT_ALLOC);
+		b->dp[b->used] = conv<uint32_t>(x&WORD);
 	}
 }
 
@@ -100,7 +100,7 @@ __host__ void get_words(bn_t *b,ZZ a){
  * @param  a input:array of words
  * @return   output: NTL ZZ
  */
-__host__ ZZ get_ZZ(bn_t a){
+__host__ ZZ get_ZZ(bn_t *a){
 	ZZ b = conv<ZZ>(0);
 	for(unsigned int i = a->used-1; i <= 0;i--){
 			b = b<<WORD;
@@ -275,7 +275,10 @@ __global__ void cuCRT(	cuyasheint_t *d_polyCRT,
 		// pid == tid <=> prime's id
 		// Load this thread's coefficient
 		// Computes x mod pi
-		d_polyCRT[cid + tid*N] = bn_mod1_low(x[cid]->dp,x[cid]->used,CRTPrimesConstant[tid]);
+		d_polyCRT[cid + tid*N] = bn_mod1_low(	x[cid].dp,
+												x[cid].used,
+												CRTPrimesConstant[tid]
+												);
 	}
 }	
 
@@ -312,22 +315,22 @@ __global__ void cuICRT(	bn_t *poly,
 	 	
 	 			// Computes the inner result
 	 			bn_t inner_result;
-	 			bn_zero(inner_result);
+	 			bn_zero(&inner_result);
 	 			cuyasheint_t x;
 	 	
 	 			bn_64bits_mulmod(	&x,
 	 								invMpis[rid],
 	 								d_polyCRT[tid],
 	 								pi);
-	 			bn_mul1_low(	inner_result->dp,
-	 					     	Mpis[rid]->dp,
+	 			bn_mul1_low(	inner_result.dp,
+	 					     	Mpis[rid].dp,
 	 					     	x,
-	 					     	Mpis[rid]->used);
+	 					     	Mpis[rid].used);
 	 			
-	 			bn_addn_low(poly[cid]->dp,
-							poly[cid]->dp,
-							inner_result->dp,
-							inner_result->used
+	 			bn_addn_low(poly[cid].dp,
+							poly[cid].dp,
+							inner_result.dp,
+							inner_result.used
 							);
 	 		}
 

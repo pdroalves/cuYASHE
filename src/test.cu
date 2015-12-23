@@ -162,7 +162,7 @@ BOOST_AUTO_TEST_CASE(simpleAdd)
 
   Polynomial b(a);//Copy
   Polynomial c = a+b;
-  c.icrt();//
+  c.update_host_data();//
 
   #ifdef VERBOSE
   std::cout << "a: " << a.to_string() << std::endl;
@@ -313,7 +313,7 @@ BOOST_AUTO_TEST_CASE(multiplyByZZOnCPU)
     // b = ZZ(0);
 
     Polynomial c = a*b % Polynomial::global_mod;
-    c.icrt();
+    c.update_host_data();
     c.normalize();
 
     ZZ_pEX c_ntl = a_ntl*conv<ZZ_p>(b);
@@ -908,7 +908,7 @@ BOOST_AUTO_TEST_CASE(encryptandAdd)
     Polynomial a_decrypted = cipher.decrypt(c);
 
     Polynomial value = (a+a);
-    value.icrt();
+    value.update_host_data();
     Polynomial value_reduced = value % t;
 
     #ifdef VERBOSE

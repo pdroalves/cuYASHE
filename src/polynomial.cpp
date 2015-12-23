@@ -5,7 +5,6 @@
 #include "integer.h"
 #include "settings.h"
 #include "common.h"
-#include "cuda_bn.h"
 
 ZZ Polynomial::CRTProduct = ZZ(1);
 std::vector<cuyasheint_t> Polynomial::CRTPrimes(0);
@@ -129,10 +128,11 @@ void Polynomial::update_device_data(){
   /**
    * Converts ZZs to bn_t
    */
-  for(unsigned int i = 0; i < this->deg(); i++){
-    bn_t coef = get_words(this->get_coeff(i));
-    bn_coefs.push_back(coef);
-  }
+  for(int i = 0; i < this->deg(); i++){
+      bn_t coef;
+      get_words(coef,get_coeff(i));
+      bn_coefs.push_back(coef);
+    }
 
   this->ON_COPY = false;
   this->set_device_updated(true);
@@ -145,149 +145,28 @@ void Polynomial::update_host_data(){
   
     if(this->get_host_updated())
       return;
-    
-    #ifdef VERBOSEMEMORYCOPY
-    std::cout << "Copying data to the CPU..."<<std::endl;
-    uint64_t start = get_cycles();
-    #endif
 
     #ifdef VERBOSE
     std::cout << "Copying data to CPU." << std::endl;
     #endif
 
-    cudaError_t result;
-
     assert(Polynomial::CRTPrimes.size() > 0);
     if(this->polyCRT.size() != Polynomial::CRTPrimes.size())
       this->polyCRT.resize(Polynomial::CRTPrimes.size());
 
+    // Prepare this polynomial to receive this->deg()+1 coefficients
+    if((int)coefs.size() <= this->deg())
+      set_coeffs(this->deg()+1);
 
-    for(unsigned int i=0;i < Polynomial::CRTPrimes.size();i++){
-      if(this->polyCRT[i].size() < (unsigned int)(this->get_crt_spacing)())
-        this->polyCRT[i].resize(this->get_crt_spacing());
-      result = cudaMemcpyAsync(&this->polyCRT[i][0] ,
-                                this->d_polyCRT + i*this->get_crt_spacing(),
-                                this->get_crt_spacing()*sizeof(cuyasheint_t),
-                                cudaMemcpyDeviceToHost,
-                                this->get_stream());
-      assert(result == cudaSuccess);
-    }
-    result = cudaDeviceSynchronize();
-    assert(result == cudaSuccess);
+    /**
+     * Convert bn_t to ZZ
+     */
+    for(int i = 0; i < this->deg(); i++)
+      ZZ coef = get_ZZ(
+        bn_coefs[i]
+        );
+
     this->set_host_updated(true);
-    this->icrt();
-  
-    #ifdef VERBOSEMEMORYCOPY
-    uint64_t end = get_cycles();
-    std::cout << "Cycles needed: " << (end-start) <<std::endl;
-    #endif
-}
-
-void Polynomial::crt(){
-    // "The product of those prime numbers should be larger than the potentially largest coefficient of polynomial c, that we will obtain as a result of a computation for accurate recovery through ICRT." produtorio_{i=1}^n (pi) > n*q^2
-
-    // Escapes, if possible    
-    if(this->get_crt_computed())
-      return;
-    else if(!this->get_host_updated())
-      this->update_host_data();
-    
-    // Set the quantity of expected residues
-    std::vector<cuyasheint_t> P = this->CRTPrimes;
-    this->polyCRT.resize(P.size());
-
-    // Extract the coefficients to a array of ZZs
-    std::vector<ZZ> array = this->get_coeffs();
-
-    // We pick each prime
-    for(unsigned int i = 0; i < P.size();i++){
-      this->polyCRT[i].resize(array.size());
-  
-    #pragma omp parallel for  
-      for(unsigned int j = 0; j < array.size();j++)
-        this->polyCRT[i][j] = conv<cuyasheint_t>(array[j] % P[i]);
-    }
-
-
-    // for(unsigned int j = 0; j < polyCRT.size();j++){
-    //   std::cout << "CRT Polynomial residue "<< j << ":" << std::endl; 
-    //   for(unsigned int i = 0; i < polyCRT[j].size() ;i++)
-    //     std::cout << polyCRT[j][i] << ", ";
-    //   std::cout << std::endl << std::endl;
-    // }
-    this->set_host_updated(true);
-    this->set_device_updated(false);
-    this->set_crt_computed(true);
-}
- 
-void Polynomial::icrt(){
-
-  // Escapes, if possible
-  if(this->get_icrt_computed())
-    return;
-  else if(!this->get_host_updated()){
-    this->set_icrt_computed(true);//If we do not set this, we get a infinite loop
-    this->update_host_data();
-  }
-
-    // for(unsigned int j = 0; j < polyCRT.size();j++){
-    //   std::cout << "ICRT Polynomial residue"<< j << ":" << std::endl; 
-    //   for(unsigned int i = 0; i < polyCRT[j].size() ;i++)
-    //     std::cout << polyCRT[j][i] << ", ";
-    //   std::cout << std::endl << std::endl;
-    // }
-  
-  ZZ M = Polynomial::CRTProduct;
-  std::vector<cuyasheint_t> primes = Polynomial::CRTPrimes;
-  std::vector<ZZ> Mpis = Polynomial::CRTMpi;
-  std::vector<cuyasheint_t> invMpis = Polynomial::CRTInvMpi;
- 
-
-  // Discards all coefficients and prepare to receive new this->CRTSPACING coefficients
-
-  this->set_coeffs(this->CRTSPACING);
-  
-
-  // Iteration over all primes
-  for(unsigned int i = 0; i < primes.size();i++){
-    // Get a prime
-    cuyasheint_t pi = primes[i];
-    ZZ Mpi = Mpis[i];
-    cuyasheint_t invMpi = invMpis[i];
-  
-
-    // Iteration over coefficients
-    #pragma omp parallel for
-    for(unsigned int j = 0; j < this->polyCRT[i].size();j++){
-      uint64_t value = this->polyCRT[i][j] % pi;
-
-      this->coefs[j] += Mpi*( invMpi*(value) % pi);
-    }
-    #ifdef CYCLECOUNTING
-    end_iteration = get_cycles();
-    std::cout << "Cycles in the inner loop: " << (end_iteration-start_iteration) << std::endl;
-    #endif
-    
-  }
- 
-  *this %= M;
-
-  this->normalize();
-
-  // Correction on negative values
-  for(unsigned int i = 0; i < this->coefs.size(); i++){
-    // std::cout << "Correção: " << this->coefs[i] << " > " << Polynomial::global_mod << "?" << std::endl;
-    // this->coefs[i] = (this->coefs[i] >= Polynomial::global_mod)? (this->coefs[i]-M) % Polynomial::global_mod : this->coefs[i]; 
-    // std::cout << this->coefs[i] << std::endl;
-  }
-  // this->update_crt_spacing(this->deg()+1);
-  
-  this->set_host_updated(true);
-  this->set_icrt_computed(true);
-  // Updated CRTSPACING
-  if(this->get_crt_spacing() < (Polynomial::global_phi->deg()))
-    this->update_crt_spacing((Polynomial::global_phi->deg()));
-  return;
 }
 
 void Polynomial::DivRem(Polynomial a,Polynomial b,Polynomial &quot,Polynomial &rem){
@@ -297,15 +176,12 @@ void Polynomial::DivRem(Polynomial a,Polynomial b,Polynomial &quot,Polynomial &r
     // Operates on GPU
     throw "DivRem for GPU not implemented yet";
   }else{
-    if(!a.get_host_updated()){
+    if(!a.get_host_updated())
         a.update_host_data();
-        a.icrt();
-    }
 
-    if(!b.get_host_updated()){
+    if(!b.get_host_updated())
         b.update_host_data();
-        b.icrt();
-    }
+    
     // No need to reduce
     if(a.deg() <= 0)
       return;

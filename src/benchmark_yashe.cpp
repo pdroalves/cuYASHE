@@ -192,9 +192,9 @@ int main(int argc, char* argv[]){
 
     Ciphertext ct_a = cipher.encrypt(a);
     Ciphertext ct_b = cipher.encrypt(b);
-    ct_a.icrt();
+    ct_a.update_host_data();
     ct_a.set_device_updated(false);
-    ct_b.icrt();
+    ct_b.update_host_data();
     ct_b.set_device_updated(false);  
 
     clock_gettime( CLOCK_REALTIME, &start);
@@ -254,8 +254,6 @@ int main(int argc, char* argv[]){
     mult_with_memcopy << d << " " << diff << std::endl;;
 
 
-    // ct_a.crt();
-    // ct_b.crt();
     // ct_a.update_device_data();
     // ct_b.update_device_data();
         
