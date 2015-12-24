@@ -14,7 +14,6 @@ NTL_CLIENT
 // __constant__ int PrimesL;
 #define MAX_PRIMES_ON_C_MEMORY 4096
 // cuyasheint_t *CRTPrimesGlobal;
-__constant__ cuyasheint_t CRTPrimesConstant[MAX_PRIMES_ON_C_MEMORY];
 
 class CUDAFunctions{
   public:
@@ -63,6 +62,7 @@ class CUDAFunctions{
 
     static void init(int N);
     static void write_crt_primes();
+    static cuyasheint_t* get_crt_primes();
   private:
 };
 #ifdef NTTMUL

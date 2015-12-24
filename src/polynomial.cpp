@@ -5,6 +5,7 @@
 #include "integer.h"
 #include "settings.h"
 #include "common.h"
+#include "cuda_bn.h"
 
 ZZ Polynomial::CRTProduct = ZZ(1);
 std::vector<cuyasheint_t> Polynomial::CRTPrimes(0);
@@ -13,7 +14,6 @@ std::vector<cuyasheint_t> Polynomial::CRTInvMpi;
 ZZ Polynomial::global_mod = ZZ(0);
 Polynomial *(Polynomial::global_phi) = NULL;
 bool Polynomial::phi_set = false;
-
 
 
 Polynomial Polynomial::operator+(Polynomial &b){
@@ -45,60 +45,127 @@ Polynomial Polynomial::operator*(ZZ b){
     }
 
 void Polynomial::operator delete(void *ptr){
-      Polynomial *p = (Polynomial*)ptr;
+  Polynomial *p = (Polynomial*)ptr;
 
-      if(p->get_device_crt_residues() != 0x0){
-        try
-        {
-          // std::cout << "Delete: cudaFree" << std::endl;
-          cudaError_t result = cudaFree(p->get_device_crt_residues());
-          if(result != cudaSuccess)
-            throw string( cudaGetErrorString(result));
-          
-        }catch(string s){
-          #ifdef VERBOSE
-          std::cout << "Exception at cudaFree: " << s << std::endl;
-          #endif 
-          cudaGetLastError();//Reset last error
-        }
-      }
-
-      // free(ptr);
+  if(p->get_device_crt_residues() != 0x0){
+    try
+    {
+      // std::cout << "Delete: cudaFree" << std::endl;
+      cudaError_t result = cudaFree(p->get_device_crt_residues());
+      if(result != cudaSuccess)
+        throw string( cudaGetErrorString(result));
+      
+    }catch(string s){
+      #ifdef VERBOSE
+      std::cout << "Exception at cudaFree: " << s << std::endl;
+      #endif 
+      cudaGetLastError();//Reset last error
     }
+  }
+
+  // free(ptr);
+}
 
 void Polynomial::copy_device_crt_residues(Polynomial &b){
-      // uint64_t start,end;
+  // uint64_t start,end;
 
-      // start = get_cycles();
-      if(!b.get_device_updated())
-        return;
+  // start = get_cycles();
+  if(!b.get_device_updated())
+    return;
 
-      // std::cout << "Will copy residues on device memory" << std::endl;
+  // std::cout << "Will copy residues on device memory" << std::endl;
 
 
-      // Adjusts CRTSPACING
-      // Here we don't use update_crt_spacing(). The reason
-      // is: speed and context.
-      // update_crt_spacing() may not just update the spacing, but
-      // also update device data. And in this context, we know
-      // that there is no relevant data to update.
-      cuyasheint_t *aux;
-      this->CRTSPACING = b.get_crt_spacing();
+  // Adjusts CRTSPACING
+  // Here we don't use update_crt_spacing(). The reason
+  // is: speed and context.
+  // update_crt_spacing() may not just update the spacing, but
+  // also update device data. And in this context, we know
+  // that there is no relevant data to update.
+  cuyasheint_t *aux;
+  this->CRTSPACING = b.get_crt_spacing();
 
-      cudaError_t result = cudaMalloc((void**)&aux,
-                          this->get_crt_spacing()*(Polynomial::CRTPrimes.size())*sizeof(cuyasheint_t));
-      assert(result == cudaSuccess);
-      result = cudaMemcpyAsync(aux,
-                          b.get_device_crt_residues(),
-                          this->get_crt_spacing()*(Polynomial::CRTPrimes.size())*sizeof(cuyasheint_t),
-                          cudaMemcpyDeviceToDevice);      
-      assert(result == cudaSuccess);
+  cudaError_t result = cudaMalloc((void**)&aux,
+                      this->get_crt_spacing()*(Polynomial::CRTPrimes.size())*sizeof(cuyasheint_t));
+  assert(result == cudaSuccess);
+  result = cudaMemcpyAsync(aux,
+                      b.get_device_crt_residues(),
+                      this->get_crt_spacing()*(Polynomial::CRTPrimes.size())*sizeof(cuyasheint_t),
+                      cudaMemcpyDeviceToDevice);      
+  assert(result == cudaSuccess);
 
-      this->set_device_crt_residues(aux);
-      // end = get_cycles();
-      // std::cout << (end-start) << " cycles" << std::endl;
+  this->set_device_crt_residues(aux);
+  // end = get_cycles();
+  // std::cout << (end-start) << " cycles" << std::endl;
+}
+/**
+ * Initiates a new bn_t object
+ * @param a input: operand
+ */
+
+////////////////////////
+// Auxiliar functions //
+////////////////////////
+///
+__host__ void bn_new(bn_t *a){
+  a->used = 0;
+  a->alloc = STD_BNT_ALLOC;
+  a->sign = BN_POS;
+  cudaMallocManaged(&a->dp,a->alloc*sizeof(cuyasheint_t));
+}
+
+__host__ void bn_free(bn_t *a){
+  a->used = 0;
+  a->alloc = 0;
+  
+  cudaError_t result = cudaDeviceSynchronize();
+  assert(result == cudaSuccess);
+  result = cudaFree(a->dp);
+  assert(result == cudaSuccess);
+
+}
+/**
+ * Increase the allocated memory for a bn_t object.
+ * @param a        input/output:operand
+ * @param new_size input: new_size for dp
+ */
+__host__ void bn_grow(bn_t *a,const unsigned int new_size){
+  // We expect that a->alloc <= new_size
+  assert((unsigned int)a->alloc <= new_size);
+  cudaMallocManaged(&a->dp+a->alloc,new_size*sizeof(cuyasheint_t));
+  a->alloc = new_size;
+
+}
+
+/**
+ * get_words converts a NTL big integer
+ * in our bn_t format
+ * @param b output: word representation
+ * @param a input: operand
+ */
+__host__ void get_words(bn_t *b,ZZ a){
+  bn_new(b);
+
+  for(ZZ x = a; x > 0; x=(x>>WORD),b->used++){
+    if(b->used >= b->alloc)
+      bn_grow(b,STD_BNT_ALLOC);
+    b->dp[b->used] = conv<uint32_t>(x&WORD);
+  }
+}
+
+/**
+ * Convert an array of words into a NTL ZZ
+ * @param  a input:array of words
+ * @return   output: NTL ZZ
+ */
+__host__ ZZ get_ZZ(bn_t *a){
+  ZZ b = conv<ZZ>(0);
+  for(unsigned int i = a->used-1; i <= 0;i--){
+      b = b<<WORD;
+      b += a->dp[i];
     }
-
+  return b;
+}
 
 void Polynomial::update_device_data(){
   /**
@@ -125,20 +192,30 @@ void Polynomial::update_device_data(){
     this->update_crt_spacing(new_spacing);
   }
 
+  bn_coefs.clear();
+  // cudaMallocManaged(&bn_coefs,new_size*sizeof(cuyasheint_t));
+  
   /**
    * Converts ZZs to bn_t
    */
   for(int i = 0; i < this->deg(); i++){
       bn_t coef;
-      get_words(coef,get_coeff(i));
+      get_words(&coef,get_coeff(i));
       bn_coefs.push_back(coef);
     }
 
+  /**
+  *  CRT
+  */
+  crt( &this->bn_coefs[0],
+      this->get_device_crt_residues(),
+      this->get_crt_spacing(),
+      Polynomial::CRTPrimes.size(),
+      this->get_stream()
+    );
+
   this->ON_COPY = false;
   this->set_device_updated(true);
-
-  // #ifdef VERBOSEMEMORYCOPY
-  // #endif
 }
 
 void Polynomial::update_host_data(){
@@ -149,7 +226,8 @@ void Polynomial::update_host_data(){
       icrt( &this->bn_coefs[0],
             this->get_device_crt_residues(),
             this->get_crt_spacing(),
-            Polynomial::CRTPrimes.size()
+            Polynomial::CRTPrimes.size(),
+            this->get_stream()
           );
 
 
@@ -170,7 +248,7 @@ void Polynomial::update_host_data(){
      */
     for(int i = 0; i < this->deg(); i++)
       ZZ coef = get_ZZ(
-        bn_coefs[i]
+        &bn_coefs[i]
         );
 
     this->set_host_updated(true);

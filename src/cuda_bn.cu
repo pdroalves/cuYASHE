@@ -21,39 +21,7 @@ __device__ cuyasheint_t *invMpis;
 // Auxiliar functions //
 ////////////////////////
 
-/**
- * Initiates a new bn_t object
- * @param a input: operand
- */
-__host__ void bn_new(bn_t *a){
-	a->used = 0;
-	a->alloc = STD_BNT_ALLOC;
-	a->sign = BN_POS;
-	cudaMallocManaged(&a->dp,a->alloc*sizeof(cuyasheint_t));
-}
 
-__host__ void bn_free(bn_t *a){
-	a->used = 0;
-	a->alloc = 0;
-	
-	cudaError_t result = cudaDeviceSynchronize();
-	assert(result == cudaSuccess);
-	result = cudaFree(a->dp);
-	assert(result == cudaSuccess);
-
-}
-/**
- * Increase the allocated memory for a bn_t object.
- * @param a        input/output:operand
- * @param new_size input: new_size for dp
- */
-__host__ void bn_grow(bn_t *a,const unsigned int new_size){
-	// We expect that a->alloc <= new_size
-	assert(a->alloc <= new_size);
-	cudaMallocManaged(&a->dp+a->alloc,new_size*sizeof(cuyasheint_t));
-	a->alloc = new_size;
-
-}
 __device__ void dv_zero(cuyasheint_t *a, int digits) {
 	int i;
  
@@ -76,37 +44,6 @@ __device__ void bn_zero(bn_t *a) {
 	a->sign = BN_POS;
 	a->used = 1;
 	dv_zero(a->dp, a->alloc);
-}
-
-
-/**
- * get_words converts a NTL big integer
- * in our bn_t format
- * @param b output: word representation
- * @param a input: operand
- */
-__host__ void get_words(bn_t *b,ZZ a){
-	bn_new(b);
-
-	for(ZZ x = a; x > 0; x=(x>>WORD),b->used++){
-		if(b->used >= b->alloc)
-			bn_grow(b,STD_BNT_ALLOC);
-		b->dp[b->used] = conv<uint32_t>(x&WORD);
-	}
-}
-
-/**
- * Convert an array of words into a NTL ZZ
- * @param  a input:array of words
- * @return   output: NTL ZZ
- */
-__host__ ZZ get_ZZ(bn_t *a){
-	ZZ b = conv<ZZ>(0);
-	for(unsigned int i = a->used-1; i <= 0;i--){
-			b = b<<WORD;
-			b += a->dp[i];
-		}
-	return b;
 }
 
 ////////////////
@@ -256,7 +193,8 @@ __device__ cuyasheint_t bn_addn_low(cuyasheint_t *c,
 __global__ void cuCRT(	cuyasheint_t *d_polyCRT,
 						const bn_t *x,
 						const int unsigned N,
-						const unsigned int NPolis
+						const unsigned int NPolis,
+						cuyasheint_t *CRTPrimes
 						){
 	/**
 	 * This function should be executed with N*Npolis threads. 
@@ -277,7 +215,7 @@ __global__ void cuCRT(	cuyasheint_t *d_polyCRT,
 		// Computes x mod pi
 		d_polyCRT[cid + tid*N] = bn_mod1_low(	x[cid].dp,
 												x[cid].used,
-												CRTPrimesConstant[tid]
+												CRTPrimes[tid]
 												);
 	}
 }	
@@ -292,7 +230,8 @@ __global__ void cuCRT(	cuyasheint_t *d_polyCRT,
 __global__ void cuICRT(	bn_t *poly,
 						const cuyasheint_t *d_polyCRT,
 						const int unsigned N,
-						const unsigned int NPolis
+						const unsigned int NPolis,
+						cuyasheint_t *CRTPrimes
 						){
 	/**
 	 * This function should be executed with N threads.
@@ -311,7 +250,7 @@ __global__ void cuICRT(	bn_t *poly,
 
 	 	for(unsigned int rid = 0; rid < NPolis;rid++){
 	 			// Get a prime
-	 			cuyasheint_t pi = CRTPrimesConstant[rid];
+	 			cuyasheint_t pi = CRTPrimes[rid];
 	 	
 	 			// Computes the inner result
 	 			bn_t inner_result;
@@ -334,12 +273,25 @@ __global__ void cuICRT(	bn_t *poly,
 							);
 	 		}
 
-	 // To-do: Modular reduction of poly[cid] by M
+	 ////////////////////////////////////////////////
+	 // To-do: Modular reduction of poly[cid] by M //
+	 ////////////////////////////////////////////////
 	 }
 
 }
 
-void icrt(bn_t *coefs,cuyasheint_t *d_polyCRT,const int N, const int NPolis);
+
+// __global__ void cuCRT(	cuyasheint_t *d_polyCRT,
+// 						const bn_t *x,
+// 						const int unsigned N,
+// 						const unsigned int NPolis
+// 						){
+	/**
+	 * This function should be executed with N*Npolis threads. 
+	 * Each thread computes one coefficient of each residue of d_polyCRT
+	 */
+	
+void crt(bn_t *coefs,cuyasheint_t *d_polyCRT,const int N, const int NPolis,cudaStream_t stream){
 
 	const int size = N*NPolis;
 	int ADDGRIDXDIM = (size%ADDBLOCKXDIM == 0? 
@@ -347,5 +299,30 @@ void icrt(bn_t *coefs,cuyasheint_t *d_polyCRT,const int N, const int NPolis);
 			size/ADDBLOCKXDIM + 1);
 	dim3 gridDim(ADDGRIDXDIM);
 	dim3 blockDim(ADDBLOCKXDIM);
+	
+	cuCRT<<<gridDim,blockDim,1,stream>>>(d_polyCRT,coefs,N,NPolis,CUDAFunctions::get_crt_primes());
+}
+
+// __global__ void cuICRT(	bn_t *poly,
+// 						const cuyasheint_t *d_polyCRT,
+// 						const int unsigned N,
+// 						const unsigned int NPolis
+// 						){
+	/**
+	 * This function should be executed with N threads.
+	 * Each thread j computes a Mpi*( invMpi*(value) % pi) and adds to poly[j]
+	 */
+
+void icrt(bn_t *coefs,cuyasheint_t *d_polyCRT,const int N, const int NPolis,cudaStream_t stream){
+
+	const int size = N;
+	int ADDGRIDXDIM = (size%ADDBLOCKXDIM == 0? 
+			size/ADDBLOCKXDIM : 
+			size/ADDBLOCKXDIM + 1);
+	dim3 gridDim(ADDGRIDXDIM);
+	dim3 blockDim(ADDBLOCKXDIM);
+	///////////
+	// To-do //
+	///////////
 }
 

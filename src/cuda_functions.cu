@@ -19,11 +19,14 @@ cuyasheint_t *CUDAFunctions::d_WInv = NULL;
 cufftHandle CUDAFunctions::plan;
 typedef double2 Complex;
 #endif
-
+__constant__ cuyasheint_t CRTPrimesConstant[MAX_PRIMES_ON_C_MEMORY];
 int CUDAFunctions::N = 0;
 
-///////////////////////////////////////
-/// Memory operations
+///////////////////////
+// Memory operations //
+///////////////////////
+
+
 __global__ void realignCRTResidues(int oldSpacing,int newSpacing, cuyasheint_t *array,cuyasheint_t *new_array,int residuesSize,int residuesQty){
   //
   const int tid = threadIdx.x + blockDim.x*blockIdx.x;
@@ -97,7 +100,6 @@ __global__ void polynomialAddSub(const int OP,const cuyasheint_t *a,const cuyash
         a_value -= b_value;
 
       c[tid] = a_value;
-      // c[tid] = a_value % CRTPrimesConstant[rid];
   }
 }
 
@@ -139,7 +141,6 @@ __global__ void polynomialAddSubInPlace(const int OP, cuyasheint_t *a,const cuya
         a_value -= b_value;
 
       a[tid] = a_value;
-      // a[tid] = a_value % CRTPrimesConstant[rid];
   }
 }
 
@@ -237,7 +238,6 @@ __global__ void copyAndNormalizeComplexRealPartToInteger(cuyasheint_t *b,const C
       value = rint(fvalue);
 
       b[tid] = value;
-      // b[tid] = value % CRTPrimesConstant[rid];
   }
 }
 ////////////////////////////////////////////////////////////////////////////////
@@ -418,10 +418,7 @@ __global__ void NTTScale(cuyasheint_t *data,const int size,const int N){
   const unsigned int tid = threadIdx.x + blockIdx.x*blockDim.x;
   // const unsigned int cid = (tid/N)*N + (tid%N); // residueId*resideSize + coefficient 
   if( tid < size )
-  {
     data[tid] /= N;
-    // data[tid] %= CRTPrimesConstant[cid];
-  }
 } 
 
 __device__ __host__ void NTTIteration(cuyasheint_t *W,
@@ -537,7 +534,6 @@ __global__ void polynomialOPInteger(const int opcode,
       output[tid] = 42;
       break;
     }
-    // output[tid] %= CRTPrimesConstant[rid];
   }
 
 }
@@ -903,7 +899,6 @@ __global__ void polynomialReduction(cuyasheint_t *a,const int half,const int N,c
 
   if( (cid+half+1 < N) && (residueID*N + cid + half + 1 < N*NPolis)){
     a[residueID*N + cid] -= a[residueID*N + cid + half + 1];
-    // a[residueID*N + cid] %= CRTPrimesConstant[residueID];
     __syncthreads();
     a[residueID*N + cid + half + 1] = 0;
   }
@@ -964,6 +959,10 @@ __host__ void Polynomial::reduce(){
   }
 }
 
+__host__ cuyasheint_t* CUDAFunctions::get_crt_primes(){
+  return CRTPrimesConstant;
+}
+
 __host__ void  CUDAFunctions::write_crt_primes(){
 
   #ifdef VERBOSE
@@ -975,12 +974,17 @@ __host__ void  CUDAFunctions::write_crt_primes(){
   
   // Choose what memory will be used to story CRT Primes
   if(Polynomial::CRTPrimes.size() < MAX_PRIMES_ON_C_MEMORY){
+    
     #ifdef VERBOSE
     std::cout << "Writting CRT Primes to GPU's constant memory" << std::endl;
     #endif
-    cudaError_t result = cudaMemcpyToSymbol (CRTPrimesConstant, &(Polynomial::CRTPrimes[0]), Polynomial::CRTPrimes.size()*sizeof(cuyasheint_t));
+
+    cudaError_t result = cudaMemcpyToSymbol ( *get_crt_primes(),
+                                              &(Polynomial::CRTPrimes[0]),
+                                              Polynomial::CRTPrimes.size()*sizeof(cuyasheint_t)
+                                            );
     assert(result == cudaSuccess);
   }else{
-    throw "Not implemented!";
+    throw "Too much primes.";
   }
 }
