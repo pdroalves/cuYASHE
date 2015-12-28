@@ -22,14 +22,17 @@ __device__ cuyasheint_t *invMpis;
 ////////////////////////
 
 
-__device__ void dv_zero(cuyasheint_t *a, int digits) {
+__host__ __device__ void dv_zero(cuyasheint_t *a, int digits) {
 	int i;
  
 	// if (digits > DV_DIGS) {
 	// 	std::cout << "ERR_NO_VALID" << std::endl;
 	// 	exit(1);
 	// }
-
+	cudaError_t result = cudaDeviceSynchronize();
+	assert(result == cudaSuccess);
+	
+	
 	for (i = 0; i < digits; i++, a++)
 		(*a) = 0;
 
@@ -40,11 +43,58 @@ __device__ void dv_zero(cuyasheint_t *a, int digits) {
  * Set a big number struct to zero
  * @param a operand
  */
-__device__ void bn_zero(bn_t *a) {
+__host__ __device__ void bn_zero(bn_t *a) {
 	a->sign = BN_POS;
 	a->used = 1;
 	dv_zero(a->dp, a->alloc);
 }
+
+/**
+ * Set a big number to digit
+ * @param a     input: big number
+ * @param digit input: digit
+ */
+__host__ __device__ void bn_set_dig(bn_t *a, cuyasheint_t digit) {
+	cudaError_t result = cudaDeviceSynchronize();
+	assert(result == cudaSuccess);
+	
+	bn_zero(a);	
+	a->dp[0] = digit;
+	a->used = 1;
+	a->sign = BN_POS;
+}
+
+__host__ void bn_new(bn_t *a){
+  a->used = 0;
+  a->alloc = STD_BNT_ALLOC;
+  a->sign = BN_POS;
+  cudaMallocManaged(&a->dp,a->alloc*sizeof(cuyasheint_t));
+}
+
+__host__ void bn_free(bn_t *a){
+  a->used = 0;
+  a->alloc = 0;
+  
+  cudaError_t result = cudaDeviceSynchronize();
+  assert(result == cudaSuccess);
+  result = cudaFree(a->dp);
+  assert(result == cudaSuccess);
+
+}
+
+/**
+ * Increase the allocated memory for a bn_t object.
+ * @param a        input/output:operand
+ * @param new_size input: new_size for dp
+ */
+__host__ void bn_grow(bn_t *a,const unsigned int new_size){
+  // We expect that a->alloc <= new_size
+  assert((unsigned int)a->alloc <= new_size);
+  cudaMallocManaged(&a->dp+a->alloc,new_size*sizeof(cuyasheint_t));
+  a->alloc = new_size;
+
+}
+
 
 ////////////////
 // Operators //

@@ -11,7 +11,7 @@ NTL = -Intl -lntl -lgmp
 LTIME_MEASURE = -lrt
 
 #LCUDA = -L/usr/local/cuda/lib64
-LCUDA = -lcuda
+LCUDA = -lcuda -lcudart -lcudadevrt 
 ICUDA = -I/usr/local/cuda/include
 CUDA_ARCH = -arch=sm_35
 
@@ -23,7 +23,7 @@ BENCHMARKYASHEBIN= $(INSTALL)/benchmark_yashe
 
 all: tests benchmarks
 
-tests:  polynomial.o cuda_functions.o cuda_bn.o test.o test_ctpt.o test_ct_mul.o test_ntt.o test_mul.o test_crt.o test_reduce.o ciphertext.o distribution.o yashe.o common.o integer.o
+tests:  polynomial.o cuda_functions.o cuda_bn.o test.o test_ctpt.o test_ct_mul.o test_ntt.o test_mul.o test_crt.o test_reduce.o test_bnt.o ciphertext.o distribution.o yashe.o common.o integer.o
 	$(CUDA_CC) $(CUDA_ARCH) $(LCUDA) $(ICUDA) -o $(TESTBIN) test.o polynomial.o cuda_functions.o cuda_bn.o ciphertext.o distribution.o yashe.o common.o integer.o -lcufft -Xcompiler $(OPENMP) $(NTL) -lboost_unit_test_framework
 	# $(CUDA_CC) $(CUDA_ARCH) $(LCUDA) $(ICUDA) -o $(TESTBIN)_ctpt test_ctpt.o polynomial.o cuda_functions.o cuda_bn.o ciphertext.o distribution.o yashe.o common.o integer.o -lcufft -Xcompiler $(OPENMP) $(NTL)
 	# $(CUDA_CC) $(CUDA_ARCH) $(LCUDA) $(ICUDA) -o $(TESTBIN)_crt test_crt.o polynomial.o cuda_functions.o cuda_bn.o ciphertext.o distribution.o yashe.o common.o integer.o -lcufft -Xcompiler $(OPENMP) $(NTL)
@@ -31,6 +31,7 @@ tests:  polynomial.o cuda_functions.o cuda_bn.o test.o test_ctpt.o test_ct_mul.o
 	# $(CUDA_CC) $(CUDA_ARCH) $(LCUDA) $(ICUDA) -o $(TESTBIN)_ct_mul test_ct_mul.o polynomial.o cuda_functions.o cuda_bn.o ciphertext.o distribution.o yashe.o common.o integer.o -lcufft -Xcompiler $(OPENMP) $(NTL)
 	# $(CUDA_CC) $(CUDA_ARCH) $(LCUDA) $(ICUDA) -o $(TESTBIN)_mul test_mul.o polynomial.o cuda_functions.o cuda_bn.o ciphertext.o distribution.o yashe.o common.o integer.o -lcufft -Xcompiler $(OPENMP) $(NTL)
 	# $(CUDA_CC) $(CUDA_ARCH) $(LCUDA) $(ICUDA) -o $(TESTBIN)_ntt test_ntt.o  polynomial.o cuda_functions.o cuda_bn.o ciphertext.o distribution.o yashe.o common.o integer.o -lcufft -Xcompiler $(OPENMP) $(NTL)
+	$(CUDA_CC) $(CUDA_ARCH) $(LCUDA) $(ICUDA) -o $(TESTBIN)_bnt test_bnt.o  polynomial.o cuda_functions.o cuda_bn.o ciphertext.o distribution.o yashe.o common.o integer.o -lcufft -Xcompiler $(OPENMP) $(NTL)
 	
 test_fft:
 	$(CUDA_CC) $(CUDA_ARCH) $(LCUDA) $(ICUDA) -o $(TESTBIN)_fft test_fft.cu -lcufft
@@ -58,7 +59,7 @@ cuda_functions.o:cuda_functions.cu
 	$(CUDA_CC) $(CUDA_ARCH) -c cuda_functions.cu $(LCUDA) $(ICUDA) -lcufft -Xcompiler $(OPENMP)
 
 cuda_bn.o:cuda_bn.cu
-	$(CUDA_CC) $(CUDA_ARCH) -c cuda_bn.cu $(LCUDA) $(ICUDA) -Xcompiler $(NTL)
+	$(CUDA_CC) $(CUDA_ARCH) -c cuda_bn.cu $(LCUDA) $(ICUDA) --relocatable-device-code true -Xcompiler $(NTL)
 
 distribution.o:distribution.cpp
 	$(CC) -c distribution.cpp -o distribution.o $(NTL) $(OPENMP)  $(LCUDA) $(ICUDA)
@@ -88,9 +89,11 @@ test_ct_mul.o: test_ct_mul.cu
 test_ntt.o:test_ntt.cu
 	# $(CUDA_CC) -c test_ntt.cu -o test_ntt.o  $(NTL)
 
+test_bnt.o:test_bnt.cu 
+	$(CUDA_CC) -c test_bnt.cu -o test_bnt.o --relocatable-device-code true
 
 test.o:test.cu
 	$(CUDA_CC) -c test.cu -o test.o  -lboost_unit_test_framework $(NTL)
 
 clean:
-	rm -f $(BIN) $(TESTBIN) $(BENCHMARKPOLYBIN) $(BENCHMARKYASHEBIN) integer.o test_crt.o  test_ct_mul.o  test_ctpt.o  test_mul.o common.o benchmark_polynomial.o benchmark_yashe.o polynomial.o tests.o test_reduce.o ciphertext.o cuda_functions.o cuda_bn.o distribution.o yashe.o test.o
+	rm -f $(BIN) $(TESTBIN) $(BENCHMARKPOLYBIN) $(BENCHMARKYASHEBIN) integer.o test_crt.o  test_ct_mul.o  test_ctpt.o  test_mul.o common.o benchmark_polynomial.o benchmark_yashe.o polynomial.o tests.o test_reduce.o ciphertext.o cuda_functions.o cuda_bn.o distribution.o yashe.o test.o test_bnt.o

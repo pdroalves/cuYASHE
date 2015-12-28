@@ -106,37 +106,6 @@ void Polynomial::copy_device_crt_residues(Polynomial &b){
 ////////////////////////
 // Auxiliar functions //
 ////////////////////////
-///
-__host__ void bn_new(bn_t *a){
-  a->used = 0;
-  a->alloc = STD_BNT_ALLOC;
-  a->sign = BN_POS;
-  cudaMallocManaged(&a->dp,a->alloc*sizeof(cuyasheint_t));
-}
-
-__host__ void bn_free(bn_t *a){
-  a->used = 0;
-  a->alloc = 0;
-  
-  cudaError_t result = cudaDeviceSynchronize();
-  assert(result == cudaSuccess);
-  result = cudaFree(a->dp);
-  assert(result == cudaSuccess);
-
-}
-/**
- * Increase the allocated memory for a bn_t object.
- * @param a        input/output:operand
- * @param new_size input: new_size for dp
- */
-__host__ void bn_grow(bn_t *a,const unsigned int new_size){
-  // We expect that a->alloc <= new_size
-  assert((unsigned int)a->alloc <= new_size);
-  cudaMallocManaged(&a->dp+a->alloc,new_size*sizeof(cuyasheint_t));
-  a->alloc = new_size;
-
-}
-
 /**
  * get_words converts a NTL big integer
  * in our bn_t format
