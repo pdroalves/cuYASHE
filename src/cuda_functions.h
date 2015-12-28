@@ -62,7 +62,6 @@ class CUDAFunctions{
 
     static void init(int N);
     static void write_crt_primes();
-    static cuyasheint_t* get_crt_primes();
   private:
 };
 #ifdef NTTMUL

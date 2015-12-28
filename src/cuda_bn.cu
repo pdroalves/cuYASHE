@@ -1,13 +1,15 @@
-#include "cuda_bn.h"
-#include "settings.h"
 #include <cuda.h>
 #include <cuda_runtime_api.h>
 #include <cuda_runtime.h>
 #include <iostream>
 #include <stdio.h>
 #include <assert.h>
+#include "cuda_bn.h"
+#include "settings.h"
 #include "cuda_functions.h"
+#include "polynomial.h"
 
+__constant__ cuyasheint_t CRTPrimesConstant[MAX_PRIMES_ON_C_MEMORY];
 
 //////////////////////////
 // CRT global variables //
@@ -31,7 +33,7 @@ __host__ __device__ void dv_zero(cuyasheint_t *a, int digits) {
 	// }
 	cudaError_t result = cudaDeviceSynchronize();
 	assert(result == cudaSuccess);
-	
+
 	
 	for (i = 0; i < digits; i++, a++)
 		(*a) = 0;
@@ -57,7 +59,7 @@ __host__ __device__ void bn_zero(bn_t *a) {
 __host__ __device__ void bn_set_dig(bn_t *a, cuyasheint_t digit) {
 	cudaError_t result = cudaDeviceSynchronize();
 	assert(result == cudaSuccess);
-	
+
 	bn_zero(a);	
 	a->dp[0] = digit;
 	a->used = 1;
@@ -89,7 +91,9 @@ __host__ void bn_free(bn_t *a){
  */
 __host__ void bn_grow(bn_t *a,const unsigned int new_size){
   // We expect that a->alloc <= new_size
-  assert((unsigned int)a->alloc <= new_size);
+  if((unsigned int)a->alloc <= new_size)
+  	return;
+
   cudaMallocManaged(&a->dp+a->alloc,new_size*sizeof(cuyasheint_t));
   a->alloc = new_size;
 
@@ -243,8 +247,7 @@ __device__ cuyasheint_t bn_addn_low(cuyasheint_t *c,
 __global__ void cuCRT(	cuyasheint_t *d_polyCRT,
 						const bn_t *x,
 						const int unsigned N,
-						const unsigned int NPolis,
-						cuyasheint_t *CRTPrimes
+						const unsigned int NPolis
 						){
 	/**
 	 * This function should be executed with N*Npolis threads. 
@@ -265,7 +268,7 @@ __global__ void cuCRT(	cuyasheint_t *d_polyCRT,
 		// Computes x mod pi
 		d_polyCRT[cid + tid*N] = bn_mod1_low(	x[cid].dp,
 												x[cid].used,
-												CRTPrimes[tid]
+												CRTPrimesConstant[tid]
 												);
 	}
 }	
@@ -350,7 +353,7 @@ void crt(bn_t *coefs,cuyasheint_t *d_polyCRT,const int N, const int NPolis,cudaS
 	dim3 gridDim(ADDGRIDXDIM);
 	dim3 blockDim(ADDBLOCKXDIM);
 	
-	cuCRT<<<gridDim,blockDim,1,stream>>>(d_polyCRT,coefs,N,NPolis,CUDAFunctions::get_crt_primes());
+	cuCRT<<<gridDim,blockDim,1,stream>>>(d_polyCRT,coefs,N,NPolis);
 }
 
 // __global__ void cuICRT(	bn_t *poly,
@@ -376,3 +379,28 @@ void icrt(bn_t *coefs,cuyasheint_t *d_polyCRT,const int N, const int NPolis,cuda
 	///////////
 }
 
+__host__ void  CUDAFunctions::write_crt_primes(){
+
+  #ifdef VERBOSE
+  std::cout << "primes: "<< std::endl;
+  for(unsigned int i = 0; i < Polynomial::CRTPrimes.size();i++)
+    std::cout << Polynomial::CRTPrimes[i] << " ";
+  std::cout << std::endl;
+  #endif
+  
+  // Choose what memory will be used to story CRT Primes
+  if(Polynomial::CRTPrimes.size() < MAX_PRIMES_ON_C_MEMORY){
+    
+    #ifdef VERBOSE
+    std::cout << "Writting CRT Primes to GPU's constant memory" << std::endl;
+    #endif
+
+    cudaError_t result = cudaMemcpyToSymbol ( CRTPrimesConstant,
+                                              &(Polynomial::CRTPrimes[0]),
+                                              Polynomial::CRTPrimes.size()*sizeof(cuyasheint_t)
+                                            );
+    assert(result == cudaSuccess);
+  }else{
+    throw "Too many primes.";
+  }
+}

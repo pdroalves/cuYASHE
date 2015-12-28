@@ -19,7 +19,6 @@ cuyasheint_t *CUDAFunctions::d_WInv = NULL;
 cufftHandle CUDAFunctions::plan;
 typedef double2 Complex;
 #endif
-__constant__ cuyasheint_t CRTPrimesConstant[MAX_PRIMES_ON_C_MEMORY];
 int CUDAFunctions::N = 0;
 
 ///////////////////////
@@ -959,32 +958,3 @@ __host__ void Polynomial::reduce(){
   }
 }
 
-__host__ cuyasheint_t* CUDAFunctions::get_crt_primes(){
-  return CRTPrimesConstant;
-}
-
-__host__ void  CUDAFunctions::write_crt_primes(){
-
-  #ifdef VERBOSE
-  std::cout << "primes: "<< std::endl;
-  for(unsigned int i = 0; i < Polynomial::CRTPrimes.size();i++)
-    std::cout << Polynomial::CRTPrimes[i] << " ";
-  std::cout << std::endl;
-  #endif
-  
-  // Choose what memory will be used to story CRT Primes
-  if(Polynomial::CRTPrimes.size() < MAX_PRIMES_ON_C_MEMORY){
-    
-    #ifdef VERBOSE
-    std::cout << "Writting CRT Primes to GPU's constant memory" << std::endl;
-    #endif
-
-    cudaError_t result = cudaMemcpyToSymbol ( *get_crt_primes(),
-                                              &(Polynomial::CRTPrimes[0]),
-                                              Polynomial::CRTPrimes.size()*sizeof(cuyasheint_t)
-                                            );
-    assert(result == cudaSuccess);
-  }else{
-    throw "Too much primes.";
-  }
-}
