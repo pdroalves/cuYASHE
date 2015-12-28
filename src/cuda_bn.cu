@@ -15,9 +15,9 @@ __constant__ cuyasheint_t CRTPrimesConstant[MAX_PRIMES_ON_C_MEMORY];
 // CRT global variables //
 //////////////////////////
 
-__device__ bn_t* M;
-__device__ bn_t* Mpis;
-__device__ cuyasheint_t *invMpis;
+bn_t* M;
+bn_t* Mpis;
+cuyasheint_t *invMpis;
 
 ////////////////////////
 // Auxiliar functions //
@@ -73,6 +73,13 @@ __host__ void bn_new(bn_t *a){
   cudaMallocManaged(&a->dp,a->alloc*sizeof(cuyasheint_t));
 }
 
+__device__ void bn_new_d(bn_t *a){
+  a->used = 0;
+  a->alloc = STD_BNT_ALLOC;
+  a->sign = BN_POS;
+  cudaMalloc(&a->dp,a->alloc*sizeof(cuyasheint_t));
+}
+
 __host__ void bn_free(bn_t *a){
   a->used = 0;
   a->alloc = 0;
@@ -99,6 +106,15 @@ __host__ void bn_grow(bn_t *a,const unsigned int new_size){
 
 }
 
+__device__ void bn_grow_d(bn_t *a,const unsigned int new_size){
+  // We expect that a->alloc <= new_size
+  if((unsigned int)a->alloc <= new_size)
+  	return;
+
+  cudaMalloc(&a->dp+a->alloc,new_size*sizeof(cuyasheint_t));
+  a->alloc = new_size;
+
+}
 
 ////////////////
 // Operators //
@@ -156,10 +172,6 @@ __device__ cuyasheint_t bn_mul1_low(cuyasheint_t *c,
 		/* Update the carry. */
 		carry = (cuyasheint_t)(r >> (dcuyasheint_t)BN_DIGIT);
 	}
-	
-	// Adds carry as last word
-	c++;
-	*c = (cuyasheint_t)carry;
 
 	return carry;
 }
@@ -215,12 +227,12 @@ __device__ void bn_64bits_mulmod(cuyasheint_t *result,
  * @return      output: result's last word
  */
 __device__ cuyasheint_t bn_addn_low(cuyasheint_t *c,
-									const cuyasheint_t *a,
-									const cuyasheint_t *b,
-									int size
+									cuyasheint_t *a,
+									cuyasheint_t *b,
+									const int size
 									) {
 	int i;
-	register cuyasheint_t carry, c0, c1, r0, r1;
+	cuyasheint_t carry, c0, c1, r0, r1;
 
 	carry = 0;
 	for (i = 0; i < size; i++, a++, b++, c++) {
@@ -284,7 +296,9 @@ __global__ void cuICRT(	bn_t *poly,
 						const cuyasheint_t *d_polyCRT,
 						const int unsigned N,
 						const unsigned int NPolis,
-						cuyasheint_t *CRTPrimes
+						const bn_t *M,
+						const bn_t *Mpis,
+						const cuyasheint_t *invMpis
 						){
 	/**
 	 * This function should be executed with N threads.
@@ -303,10 +317,11 @@ __global__ void cuICRT(	bn_t *poly,
 
 	 	for(unsigned int rid = 0; rid < NPolis;rid++){
 	 			// Get a prime
-	 			cuyasheint_t pi = CRTPrimes[rid];
+	 			cuyasheint_t pi = CRTPrimesConstant[rid];
 	 	
 	 			// Computes the inner result
 	 			bn_t inner_result;
+	 			bn_new_d(&inner_result);
 	 			bn_zero(&inner_result);
 	 			cuyasheint_t x;
 	 	
@@ -314,11 +329,16 @@ __global__ void cuICRT(	bn_t *poly,
 	 								invMpis[rid],
 	 								d_polyCRT[tid],
 	 								pi);
-	 			bn_mul1_low(	inner_result.dp,
+	 			cuyasheint_t carry = bn_mul1_low(	inner_result.dp,
 	 					     	Mpis[rid].dp,
 	 					     	x,
 	 					     	Mpis[rid].used);
-	 			
+	 			if(carry){
+	 				if(inner_result.used+1 >= inner_result.alloc)
+	 					bn_grow_d(&inner_result,inner_result.used+1);
+ 					inner_result.dp[inner_result.used] = carry;
+ 					inner_result.used++;
+ 				}
 	 			bn_addn_low(poly[cid].dp,
 							poly[cid].dp,
 							inner_result.dp,
@@ -333,12 +353,6 @@ __global__ void cuICRT(	bn_t *poly,
 
 }
 
-
-// __global__ void cuCRT(	cuyasheint_t *d_polyCRT,
-// 						const bn_t *x,
-// 						const int unsigned N,
-// 						const unsigned int NPolis
-// 						){
 	/**
 	 * This function should be executed with N*Npolis threads. 
 	 * Each thread computes one coefficient of each residue of d_polyCRT
@@ -353,14 +367,11 @@ void crt(bn_t *coefs,cuyasheint_t *d_polyCRT,const int N, const int NPolis,cudaS
 	dim3 gridDim(ADDGRIDXDIM);
 	dim3 blockDim(ADDBLOCKXDIM);
 	
+	cudaError_t result = cudaDeviceSynchronize();
+	assert(result == cudaSuccess);
+
 	cuCRT<<<gridDim,blockDim,1,stream>>>(d_polyCRT,coefs,N,NPolis);
 }
-
-// __global__ void cuICRT(	bn_t *poly,
-// 						const cuyasheint_t *d_polyCRT,
-// 						const int unsigned N,
-// 						const unsigned int NPolis
-// 						){
 	/**
 	 * This function should be executed with N threads.
 	 * Each thread j computes a Mpi*( invMpi*(value) % pi) and adds to poly[j]
@@ -374,9 +385,17 @@ void icrt(bn_t *coefs,cuyasheint_t *d_polyCRT,const int N, const int NPolis,cuda
 			size/ADDBLOCKXDIM + 1);
 	dim3 gridDim(ADDGRIDXDIM);
 	dim3 blockDim(ADDBLOCKXDIM);
-	///////////
-	// To-do //
-	///////////
+
+	cudaError_t result = cudaDeviceSynchronize();
+	assert(result == cudaSuccess);
+
+	cuICRT<<<gridDim,blockDim,1,stream>>>(	coefs,
+											d_polyCRT,
+											N,
+											NPolis,
+											M,
+											Mpis,
+											invMpis);
 }
 
 __host__ void  CUDAFunctions::write_crt_primes(){
@@ -395,11 +414,61 @@ __host__ void  CUDAFunctions::write_crt_primes(){
     std::cout << "Writting CRT Primes to GPU's constant memory" << std::endl;
     #endif
 
-    cudaError_t result = cudaMemcpyToSymbol ( CRTPrimesConstant,
+    cudaStream_t stream;
+    cudaStreamCreate(&stream);
+
+    /////////////////
+    // Copy primes //
+    /////////////////
+    cudaError_t result = cudaMemcpyToSymbolAsync ( CRTPrimesConstant,
                                               &(Polynomial::CRTPrimes[0]),
-                                              Polynomial::CRTPrimes.size()*sizeof(cuyasheint_t)
+                                              Polynomial::CRTPrimes.size()*sizeof(cuyasheint_t),
+                                              0,
+	                                           cudaMemcpyHostToDevice,
+                                              stream
                                             );
     assert(result == cudaSuccess);
+
+    ////////////
+    // Copy M //
+    ////////////
+
+    if(M)
+    	cudaFree(M);
+    cudaMallocManaged((void**)&M,sizeof(bn_t));
+    get_words(M,Polynomial::CRTProduct);
+
+    //////////////
+    // Copy Mpi //
+    //////////////
+    
+    if(Mpis)
+    	cudaFree(Mpis);
+    cudaMallocManaged((void**)&Mpis,Polynomial::CRTPrimes.size()*sizeof(cuyasheint_t));
+    for(unsigned int i = 0; i < Polynomial::CRTPrimes.size();i++){
+    	bn_t *Mpi;
+	    cudaMallocManaged((void**)&Mpi,sizeof(bn_t));
+    	get_words(Mpi,Polynomial::CRTMpi[i]);
+    	Mpis[i] = *Mpi;
+    }
+
+    /////////////////
+    // Copy InvMpi //
+    /////////////////
+
+    if(invMpis)
+    	cudaFree(invMpis);
+    result = cudaMalloc((void**)&invMpis,Polynomial::CRTPrimes.size()*sizeof(cuyasheint_t));
+    assert(result == cudaSuccess);
+
+	result = cudaMemcpyAsync(invMpis,
+							&Polynomial::CRTInvMpi[0],
+							Polynomial::CRTPrimes.size()*sizeof(cuyasheint_t),
+							cudaMemcpyHostToDevice
+							);
+    assert(result == cudaSuccess);
+
+
   }else{
     throw "Too many primes.";
   }

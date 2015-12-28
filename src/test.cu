@@ -149,6 +149,9 @@ BOOST_AUTO_TEST_CASE(justCRT)
     #ifdef VERBOSE
     std::cout << std::endl << a.to_string() << " == " << std::endl<< b.to_string() << std::endl;
     #endif
+    if(a != b){
+          std::cout << a.to_string() << std::endl;
+          std::cout << b.to_string() << std::endl;}
     BOOST_REQUIRE(a == b);
   }
 }
@@ -907,8 +910,8 @@ BOOST_AUTO_TEST_CASE(encryptandAdd)
 
     Polynomial a_decrypted = cipher.decrypt(c);
 
-    Polynomial value = (a+a);
-    value.update_host_data();
+    Polynomial value = (a+a)
+;    value.update_host_data();
     Polynomial value_reduced = value % t;
 
     #ifdef VERBOSE

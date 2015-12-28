@@ -114,7 +114,6 @@ void Polynomial::copy_device_crt_residues(Polynomial &b){
  */
 __host__ void get_words(bn_t *b,ZZ a){
   bn_new(b);
-
   for(ZZ x = a; x > 0; x=(x>>WORD),b->used++){
     if(b->used >= b->alloc)
       bn_grow(b,STD_BNT_ALLOC);
@@ -129,7 +128,9 @@ __host__ void get_words(bn_t *b,ZZ a){
  */
 __host__ ZZ get_ZZ(bn_t *a){
   ZZ b = conv<ZZ>(0);
-  for(unsigned int i = a->used-1; i <= 0;i--){
+  for(int i = a->used-1; i >= 0;i--){
+      cudaError_t result = cudaDeviceSynchronize();
+      assert(result == cudaSuccess);
       b = b<<WORD;
       b += a->dp[i];
     }
@@ -161,27 +162,36 @@ void Polynomial::update_device_data(){
     this->update_crt_spacing(new_spacing);
   }
 
-  bn_coefs.clear();
-  // cudaMallocManaged(&bn_coefs,new_size*sizeof(cuyasheint_t));
+  if(bn_coefs.size() > 0){
+    for(unsigned int i = 0; i < bn_coefs.size();i++){
+          bn_free(bn_coefs[i]);
+          cudaFree(bn_coefs[i]);
+        }
+    bn_coefs.clear();
+  }
   
   /**
    * Converts ZZs to bn_t
    */
-  for(int i = 0; i < this->deg(); i++){
-      bn_t coef;
-      get_words(&coef,get_coeff(i));
-      bn_coefs.push_back(coef);
+  bn_t *coefs;
+  cudaMallocManaged((void**)&coefs,(this->deg()+1)*sizeof(bn_t));
+  for(int i = 0; i <= this->deg(); i++){
+      get_words(&coefs[i],get_coeff(i));
+      bn_coefs.push_back(&coefs[i]);
     }
 
   /**
   *  CRT
   */
-  crt( &this->bn_coefs[0],
+  crt( this->bn_coefs[0],
       this->get_device_crt_residues(),
       this->get_crt_spacing(),
       Polynomial::CRTPrimes.size(),
       this->get_stream()
     );
+
+  cudaError_t result = cudaDeviceSynchronize();
+  assert(result == cudaSuccess);
 
   this->ON_COPY = false;
   this->set_device_updated(true);
@@ -191,13 +201,24 @@ void Polynomial::update_host_data(){
   
     if(get_host_updated())
       return;
-    if(!get_icrt_computed())
-      icrt( &this->bn_coefs[0],
-            this->get_device_crt_residues(),
-            this->get_crt_spacing(),
-            Polynomial::CRTPrimes.size(),
-            this->get_stream()
-          );
+    if(!get_icrt_computed()){
+          this->bn_coefs.clear();
+
+          for(unsigned int i =0; i < this->get_crt_spacing(); i++){
+            bn_t *b;
+            cudaMallocManaged((void**)&b,sizeof(bn_t));
+            bn_new(b);
+            bn_zero(b);
+
+            bn_coefs.push_back(b);
+          }
+          icrt( this->bn_coefs[0],
+                this->get_device_crt_residues(),
+                this->get_crt_spacing(),
+                Polynomial::CRTPrimes.size(),
+                this->get_stream()
+              );
+        }
 
 
     #ifdef VERBOSE
@@ -212,14 +233,18 @@ void Polynomial::update_host_data(){
     if((int)coefs.size() <= this->deg())
       set_coeffs(this->deg()+1);
 
+    cudaError_t result = cudaDeviceSynchronize();
+    assert(result == cudaSuccess);
+
     /**
      * Convert bn_t to ZZ
      */
-    for(int i = 0; i < this->deg(); i++)
-      ZZ coef = get_ZZ(
-        &bn_coefs[i]
-        );
-
+    this->set_coeffs(this->deg()+1);
+    for(int i = 0; i <= this->deg(); i++){
+      ZZ coef = get_ZZ(bn_coefs[i]);
+      this->set_coeff(i,coef);
+    }
+    
     this->set_host_updated(true);
 }
 

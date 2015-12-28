@@ -67,7 +67,7 @@ int main(void){
 
 	cudaMemcpy(h_polyCRT,d_polyCRT,nprimes*sizeof(cuyasheint_t),cudaMemcpyDeviceToHost);
 
-	std::cout << "Residues: " << std::endl;
+	std::cout << std::endl << "Residues: " << std::endl;
 	for(unsigned int i = 0; i < nprimes; i++)
 		std::cout << h_polyCRT[i] << ", "<< std::endl;
 

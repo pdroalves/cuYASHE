@@ -17,6 +17,7 @@
 NTL_CLIENT
 
 cuyasheint_t polynomial_get_cycles();
+void get_words(bn_t* b,ZZ a);
 
 // template Polynomial common_addition<Polynomial>(Polynomial *a,Polynomial *b);
 
@@ -213,13 +214,10 @@ class Polynomial{
       this->set_host_updated(b.get_host_updated());
       this->set_device_updated(b.get_device_updated());
 
-      // The line below takes 66k cycles to return. We will comment it for now.
       // this->set_mod(b.get_mod());
       
-      // if(this != Polynomial::global_phi){
-        // The line below takes 1M cycles to return. We will comment it for now.
+      // if(this != Polynomial::global_phi)
         // this->set_phi(b.get_phi());
-      // }
 
       this->set_crt_computed(b.get_crt_computed());
       this->set_icrt_computed(b.get_icrt_computed());
@@ -536,12 +534,12 @@ class Polynomial{
     }
 
     bool operator==(Polynomial b){
-      if(!this->get_host_updated()){
+      if(!this->get_host_updated())
           this->update_host_data();
-      }
-      if(!b.get_host_updated()){
+      
+      if(!b.get_host_updated())
         b.update_host_data();
-      }
+      
       this->normalize();
       b.normalize();
 
@@ -678,10 +676,11 @@ class Polynomial{
     void set_coeffs(std::vector<cuyasheint_t> values){
 
       // Replaces all coefficients
+      this->coefs.clear();
       this->coefs.resize(values.size());
-      for(std::vector<cuyasheint_t>::iterator iter = values.begin();iter != values.end();iter++){
+      for(std::vector<cuyasheint_t>::iterator iter = values.begin();iter != values.end();iter++)
         this->coefs[iter-values.begin()] = conv<ZZ>(*iter);
-      }
+      
       this->set_device_updated(false);
       this->set_host_updated(true);
       if(this->get_crt_spacing() < (this->deg()+1))
@@ -690,7 +689,10 @@ class Polynomial{
     void set_coeffs(std::vector<ZZ> values){
 
       // Replaces all coefficients
-      this->coefs = values;
+      this->coefs.clear();
+      this->coefs.resize(values.size());
+      for(std::vector<ZZ>::iterator iter = values.begin();iter != values.end();iter++)
+        this->coefs[iter-values.begin()] = *iter;
 
       this->set_device_updated(false);
       this->set_host_updated(true);
@@ -709,8 +711,8 @@ class Polynomial{
         std::cout << "Polynomial coeff cleaned and resized to " << this->coefs.size() << std::endl;
       #endif
 
-      this->set_device_updated(false);
-      this->set_host_updated(true);
+      // this->set_device_updated(false);
+      // this->set_host_updated(true);
       // if(this->get_crt_spacing() < (this->deg()+1))
         // this->set_crt_spacing(Polynomial::global_phi->deg()+1);
 
@@ -724,9 +726,9 @@ class Polynomial{
         std::cout << "Polynomial coeff cleaned and resized to " << this->coefs.size() << std::endl;
       #endif
 
-      this->set_device_updated(false);
-      this->set_host_updated(true);      
-      this->update_crt_spacing(size);
+      // this->set_device_updated(false);
+      // this->set_host_updated(true);      
+      // this->update_crt_spacing(size);
     }
     std::vector<std::vector<cuyasheint_t> > get_crt_residues(){
       std::vector<std::vector<cuyasheint_t> > crt_residues_copy(this->polyCRT);
@@ -846,6 +848,8 @@ class Polynomial{
         // #endif
       }else{        
         this->set_icrt_computed(false);
+        this->set_coeffs();
+        // this->set_coeffs();
         // #ifdef VERBOSE
         // std::cout << "Host data is NOT updated" << std::endl;
         // #endif
@@ -1100,8 +1104,7 @@ class Polynomial{
     //Functions and methods
   protected:
     std::vector<ZZ> coefs;
-    std::vector<bn_t> bn_coefs;
-    // bn_t* bn_coefs = 0x0;
+    std::vector<bn_t*> bn_coefs;
     
     std::vector<std::vector<cuyasheint_t> > polyCRT; // Must be initialized by crt()
     cuyasheint_t *aux_polyCRT = 0x0; // Must be initialized on CRTSPACING definition and updated by crt(), if needed
