@@ -637,9 +637,9 @@ class Polynomial{
     }
     void set_coeff(int index,ZZ value){
 
-      if(!this->get_host_updated()){
-        this->update_host_data();
-      }
+      // if(!this->get_host_updated()){
+        // this->update_host_data();
+      // }
 
       if((unsigned int)(index) >= this->coefs.size()){
         #ifdef VERBOSE

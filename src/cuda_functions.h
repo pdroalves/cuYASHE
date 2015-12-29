@@ -8,6 +8,7 @@
 #ifdef CUFFTMUL
 #include <cufft.h>
 #endif
+#include "cuda_bn.h"
 
 NTL_CLIENT
 
@@ -19,11 +20,24 @@ class CUDAFunctions{
   public:
   	static int N;
     static int std_bn_t_alloc;
+    //////////////////////////
+    // CRT global variables //
+    //////////////////////////
+    static bn_t M;
+    static bn_t* Mpis;
+    static cuyasheint_t *invMpis;
+
     #ifdef NTTMUL
+    /////////
+    // NTT //
+    /////////
     static cuyasheint_t wN;
     static cuyasheint_t *d_W;
     static cuyasheint_t *d_WInv;
     #elif defined(CUFFTMUL)
+    ///////////
+    // cuFFT //
+    ///////////
     static cufftHandle plan;
     #endif
 

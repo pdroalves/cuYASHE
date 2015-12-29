@@ -25,7 +25,8 @@
 #define STD_BNT_ALLOC 32 // 1024 bits big integers
 
 // We use cuyasheint_t as uint64_t to simplify operations
-typedef uint64_t cuyasheint_t;
+// typedef uint64_t cuyasheint_t;
+typedef uint32_t cuyasheint_t;
 
 enum add_mode_t {ADD,SUB,MUL,DIV,MOD};
 enum ntt_mode_t {INVERSE,FORWARD};

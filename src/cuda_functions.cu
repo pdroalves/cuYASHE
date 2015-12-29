@@ -299,7 +299,7 @@ __device__ __host__ uint64_t s_rem (uint64_t a){
   return res;
 }
 
-__device__ __host__  uint64_t s_mul(volatile uint64_t a,volatile uint64_t b){
+__device__ __host__  uint64_t s_mul(uint64_t a,uint64_t b){
   // Multiply and reduce a and b by prime 2^64-2^32+1
   const uint64_t P = 0xffffffff00000001;
 
@@ -957,4 +957,3 @@ __host__ void Polynomial::reduce(){
     }
   }
 }
-

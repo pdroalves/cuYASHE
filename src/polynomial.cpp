@@ -113,11 +113,14 @@ void Polynomial::copy_device_crt_residues(Polynomial &b){
  * @param a input: operand
  */
 __host__ void get_words(bn_t *b,ZZ a){
+  cudaError_t result = cudaDeviceSynchronize();
+  assert(result == cudaSuccess);
+
   bn_new(b);
   for(ZZ x = a; x > 0; x=(x>>WORD),b->used++){
     if(b->used >= b->alloc)
-      bn_grow(b,STD_BNT_ALLOC);
-    b->dp[b->used] = conv<uint32_t>(x&WORD);
+      bn_grow(b,b->alloc+STD_BNT_ALLOC);
+    b->dp[b->used] = conv<uint32_t>(x&UINT32_MAX);
   }
 }
 
@@ -128,12 +131,9 @@ __host__ void get_words(bn_t *b,ZZ a){
  */
 __host__ ZZ get_ZZ(bn_t *a){
   ZZ b = conv<ZZ>(0);
-  for(int i = a->used-1; i >= 0;i--){
-      cudaError_t result = cudaDeviceSynchronize();
-      assert(result == cudaSuccess);
-      b = b<<WORD;
-      b += a->dp[i];
-    }
+  for(int i = a->used-1; i >= 0;i--)
+      b = (b<<WORD) | (a->dp[i]);
+    
   return b;
 }
 
@@ -204,13 +204,16 @@ void Polynomial::update_host_data(){
     if(!get_icrt_computed()){
           this->bn_coefs.clear();
 
+          bn_t *coefs;
+          cudaMallocManaged((void**)&coefs, this->get_crt_spacing()*sizeof(bn_t));
+          cudaError_t result = cudaDeviceSynchronize();
+          assert(result == cudaSuccess);
           for(unsigned int i =0; i < this->get_crt_spacing(); i++){
-            bn_t *b;
-            cudaMallocManaged((void**)&b,sizeof(bn_t));
-            bn_new(b);
-            bn_zero(b);
 
-            bn_coefs.push_back(b);
+            bn_new(&coefs[i]);
+            bn_zero(&coefs[i]);
+
+            bn_coefs.push_back(&coefs[i]);
           }
           icrt( this->bn_coefs[0],
                 this->get_device_crt_residues(),
