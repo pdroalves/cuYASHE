@@ -317,6 +317,7 @@ __host__ __device__ cuyasheint_t bn_add1_low(cuyasheint_t *c, const cuyasheint_t
  */
 __global__ void cuCRT(	cuyasheint_t *d_polyCRT,
 						const bn_t *x,
+						const int used_coefs,
 						const unsigned int N,
 						const unsigned int NPolis
 						){
@@ -334,10 +335,10 @@ __global__ void cuCRT(	cuyasheint_t *d_polyCRT,
 	 * rid: residue id
 	 */
 	const unsigned int tid = threadIdx.x + blockIdx.x*blockDim.x;
-	const unsigned int cid = tid & (N-1);
+	const unsigned int cid = tid % N;
 	const unsigned int rid = tid / N;
 
-	if(tid < N*NPolis)
+	if(tid < N*NPolis && cid < used_coefs)
 		// Computes x mod pi
 		d_polyCRT[tid] = bn_mod1_low(	x[cid].dp,
 										x[cid].used,
@@ -373,16 +374,17 @@ __global__ void cuICRT(	bn_t *poly,
 	 * rid: residue id
 	 */
 	const int tid = threadIdx.x + blockIdx.x*blockDim.x;
-	const int cid = tid & (N -1 ); // We expect that N is a power of two
+	const int cid = tid;
+	
 	 if(tid < N){
 
 	 	bn_zero(&poly[cid]);
 	 	for(unsigned int rid = 0; rid < NPolis;rid++){
-				volatile cuyasheint_t carry;
+				cuyasheint_t carry;
 	 			cuyasheint_t x;
 
 	 			// Get a prime
-	 			cuyasheint_t pi = (cuyasheint_t)CRTPrimesConstant[rid];
+	 			cuyasheint_t pi = CRTPrimesConstant[rid];
 	 	
 	 			// Computes the inner result
 	 			bn_t inner_result = inner_results[cid];
@@ -453,7 +455,7 @@ __global__ void cuICRT(	bn_t *poly,
 	 * Each thread computes one coefficient of each residue of d_polyCRT
 	 */
 	
-void crt(bn_t *coefs,cuyasheint_t *d_polyCRT,const int N, const int NPolis,cudaStream_t stream){
+void crt(bn_t *coefs,const int used_coefs,cuyasheint_t *d_polyCRT,const int N, const int NPolis,cudaStream_t stream){
 
 	const int size = N*NPolis;
 	int ADDGRIDXDIM = (size%ADDBLOCKXDIM == 0? 
@@ -465,7 +467,7 @@ void crt(bn_t *coefs,cuyasheint_t *d_polyCRT,const int N, const int NPolis,cudaS
 	cudaError_t result = cudaDeviceSynchronize();
 	assert(result == cudaSuccess);
 
-	cuCRT<<<gridDim,blockDim,0,stream>>>(d_polyCRT,coefs,N,NPolis);
+	cuCRT<<<gridDim,blockDim,0,stream>>>(d_polyCRT,coefs,used_coefs,N,NPolis);
 }
 	/**
 	 * This function should be executed with N threads.

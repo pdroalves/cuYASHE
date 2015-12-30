@@ -84,21 +84,15 @@ __global__ void polynomialAddSub(const int OP,const cuyasheint_t *a,const cuyash
   // We have one thread per polynomial coefficient on 32 threads-block.
   // For CRT polynomial adding, all representations should be concatenated aligned
   const int tid = threadIdx.x + blockDim.x*blockIdx.x;
-  // const int rid = tid / N; // Residue id
-  cuyasheint_t a_value;
-  cuyasheint_t b_value;
 
   if(tid < size ){
       // Coalesced access to global memory. Doing this way we reduce required bandwich.
-      a_value = a[tid];
-      b_value = b[tid];
-
-      if(OP == ADD)
-        a_value += b_value;
-      else
-        a_value -= b_value;
-
-      c[tid] = a_value;
+      if(OP == ADD){
+        c[tid] = a[tid] + b[tid];
+        if(c[tid] < a[tid])
+          printf("Overflow!");
+      }else
+        c[tid] = a[tid] - b[tid];
   }
 }
 

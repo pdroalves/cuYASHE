@@ -155,7 +155,7 @@ int main(void){
 	cudaStream_t stream;
 	cudaStreamCreate(&stream);
 
-	crt(value,(cuyasheint_t*)d_polyCRT,1,nprimes,stream);
+	crt(value,1,(cuyasheint_t*)d_polyCRT,1,nprimes,stream);
 
 	/**
 	 * Print residues for check

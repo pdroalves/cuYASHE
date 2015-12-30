@@ -145,7 +145,7 @@ void Polynomial::update_device_data(){
   if(this->get_device_updated())
     return;
 
-
+  cudaError_t result;
   #if defined(VERBOSE) || defined(VERBOSEMEMORYCOPY) 
   std::cout << "Copying data to GPU." << std::endl;
   #endif
@@ -165,7 +165,8 @@ void Polynomial::update_device_data(){
   if(bn_coefs.size() > 0){
     for(unsigned int i = 0; i < bn_coefs.size();i++){
           bn_free(bn_coefs[i]);
-          cudaFree(bn_coefs[i]);
+          result = cudaFree(bn_coefs[i]);
+          assert(result == cudaSuccess);
         }
     bn_coefs.clear();
   }
@@ -173,24 +174,42 @@ void Polynomial::update_device_data(){
   /**
    * Converts ZZs to bn_t
    */
-  bn_t *coefs;
-  cudaMallocManaged((void**)&coefs,(this->deg()+1)*sizeof(bn_t));
-  for(int i = 0; i <= this->deg(); i++){
-      get_words(&coefs[i],get_coeff(i));
-      bn_coefs.push_back(&coefs[i]);
-    }
+  if((this->deg()+1) == 0){
+    bn_t *zero;
+    result = cudaMallocManaged((void**)&zero,sizeof(bn_t));
+    assert(result == cudaSuccess);
+    
+    bn_new(zero);
+    bn_zero(zero);
+    bn_coefs.push_back(zero);
+  }else{
+    bn_t *coefs;
+    result = cudaMallocManaged((void**)&coefs,(this->deg()+1)*sizeof(bn_t));
+    assert(result == cudaSuccess);
+    for(int i = 0; i <= this->deg(); i++){
+        get_words(&coefs[i],get_coeff(i));
+        bn_coefs.push_back(&coefs[i]);
+      }
+  }
+
+  result = cudaMemsetAsync(this->get_device_crt_residues(),
+                  0,
+                  this->get_crt_spacing()*Polynomial::CRTPrimes.size(),
+                  this->get_stream());
+  assert(result == cudaSuccess);
 
   /**
   *  CRT
   */
   crt( this->bn_coefs[0],
+      this->bn_coefs.size(),
       this->get_device_crt_residues(),
       this->get_crt_spacing(),
       Polynomial::CRTPrimes.size(),
       this->get_stream()
     );
 
-  cudaError_t result = cudaDeviceSynchronize();
+  result = cudaDeviceSynchronize();
   assert(result == cudaSuccess);
 
   this->ON_COPY = false;

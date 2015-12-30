@@ -46,7 +46,7 @@ __host__ __device__ cuyasheint_t bn_mul1_low(cuyasheint_t *c,
 ZZ get_ZZ(bn_t *a);
 
 
-void crt(bn_t *coefs,cuyasheint_t *d_polyCRT,const int N, const int NPolis,cudaStream_t stream);
+void crt(bn_t *coefs,const int used_coefs,cuyasheint_t *d_polyCRT,const int N, const int NPolis,cudaStream_t stream);
 void icrt(bn_t *coefs,cuyasheint_t *d_polyCRT,const int N, const int NPolis,cudaStream_t stream);
 
 

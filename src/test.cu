@@ -138,7 +138,6 @@ BOOST_FIXTURE_TEST_SUITE(PolyFixture, PolySuite)
 BOOST_AUTO_TEST_CASE(justCRT)
 {
   Polynomial a;
-  std::cout << "M: "<<Polynomial::CRTProduct << std::endl;
 
   for(int count = 0; count < NTESTS;count ++){
     Polynomial::random(&a,degree-1);
@@ -231,13 +230,15 @@ BOOST_AUTO_TEST_CASE(zeroAdd)
   Polynomial b;
   Polynomial::random(&a,degree-1);
 
-  Polynomial r = a + b;
 
-  #ifdef VERBOSE
-  std::cout << "r: " << r.to_string() << std::endl;
+  // #ifdef VERBOSE
+  std::cout << "M: "<<Polynomial::CRTProduct << std::endl;
   std::cout << "a: " << a.to_string() <<std::endl;
   std::cout << "b: " << b.to_string() <<std::endl;
-  #endif
+  // #endif
+  Polynomial r = a + b;
+  
+  std::cout << "r: " << r.to_string() << std::endl;
   BOOST_REQUIRE(r == a);
 
 }
