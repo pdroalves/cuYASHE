@@ -138,6 +138,8 @@ BOOST_FIXTURE_TEST_SUITE(PolyFixture, PolySuite)
 BOOST_AUTO_TEST_CASE(justCRT)
 {
   Polynomial a;
+  std::cout << "M: "<<Polynomial::CRTProduct << std::endl;
+
   for(int count = 0; count < NTESTS;count ++){
     Polynomial::random(&a,degree-1);
 

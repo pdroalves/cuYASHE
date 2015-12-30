@@ -317,31 +317,33 @@ __host__ __device__ cuyasheint_t bn_add1_low(cuyasheint_t *c, const cuyasheint_t
  */
 __global__ void cuCRT(	cuyasheint_t *d_polyCRT,
 						const bn_t *x,
-						const int unsigned N,
+						const unsigned int N,
 						const unsigned int NPolis
 						){
 	/**
 	 * This function should be executed with N*Npolis threads. 
 	 * Each thread computes one coefficient of each residue of d_polyCRT
+	 *
+	 * x should be an array of N elements
+	 * d_polyCRT should be an array of N*NPolis elements
 	 */
 	
 	/**
 	 * tid: thread id
 	 * cid: coefficient id
+	 * rid: residue id
 	 */
-	const int tid = threadIdx.x + blockIdx.x*blockDim.x;
-	const int cid = tid & (N -1 ); // We expect that N is a power of two
+	const unsigned int tid = threadIdx.x + blockIdx.x*blockDim.x;
+	const unsigned int cid = tid & (N-1);
+	const unsigned int rid = tid / N;
 
-	if(tid < N*NPolis){
-
-		// pid == tid <=> prime's id
-		// Load this thread's coefficient
+	if(tid < N*NPolis)
 		// Computes x mod pi
-		d_polyCRT[cid + tid*N] = bn_mod1_low(	(uint32_t*)x[cid].dp,
-												x[cid].used,
-												CRTPrimesConstant[tid]
-												);
-	}
+		d_polyCRT[tid] = bn_mod1_low(	x[cid].dp,
+										x[cid].used,
+										CRTPrimesConstant[rid]
+										);
+	
 }	
 
 /**
@@ -353,7 +355,7 @@ __global__ void cuCRT(	cuyasheint_t *d_polyCRT,
  */
 __global__ void cuICRT(	bn_t *poly,
 						const cuyasheint_t *d_polyCRT,
-						const int unsigned N,
+						const unsigned int N,
 						const unsigned int NPolis,
 						const bn_t M,
 						const bn_t *Mpis,
@@ -374,6 +376,7 @@ __global__ void cuICRT(	bn_t *poly,
 	const int cid = tid & (N -1 ); // We expect that N is a power of two
 	 if(tid < N){
 
+	 	bn_zero(&poly[cid]);
 	 	for(unsigned int rid = 0; rid < NPolis;rid++){
 				volatile cuyasheint_t carry;
 	 			cuyasheint_t x;
@@ -424,7 +427,7 @@ __global__ void cuICRT(	bn_t *poly,
 				if (a.used == b.used) {
 					carry = bn_addn_low(poly[cid].dp, a.dp, b.dp, max);
 				} else {
-					carry = bn_addn_low(a.dp, a.dp, b.dp, min);
+					carry = bn_addn_low(poly[cid].dp, a.dp, b.dp, min);
 					carry = bn_add1_low(poly[cid].dp + min, a.dp + min, carry, max - min);
 				}
 
@@ -462,7 +465,7 @@ void crt(bn_t *coefs,cuyasheint_t *d_polyCRT,const int N, const int NPolis,cudaS
 	cudaError_t result = cudaDeviceSynchronize();
 	assert(result == cudaSuccess);
 
-	cuCRT<<<gridDim,blockDim,1,stream>>>(d_polyCRT,coefs,N,NPolis);
+	cuCRT<<<gridDim,blockDim,0,stream>>>(d_polyCRT,coefs,N,NPolis);
 }
 	/**
 	 * This function should be executed with N threads.
@@ -490,7 +493,7 @@ void icrt(bn_t *coefs,cuyasheint_t *d_polyCRT,const int N, const int NPolis,cuda
 	result = cudaDeviceSynchronize();
 	assert(result == cudaSuccess);
   	
-	cuICRT<<<gridDim,blockDim,1,stream>>>(	coefs,
+	cuICRT<<<gridDim,blockDim,0,stream>>>(	coefs,
 											d_polyCRT,
 											N,
 											NPolis,

@@ -211,8 +211,6 @@ void Polynomial::update_host_data(){
           for(unsigned int i =0; i < this->get_crt_spacing(); i++){
 
             bn_new(&coefs[i]);
-            bn_zero(&coefs[i]);
-
             bn_coefs.push_back(&coefs[i]);
           }
           icrt( this->bn_coefs[0],
@@ -244,7 +242,8 @@ void Polynomial::update_host_data(){
      */
     this->set_coeffs(this->deg()+1);
     for(int i = 0; i <= this->deg(); i++){
-      ZZ coef = get_ZZ(bn_coefs[i]);
+      // ZZ coef = get_ZZ(bn_coefs[i]);
+      ZZ coef = get_ZZ(bn_coefs[i]) % Polynomial::CRTProduct;
       this->set_coeff(i,coef);
     }
     

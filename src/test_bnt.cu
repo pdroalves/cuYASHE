@@ -191,6 +191,6 @@ int main(void){
 	for(unsigned int i = 0; i < value->used; i++)
 		std::cout << value->dp[i] << ", "<< std::endl;
 
-	std::cout << std::endl << get_ZZ(value) << " =? " << X << std::endl; 
+	std::cout << std::endl << get_ZZ(value)%Polynomial::CRTProduct << " =? " << X << std::endl; 
 	return 0;
 }
