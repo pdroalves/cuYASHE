@@ -24,68 +24,55 @@ bool check_overflow(uint64_t a,uint64_t b);
 template <class P>
 P common_addition(P *a,P *b){
 	// P should be Polynomial or Ciphertext
-	#ifdef MAYADDONCPU
-		if(!a->get_device_updated() && !b->get_device_updated()){
-			// CPU add
-			#ifdef VERBOSE
-			std::cout << "Operator+ on CPU" << std::endl;
-			#endif
-			P c(*this);
-			c.CPUAddition(&b);
-			return c;
-		}else{
+	#ifdef VERBOSE
+	std::cout << "Operator+ on GPU" << std::endl;
 	#endif
-		#ifdef VERBOSE
-		std::cout << "Operator+ on GPU" << std::endl;
-		#endif
-			// Check align
-		  int new_spacing = std::max(a->CRTSPACING,b->CRTSPACING);
-			if(a->CRTSPACING != b->CRTSPACING){
-			  a->update_crt_spacing(new_spacing);
-			  b->update_crt_spacing(new_spacing);
-			}
+		// Check align
+	int new_spacing = std::max(a->CRTSPACING,b->CRTSPACING);
+	if(a->CRTSPACING != b->CRTSPACING){
+	  a->update_crt_spacing(new_spacing);
+	  b->update_crt_spacing(new_spacing);
+	}
 
-			#ifdef VERBOSE
-			std::cout << "Add with CRTSPACING" << a->get_crt_spacing() << std::endl;
-			// std::cout << "this: " << a->to_string() << std::endl;
-			// std::cout << "other " << b->to_string() << std::endl;
-			#endif
-
-			// Apply CRT and copy data to global memory, if needed
-			// #pragma omp parallel sections num_threads(2)
-			{
-			    // #pragma omp section
-			    {
-			      #ifdef VERBOSE
-		      	  std::cout << "a: " << std::endl;
-		      	  #endif
-			      if(!a->get_device_updated()){
-			        a->update_device_data();
-			      }
-
-			    }
-			    // #pragma omp section
-			    {
-			      #ifdef VERBOSE
-		       	  std::cout << "b: " << std::endl;
-		      	  #endif
-		       	  if(!b->get_device_updated()){
-			        b->update_device_data();
-			      }
-			    }
-			}
-
-			cuyasheint_t *d_result = CUDAFunctions::callPolynomialAddSub(a->get_stream(),a->get_device_crt_residues(),b->get_device_crt_residues(),(int)(a->CRTSPACING*P::CRTPrimes.size()),ADD);
-
-			P c = P(a->get_mod(),a->get_phi(),new_spacing);
-			c.set_device_crt_residues(d_result);
-			c.set_host_updated(false);
-			c.set_device_updated(true);
-			// cudaDeviceSynchronize();
-			return c;
-	#ifdef MAYADDONCPU
-		}
+	#ifdef VERBOSE
+	std::cout << "Add with CRTSPACING" << a->get_crt_spacing() << std::endl;
+	// std::cout << "this: " << a->to_string() << std::endl;
+	// std::cout << "other " << b->to_string() << std::endl;
 	#endif
+
+	// Apply CRT and copy data to global memory, if needed
+	// #pragma omp parallel sections num_threads(2)
+	{
+	    // #pragma omp section
+	    {
+	      #ifdef VERBOSE
+      	  std::cout << "a: " << std::endl;
+      	  #endif
+	      if(!a->get_device_updated()){
+	        a->update_device_data();
+	      }
+
+	    }
+	    // #pragma omp section
+	    {
+	      #ifdef VERBOSE
+       	  std::cout << "b: " << std::endl;
+      	  #endif
+       	  if(!b->get_device_updated()){
+	        b->update_device_data();
+	      }
+	    }
+	}
+
+	cuyasheint_t *d_result = CUDAFunctions::callPolynomialAddSub(a->get_stream(),a->get_device_crt_residues(),b->get_device_crt_residues(),(int)(a->CRTSPACING*P::CRTPrimes.size()),ADD);
+
+	P c = P(a->get_mod(),a->get_phi(),new_spacing);
+	c.set_device_crt_residues(d_result);
+	c.set_host_updated(false);
+	c.set_device_updated(true);
+	// cudaDeviceSynchronize();
+	return c;
+
 }
 
 template <class P>
@@ -170,8 +157,7 @@ P common_multiplication(P *a_input, P *b_input){
   	// if(!a.get_device_updated())
   		// a.update_crt_spacing(needed_spacing);
   	// else
-	  	update_A_spacing = true;
-  	
+	  	update_A_spacing = true;  	
   }
   if(b.get_crt_spacing() != needed_spacing){
   	// if(!b.get_device_updated())

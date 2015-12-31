@@ -115,6 +115,75 @@ __host__ cuyasheint_t* CUDAFunctions::callPolynomialAddSub(cudaStream_t stream,c
   return d_new_array;
 }
 
+// __host__ cuyasheint_t* CUDAFunctions::callPolynomialAddSub( const cudaStream_t stream,
+//                                                             const cuyasheint_t *a,
+//                                                             const int A_N,
+//                                                             const bool realign_A,
+//                                                             const cuyasheint_t *b,
+//                                                             const int B_N,
+//                                                             const bool realign_B,
+//                                                             const int N,
+//                                                             const int NPolis,
+//                                                             const int OP){
+
+//   /////////////////////
+//   // Realign if need //
+//   /////////////////////
+//   if(realign_A){
+//     int size;
+//     const int newSpacing = N;
+//     const int oldSpacing = A_N;
+
+//     if(newSpacing < oldSpacing)
+//       size = newSpacing*NPolis;
+//     else
+//       size = oldSpacing*NPolis;
+
+//     const int ADDGRIDXDIM = (size%ADDBLOCKXDIM == 0? size/ADDBLOCKXDIM : size/ADDBLOCKXDIM + 1);
+//     dim3 gridDim(ADDGRIDXDIM);
+//     dim3 blockDim(ADDBLOCKXDIM);
+//     callRealignCRTResidues<<< gridDim,blockDim,1,stream >>>(stream,A_N,N,d_a,N,NPolis);
+//     assert(cudaGetLastError() == cudaSuccess);
+//   }
+
+//   if(realign_B){
+//     int size;
+//     const int newSpacing = N;
+//     const int oldSpacing = B_N;
+
+//     if(newSpacing < oldSpacing)
+//       size = newSpacing*NPolis;
+//     else
+//       size = oldSpacing*NPolis;
+
+//     const int ADDGRIDXDIM = (size%ADDBLOCKXDIM == 0? size/ADDBLOCKXDIM : size/ADDBLOCKXDIM + 1);
+//     dim3 gridDim(ADDGRIDXDIM);
+//     dim3 blockDim(ADDBLOCKXDIM);
+//     callRealignCRTResidues<<< gridDim,blockDim,1,stream >>>(stream,B_N,N,d_b,N,NPolis);
+//     assert(cudaGetLastError() == cudaSuccess);
+//   }
+
+//   ////////////////////
+//   // Call operation //
+//   ////////////////////
+//   const int size = N*NPolis 
+//   const int ADDGRIDXDIM = (size%ADDBLOCKXDIM == 0? size/ADDBLOCKXDIM : size/ADDBLOCKXDIM + 1);
+//   dim3 gridDim(ADDGRIDXDIM);
+//   dim3 blockDim(ADDBLOCKXDIM);
+
+//   cuyasheint_t *d_new_array;
+//   cudaError_t result = cudaMalloc((void**)&d_new_array,size*sizeof(cuyasheint_t));
+//   assert(result == cudaSuccess);
+
+//   polynomialAddSub <<< gridDim,blockDim,1,stream  >>> (OP,a,b,d_new_array,size,N);
+//   #ifdef VERBOSE
+//   std::cout << gridDim.x << " " << blockDim.x << std::endl;
+//   std::cout << "polynomialAdd kernel:" << cudaGetErrorString(cudaGetLastError()) << std::endl;
+//   #endif
+
+//   return d_new_array;
+// }
+
 __global__ void polynomialAddSubInPlace(const int OP, cuyasheint_t *a,const cuyasheint_t *b,const int size,const int N){
   // We have one thread per polynomial coefficient on 32 threads-block.
   // For CRT polynomial adding, all representations should be concatenated aligned

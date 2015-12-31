@@ -162,11 +162,20 @@ void Polynomial::update_device_data(){
     this->update_crt_spacing(new_spacing);
   }
 
+  result = cudaDeviceSynchronize();
+  assert(result == cudaSuccess);
   if(bn_coefs.size() > 0){
+
     for(unsigned int i = 0; i < bn_coefs.size();i++){
-          bn_free(bn_coefs[i]);
-          result = cudaFree(bn_coefs[i]);
-          assert(result == cudaSuccess);
+          try{
+            result = cudaDeviceSynchronize();
+            assert(result == cudaSuccess);
+            result = cudaFree(bn_coefs[i]->dp);
+            assert(result == cudaSuccess);
+          }catch(string s){
+            // To-do
+          }
+          // result = cudaFree(bn_coefs[i]);
         }
     bn_coefs.clear();
   }
@@ -194,7 +203,7 @@ void Polynomial::update_device_data(){
 
   result = cudaMemsetAsync(this->get_device_crt_residues(),
                   0,
-                  this->get_crt_spacing()*Polynomial::CRTPrimes.size(),
+                  this->get_crt_spacing()*Polynomial::CRTPrimes.size()*sizeof(cuyasheint_t),
                   this->get_stream());
   assert(result == cudaSuccess);
 

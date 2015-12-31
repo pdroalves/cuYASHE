@@ -322,7 +322,7 @@ __global__ void cuCRT(	cuyasheint_t *d_polyCRT,
 						const unsigned int NPolis
 						){
 	/**
-	 * This function should be executed with N*Npolis threads. 
+	 * This function should be executed with used_coefs*Npolis threads. 
 	 * Each thread computes one coefficient of each residue of d_polyCRT
 	 *
 	 * x should be an array of N elements
@@ -335,10 +335,10 @@ __global__ void cuCRT(	cuyasheint_t *d_polyCRT,
 	 * rid: residue id
 	 */
 	const unsigned int tid = threadIdx.x + blockIdx.x*blockDim.x;
-	const unsigned int cid = tid % N;
-	const unsigned int rid = tid / N;
+	const unsigned int cid = tid % used_coefs;
+	const unsigned int rid = tid / used_coefs;
 
-	if(tid < N*NPolis && cid < used_coefs)
+	if(tid < used_coefs*NPolis)
 		// Computes x mod pi
 		d_polyCRT[tid] = bn_mod1_low(	x[cid].dp,
 										x[cid].used,
@@ -457,7 +457,7 @@ __global__ void cuICRT(	bn_t *poly,
 	
 void crt(bn_t *coefs,const int used_coefs,cuyasheint_t *d_polyCRT,const int N, const int NPolis,cudaStream_t stream){
 
-	const int size = N*NPolis;
+	const int size = used_coefs*NPolis;
 	int ADDGRIDXDIM = (size%ADDBLOCKXDIM == 0? 
 			size/ADDBLOCKXDIM : 
 			size/ADDBLOCKXDIM + 1);

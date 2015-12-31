@@ -53,7 +53,7 @@ class Polynomial{
 
         // If the irreductible polynomial have degree N, this polynomial's degree will be limited to N-1
         if(Polynomial::global_phi->deg() >= 0)
-          this->update_crt_spacing(Polynomial::global_phi->deg()+1);
+          this->update_crt_spacing(Polynomial::global_phi->deg());
       }
       
 
@@ -80,7 +80,7 @@ class Polynomial{
       //   // If a global phi is defined, use it
         this->phi = Polynomial::global_phi; // Doesn't copy. Uses the reference.
       }
-      this->update_crt_spacing(Polynomial::global_phi->deg()+1);
+      this->update_crt_spacing(Polynomial::global_phi->deg());
 
       if(Polynomial::phi_set){
         this->coefs.resize(this->get_phi().deg()+1);
@@ -238,7 +238,6 @@ class Polynomial{
       if(!get_host_updated())
         update_host_data();
       
-
       stringstream ss;
       for(int i = 0; i <=  this->deg();i++)
         ss << this->get_coeff(i) << ", ";
@@ -714,7 +713,7 @@ class Polynomial{
       // this->set_device_updated(false);
       // this->set_host_updated(true);
       // if(this->get_crt_spacing() < (this->deg()+1))
-        // this->set_crt_spacing(Polynomial::global_phi->deg()+1);
+        // this->set_crt_spacing(Polynomial::global_phi->deg());
 
     }
      void set_coeffs(int size){
@@ -1085,7 +1084,7 @@ class Polynomial{
           a->set_coeff(i,ZZ(rand()) % a->global_mod);
       a->set_device_updated(false);
       a->set_host_updated(true);
-      a->update_crt_spacing();
+      a->normalize();
     }
     cudaStream_t get_stream(){
       return this->stream;

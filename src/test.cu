@@ -185,7 +185,9 @@ BOOST_AUTO_TEST_CASE(multipleAdds)
   Polynomial b;
   for(int count = 0; count < NTESTS;count ++){
     b += a;
-    //std::cout << b.to_string() << std::endl;
+    b.update_host_data();
+    // b = b+a;
+    // std::cout << b.to_string() << std::endl;
   }
 
   #ifdef VERBOSE
@@ -231,11 +233,11 @@ BOOST_AUTO_TEST_CASE(zeroAdd)
   Polynomial::random(&a,degree-1);
 
 
-  // #ifdef VERBOSE
+  #ifdef VERBOSE
   std::cout << "M: "<<Polynomial::CRTProduct << std::endl;
   std::cout << "a: " << a.to_string() <<std::endl;
   std::cout << "b: " << b.to_string() <<std::endl;
-  // #endif
+  #endif
   Polynomial r = a + b;
   
   std::cout << "r: " << r.to_string() << std::endl;
