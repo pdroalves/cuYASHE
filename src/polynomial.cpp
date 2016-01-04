@@ -14,6 +14,8 @@ std::vector<cuyasheint_t> Polynomial::CRTInvMpi;
 ZZ Polynomial::global_mod = ZZ(0);
 Polynomial *(Polynomial::global_phi) = NULL;
 bool Polynomial::phi_set = false;
+std::map<ZZ, bn_t*> Polynomial::reciprocals;
+
 
 
 Polynomial Polynomial::operator+(Polynomial &b){

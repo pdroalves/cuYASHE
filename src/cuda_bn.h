@@ -43,7 +43,10 @@ __host__ __device__ cuyasheint_t bn_mul1_low(cuyasheint_t *c,
 									const cuyasheint_t *a,
 									cuyasheint_t digit,
 									int size);
-ZZ get_ZZ(bn_t *a);
+__host__ void callCuModN(bn_t * c, const bn_t * a,int NCoefs,
+		const cuyasheint_t * m, int sm, const cuyasheint_t * u, int su,
+		cudaStream_t stream);
+__host__ ZZ get_ZZ(bn_t *a);
 
 
 void crt(bn_t *coefs,const int used_coefs,cuyasheint_t *d_polyCRT,const int N, const int NPolis,cudaStream_t stream);

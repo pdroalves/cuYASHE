@@ -1,6 +1,7 @@
 #ifndef POLYNOMIAL_H
 #define POLYNOMIAL_H
 #include <stdio.h>
+#include <map>
 #include <vector>
 #include <sstream>
 #include <NTL/ZZ.h>
@@ -61,6 +62,7 @@ class Polynomial{
         this->coefs.resize(this->get_phi().deg()+1);
       
 
+      Polynomial::compute_reciprocals();
       #ifdef VERBOSE
         std::cout << "Polynomial constructed with CRTSPACING " << this->CRTSPACING << " and no mod or phi elements" << std::endl;
       #endif
@@ -85,6 +87,9 @@ class Polynomial{
       if(Polynomial::phi_set){
         this->coefs.resize(this->get_phi().deg()+1);
       }
+      
+      Polynomial::compute_reciprocals();
+      
       #ifdef VERBOSE
         std::cout << "Polynomial constructed with CRTSPACING " << this->CRTSPACING << ", mod "  << this->mod << " but no phi."<< std::endl;
       #endif
@@ -108,6 +113,9 @@ class Polynomial{
       if(Polynomial::phi_set){
         this->coefs.resize(this->get_phi().deg()+1);
       }
+      
+      Polynomial::compute_reciprocals();
+      
       #ifdef VERBOSE
         std::cout << "Polynomial constructed with CRTSPACING " << this->CRTSPACING << ", mod "  << this->mod <<" and phi " << this-> phi << std::endl;
       #endif
@@ -135,6 +143,9 @@ class Polynomial{
         this->coefs.resize(this->get_phi().deg()+1);
       }
 
+      
+      Polynomial::compute_reciprocals();
+      
       #ifdef VERBOSE
         std::cout << "Polynomial constructed with CRTSPACING " << this->CRTSPACING << " and no mod or phi elements" << std::endl;
       #endif
@@ -159,6 +170,9 @@ class Polynomial{
       if(Polynomial::phi_set){
         this->coefs.resize(this->get_phi().deg()+1);
       }
+      
+      Polynomial::compute_reciprocals();
+      
       #ifdef VERBOSE
         std::cout << "Polynomial constructed with CRTSPACING " << this->CRTSPACING << ", mod "  << this->mod <<" and phi " << this->phi << std::endl;
       #endif
@@ -180,6 +194,9 @@ class Polynomial{
       if(Polynomial::phi_set){
         this->coefs.resize(this->get_phi().deg()+1);
       }
+      
+      Polynomial::compute_reciprocals();
+      
       #ifdef VERBOSE
         std::cout << "Polynomial constructed with CRTSPACING " << this->CRTSPACING << ", mod "  << this->mod << std::endl;
       #endif
@@ -444,30 +461,48 @@ class Polynomial{
     }
     Polynomial operator%(ZZ b){
 
-      if(this->get_host_updated()){
-        #warning "Polynomial mod on device not implemented!";
-       
-        this->update_host_data();
+      if(!this->get_host_updated()){
+        Polynomial p(*this);
+        
+        p %= b;
+  
+        return p;
+      }else{
+        // Doing this, we reduce needless cycles to copy device data
+        bool device_updated_flag = get_device_updated();
+        this->set_device_updated(false);
+        Polynomial p(*this);
+        this->set_device_updated(device_updated_flag);
+          
+        p %= b;
+        return p;
       }
 
-      // Doing this, we reduce needless cycles to copy device data
-      this->set_device_updated(false);
-      Polynomial p(*this);
-      this->set_device_updated(true);
-
-      // #pragma omp parallel for
-      for(int i = 0; i <= p.deg();i++)
-        p.set_coeff(i,p.get_coeff(i)%b);
-      
-      p.set_device_updated(false);
-
-      return p;
     }
     Polynomial operator%=(ZZ b){
       if(!this->get_host_updated()){
-        #warning "Polynomial mod on device not implemented!";
-       
-        this->update_host_data();
+
+        icrt( bn_coefs[0],
+              get_device_crt_residues(),
+              get_crt_spacing(),
+              Polynomial::CRTPrimes.size(),
+              get_stream()
+              );
+
+        bn_t *m;
+        cudaMallocManaged((void**)&m,sizeof(bn_t));
+        get_words(m,b);
+
+        bn_t *u = Polynomial::reciprocals[b];
+        callCuModN( bn_coefs[0],
+                    bn_coefs[0],
+                    get_crt_spacing(),
+                    m->dp,
+                    m->used,
+                    u->dp,
+                    u->used,
+                    get_stream());
+        return *this;
       }
 
       // #pragma omp parallel for
@@ -1100,7 +1135,35 @@ class Polynomial{
     bool DEVICE_IS_UPDATE;
     bool CRT_COMPUTED;
     bool ICRT_COMPUTED;
+    bool RECIPROCAL_COMPUTED;
+    static std::map<ZZ, bn_t*> reciprocals;
+
     //Functions and methods
+    static void compute_reciprocals(){
+      cudaError_t result;
+
+      /////////////////////////////////////////////////////////
+      // The reciprocal of 77287149995192912462927307869L is//
+      // 81217922200224777669139429703L                     //
+      ///////////////////////////////////////////////////////
+      bn_t *u1;
+      result = cudaMallocManaged((void**)&u1,sizeof(bn_t));
+      assert(result == cudaSuccess);
+
+      result = cudaDeviceSynchronize();
+      assert(result == cudaSuccess);
+
+      bn_new(u1);
+      assert(STD_BNT_ALLOC >= 4);
+      u1->dp[0] = 3588159815;
+      u1->dp[1] = 3058528714;
+      u1->dp[2] = 107865088;
+      u1->dp[3] = 1;
+
+      u1->used = 4;
+
+      Polynomial::reciprocals[to_ZZ("77287149995192912462927307869L")] = u1;
+    }    
   protected:
     std::vector<ZZ> coefs;
     std::vector<bn_t*> bn_coefs;

@@ -305,6 +305,225 @@ __host__ __device__ cuyasheint_t bn_add1_low(cuyasheint_t *c, const cuyasheint_t
 	return carry;
 }
 
+
+////////////////////////
+// Subtract
+////////////////////////
+/**
+ * [bn_subn_low description]
+ * @param  c    [description]
+ * @param  a    [description]
+ * @param  b    [description]
+ * @param  size [description]
+ * @return      [description]
+ */
+__host__ __device__ cuyasheint_t bn_subn_low(cuyasheint_t * c, const cuyasheint_t * a,
+		const cuyasheint_t * b, int size) {
+	int i;
+	cuyasheint_t carry, r0, diff;
+
+	/* Zero the carry. */
+	carry = 0;
+	for (i = 0; i < size; i++, a++, b++, c++) {
+		diff = (*a) - (*b);
+		r0 = diff - carry;
+		carry = ((*a) < (*b)) || (carry && !diff);
+		(*c) = r0;
+	}
+	return carry;
+}
+
+/**
+ * Accumulates a double precision digit in a triple register variable.
+ *
+ * @param[in,out] R2		- most significant word of the triple register.
+ * @param[in,out] R1		- middle word of the triple register.
+ * @param[in,out] R0		- lowest significant word of the triple register.
+ * @param[in] A				- the first digit to multiply.
+ * @param[in] B				- the second digit to multiply.
+ */
+#define COMBA_STEP_BN_MUL_LOW(R2, R1, R0, A, B)								\
+	dcuyasheint_t r = (dcuyasheint_t)(A) * (dcuyasheint_t)(B);										\
+	cuyasheint_t _r = (R1);														\
+	(R0) += (cuyasheint_t)(r);														\
+	(R1) += (R0) < (cuyasheint_t)(r);												\
+	(R2) += (R1) < _r;														\
+	(R1) += (cuyasheint_t)((r) >> (dcuyasheint_t)BN_DIGIT);								\
+	(R2) += (R1) < (cuyasheint_t)((r) >> (dcuyasheint_t)BN_DIGIT);
+
+/**
+ * Accumulates a single precision digit in a triple register variable.
+ *
+ * @param[in,out] R2		- most significant word of the triple register.
+ * @param[in,out] R1		- middle word of the triple register.
+ * @param[in,out] R0		- lowest significant word of the triple register.
+ * @param[in] A				- the first digit to accumulate.
+ */
+#define COMBA_ADD(R2, R1, R0, A)											\
+	cuyasheint_t __r = (R1);														\
+	(R0) += (A);															\
+	(R1) += (R0) < (A);														\
+	(R2) += (R1) < __r;														\
+
+__host__ __device__ void bn_muld_low(cuyasheint_t * c, const cuyasheint_t * a, int sa,
+		const cuyasheint_t * b, int sb, int l, int h) {
+	int i, j, ta;
+	const cuyasheint_t *tmpa, *tmpb;
+	cuyasheint_t r0, r1, r2;
+
+	c += l;
+
+	r0 = r1 = r2 = 0;
+	for (i = l; i < sb; i++, c++) {
+		tmpa = a;
+		tmpb = b + i;
+		for (j = 0; j <= i; j++, tmpa++, tmpb--) {
+			COMBA_STEP_BN_MUL_LOW(r2, r1, r0, *tmpa, *tmpb);
+		}
+		*c = r0;
+		r0 = r1;
+		r1 = r2;
+		r2 = 0;
+	}
+	ta = 0;
+	for (i = sb; i < sa; i++, c++) {
+		tmpa = a + ++ta;
+		tmpb = b + (sb - 1);
+		for (j = 0; j < sb; j++, tmpa++, tmpb--) {
+			COMBA_STEP_BN_MUL_LOW(r2, r1, r0, *tmpa, *tmpb);
+		}
+		*c = r0;
+		r0 = r1;
+		r1 = r2;
+		r2 = 0;
+	}
+	for (i = sa; i < h; i++, c++) {
+		tmpa = a + ++ta;
+		tmpb = b + (sb - 1);
+		for (j = 0; j < sa - ta; j++, tmpa++, tmpb--) {
+			COMBA_STEP_BN_MUL_LOW(r2, r1, r0, *tmpa, *tmpb);
+		}
+		*c = r0;
+		r0 = r1;
+		r1 = r2;
+		r2 = 0;
+	}
+}
+
+
+/**
+ * [bn_mod_barrt description]
+ * @param c  [description]
+ * @param a  [description]
+ * @param sa [description]
+ * @param m  [description]
+ * @param sm [description]
+ * @param u  [description]
+ * @param su [description]
+ */
+
+__device__ void bn_mod_barrt(bn_t *C, const bn_t *A,const int NCoefs,
+		const cuyasheint_t * m,  int sm, const cuyasheint_t * u, int su) {
+
+	/**
+	 * Each thread handles one coefficient
+	 */
+	
+	const int tid = threadIdx.x + blockDim.x*blockIdx.x;
+
+	if(tid < NCoefs){
+		cuyasheint_t *a = A[tid].dp;
+		int sa = A[tid].used;
+		cuyasheint_t *c = C[tid].dp;
+
+		unsigned long mu;
+		cuyasheint_t q[2*STD_BNT_ALLOC],t[2*STD_BNT_ALLOC],carry;
+		int sq, st;
+		int i;
+
+		mu = sm;
+		sq = sa - (mu - 1);
+		for (i = 0; i < sq; i++) {
+			q[i] = a[i + (mu - 1)];
+		}
+
+		if (sq > su) {
+			bn_muld_low(t, q, sq, u, su, mu, sq + su);
+		} else {
+			bn_muld_low(t, u, su, q, sq, mu - (su - sq) - 1, sq + su);
+		}
+		st = sq + su;
+		while (st > 0 && t[st - 1] == 0) {
+			--(st);
+		}
+
+		sq = st - (mu + 1);
+		for (i = 0; i < sq; i++) {
+			q[i] = t[i + (mu + 1)];
+		}
+
+		if (sq > sm) {
+			bn_muld_low(t, q, sq, m, sm, 0, sq + 1);
+		} else {
+			bn_muld_low(t, m, sm, q, sq, 0, mu + 1);
+		}
+		st = mu + 1;
+		while (st > 0 && t[st - 1] == 0) {
+			st--;
+		}
+
+		sq = mu + 1;
+		for (i = 0; i < sq; i++) {
+			q[i] = t[i];
+		}
+
+		st = mu + 1;
+		for (i = 0; i < sq; i++) {
+			t[i] = a[i];
+		}
+		carry = bn_subn_low(t, t, q, sq);
+		while (st > 0 && t[st - 1] == 0) {
+			st--;
+		}
+
+		if (carry) {
+			sq = (mu + 1);
+			for (i = 0; i < sq - 1; i++) {
+				q[i] = 0;
+			}
+			q[sq - 1] = 1;
+			bn_subn_low(t, q, t, sq);
+		}
+
+		while (bn_cmpn_low(t, m, sm) == 1) {
+			bn_subn_low(t, t, m, sm);
+		}
+
+		for (i = 0; i < st; i++) {
+			c[i] = t[i];
+		}
+	}
+}
+
+
+__global__ void cuModN(bn_t * c, const bn_t * a, const int NCoefs,
+		const cuyasheint_t * m, int sm, const cuyasheint_t * u, int su){
+	bn_mod_barrt(c,a,NCoefs,m,sm,u,su);
+}
+
+__host__ void callCuModN(bn_t * c, const bn_t * a,int NCoefs,
+		const cuyasheint_t * m, int sm, const cuyasheint_t * u, int su,
+		cudaStream_t stream){
+
+	const int size = NCoefs;
+	int ADDGRIDXDIM = (size%ADDBLOCKXDIM == 0? 
+			size/ADDBLOCKXDIM : 
+			size/ADDBLOCKXDIM + 1);
+	dim3 gridDim(ADDGRIDXDIM);
+	dim3 blockDim(ADDBLOCKXDIM);
+
+	cuModN<<<gridDim,blockDim,0,stream>>>(c,a,NCoefs,m,sm,u,su);
+}
 /////////
 // CRT //
 /////////
@@ -483,10 +702,12 @@ void icrt(bn_t *coefs,cuyasheint_t *d_polyCRT,const int N, const int NPolis,cuda
 	dim3 gridDim(ADDGRIDXDIM);
 	dim3 blockDim(ADDBLOCKXDIM);
 
-	bn_t *inner_results;
-	cudaMallocManaged((void**)&inner_results, N*sizeof(bn_t));
+	cudaError_t result;
 
-	cudaError_t result = cudaDeviceSynchronize();
+	bn_t *inner_results;
+	result = cudaMallocManaged((void**)&inner_results, N*sizeof(bn_t));
+
+	result = cudaDeviceSynchronize();
 	assert(result == cudaSuccess);
 
 	for(unsigned int i =0; i < N; i++)

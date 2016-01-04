@@ -41,7 +41,7 @@ struct PolySuite
 
         degree = 8;
 
-        q = conv<ZZ>("1171313591017775093490277364417L");
+        q = conv<ZZ>("77287149995192912462927307869L");
         Polynomial::global_mod = q; // Defines default GF(q)
         Polynomial::BuildNthCyclotomic(&phi,degree);
         phi.set_mod(Polynomial::global_mod);
@@ -82,7 +82,7 @@ struct YasheSuite
 
         // Params
         ZZ q;
-        q = conv<ZZ>("1171313591017775093490277364417L");
+        q = conv<ZZ>("77287149995192912462927307869L");
         // q = conv<ZZ>("655615111");
         Polynomial::global_mod = q;
         ZZ_p::init(q); // Defines GF(q)
@@ -183,17 +183,13 @@ BOOST_AUTO_TEST_CASE(multipleAdds)
   Polynomial::random(&a,degree-1);
 
   Polynomial b;
-  for(int count = 0; count < NTESTS;count ++){
+  for(int count = 0; count < NTESTS;count ++)
     b += a;
-    b.update_host_data();
-    // b = b+a;
-    // std::cout << b.to_string() << std::endl;
-  }
 
-  #ifdef VERBOSE
+  // #ifdef VERBOSE
   std::cout << "a: " << a.to_string() << std::endl;
   std::cout << "b: " << b.to_string() << std::endl;
-  #endif
+  // #endif
   BOOST_REQUIRE(b == (a*NTESTS)%(b.get_mod()));
 }
 
