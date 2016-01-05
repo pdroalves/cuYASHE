@@ -20,6 +20,7 @@ NTL_CLIENT
 cuyasheint_t polynomial_get_cycles();
 void get_words(bn_t* b,ZZ a);
 
+
 // template Polynomial common_addition<Polynomial>(Polynomial *a,Polynomial *b);
 
 class Polynomial{
@@ -225,8 +226,9 @@ class Polynomial{
         this->polyCRT = b.get_crt_residues();
       
       if(b.get_device_updated())
-        this->copy_device_crt_residues(b);
-        // this->d_polyCRT = b.d_polyCRT;
+        // this->copy_device_crt_residues(b);
+        this->d_polyCRT = b.d_polyCRT;
+      
       
       this->set_host_updated(b.get_host_updated());
       this->set_device_updated(b.get_device_updated());
@@ -481,27 +483,10 @@ class Polynomial{
     }
     Polynomial operator%=(ZZ b){
       if(!this->get_host_updated()){
+        if(!this->get_icrt_computed())
+          this->icrt();
 
-        icrt( bn_coefs[0],
-              get_device_crt_residues(),
-              get_crt_spacing(),
-              Polynomial::CRTPrimes.size(),
-              get_stream()
-              );
-
-        bn_t *m;
-        cudaMallocManaged((void**)&m,sizeof(bn_t));
-        get_words(m,b);
-
-        bn_t *u = Polynomial::reciprocals[b];
-        callCuModN( bn_coefs[0],
-                    bn_coefs[0],
-                    get_crt_spacing(),
-                    m->dp,
-                    m->used,
-                    u->dp,
-                    u->used,
-                    get_stream());
+        this->modn(b);
         return *this;
       }
 
@@ -807,13 +792,24 @@ class Polynomial{
         std::vector<ZZ> Mpi;
         std::vector<cuyasheint_t> InvMpi;
 
-        int primes_size = CRTPRIMESIZE;
         cuyasheint_t n;
 
         // Get primes
         // std::cout << "Primes: " << std::endl;
+        #ifdef CUFFTMUL
+        int primes_size = CRTPRIMESIZE;
+        #else
+        unsigned int count = 0;
+        #endif
         while( (M < (2*degree)*q*q) ){
+            
+            #ifdef CUFFTMUL
             n = NTL::GenPrime_long(primes_size);
+            #else
+            n = PRIMES_BUCKET[count];
+            count++;
+            #endif
+
             if( std::find(P.begin(), P.end(), n) == P.end()){
               // Does not contains
               // std::cout << n << std::endl;
@@ -828,6 +824,10 @@ class Polynomial{
           Mpi.push_back(M/pi);
           InvMpi.push_back(conv<cuyasheint_t>(NTL::InvMod(Mpi[i]%pi,pi)));
         }
+
+        #ifndef CUFFTMUL
+        Polynomial::compute_reciprocal(M);
+        #endif
 
         Polynomial::CRTProduct = M;
         Polynomial::CRTPrimes = P;
@@ -960,7 +960,26 @@ class Polynomial{
 
       return b;
     }
+    void crt();
+    void icrt();
+    void modn(ZZ n){
 
+      bn_t *m;
+      cudaMallocManaged((void**)&m,sizeof(bn_t));
+      get_words(m,n);
+
+      bn_t *u = Polynomial::reciprocals[n];
+      assert( u != NULL);
+
+      callCuModN( bn_coefs[0],
+                  bn_coefs[0],
+                  get_crt_spacing(),
+                  m->dp,
+                  m->used,
+                  u->dp,
+                  u->used,
+                  get_stream());
+    }
     int deg(){
       if(!get_host_updated())
         return bn_coefs.size()-1;
@@ -1139,12 +1158,40 @@ class Polynomial{
     static std::map<ZZ, bn_t*> reciprocals;
 
     //Functions and methods
+    
+    //////////////////////////
+    // u = q * 2^(2*192)//q //
+    //////////////////////////
+
+    /**
+     * Computes the reciprocal for an arbitrary ZZ
+     * @param b [description]
+     */
+    static void compute_reciprocal(ZZ q){
+      // x = 2^e (e >= 0)
+      ZZ x = power2_ZZ(2*192);
+      ZZ u_ZZ = (q*x)/q;
+
+      bn_t *u;
+      cudaError_t result = cudaMallocManaged((void**)&u,sizeof(bn_t));
+      assert(result == cudaSuccess);
+      get_words(u,u_ZZ);
+
+      std::cout << "q: " << q << std::endl;
+      std::cout << "u_ZZ: " << u_ZZ << std::endl;
+
+      Polynomial::reciprocals[q] = u;
+    }
+
+    /**
+     * Computes the reciprocals for all expected Yashe::q
+     */
     static void compute_reciprocals(){
       cudaError_t result;
 
       /////////////////////////////////////////////////////////
       // The reciprocal of 77287149995192912462927307869L is//
-      // 81217922200224777669139429703L                     //
+      // 154574299990385824925854615738L                     //
       ///////////////////////////////////////////////////////
       bn_t *u1;
       result = cudaMallocManaged((void**)&u1,sizeof(bn_t));
@@ -1155,9 +1202,9 @@ class Polynomial{
 
       bn_new(u1);
       assert(STD_BNT_ALLOC >= 4);
-      u1->dp[0] = 3588159815;
-      u1->dp[1] = 3058528714;
-      u1->dp[2] = 107865088;
+      u1->dp[0] = 3131459770;
+      u1->dp[1] = 515080L;
+      u1->dp[2] = 4084522297;
       u1->dp[3] = 1;
 
       u1->used = 4;

@@ -73,7 +73,11 @@ __host__ void bn_new(bn_t *a){
   a->used = 0;
   a->alloc = STD_BNT_ALLOC;
   a->sign = BN_POS;
-  cudaMallocManaged(&a->dp,a->alloc*sizeof(cuyasheint_t));
+  cudaError_t result = cudaMallocManaged(&a->dp,a->alloc*sizeof(cuyasheint_t));
+  if(result != cudaSuccess)
+  	std::cout << "cudaMalloc error: " << cudaGetErrorString(result) << std::endl;
+  assert(result == cudaSuccess);
+
 }
 
 __device__ void bn_new_d(bn_t *a){
@@ -84,14 +88,16 @@ __device__ void bn_new_d(bn_t *a){
 }
 
 __host__ void bn_free(bn_t *a){
-  a->used = 0;
-  a->alloc = 0;
-  
   cudaError_t result = cudaDeviceSynchronize();
   assert(result == cudaSuccess);
-  result = cudaFree(a->dp);
-  assert(result == cudaSuccess);
 
+  a->used = 0;
+  a->alloc = 0;  
+
+  if(a->dp != NULL){
+	result = cudaFree(a->dp);
+  	assert(result == cudaSuccess);
+  }
 }
 
 __host__ __device__ int bn_cmpn_low(const cuyasheint_t *a, const cuyasheint_t *b, int size) {
@@ -674,7 +680,7 @@ __global__ void cuICRT(	bn_t *poly,
 	 * Each thread computes one coefficient of each residue of d_polyCRT
 	 */
 	
-void crt(bn_t *coefs,const int used_coefs,cuyasheint_t *d_polyCRT,const int N, const int NPolis,cudaStream_t stream){
+void callCRT(bn_t *coefs,const int used_coefs,cuyasheint_t *d_polyCRT,const int N, const int NPolis,cudaStream_t stream){
 
 	const int size = used_coefs*NPolis;
 	int ADDGRIDXDIM = (size%ADDBLOCKXDIM == 0? 
@@ -693,7 +699,7 @@ void crt(bn_t *coefs,const int used_coefs,cuyasheint_t *d_polyCRT,const int N, c
 	 * Each thread j computes a Mpi*( invMpi*(value) % pi) and adds to poly[j]
 	 */
 
-void icrt(bn_t *coefs,cuyasheint_t *d_polyCRT,const int N, const int NPolis,cudaStream_t stream){
+void callICRT(bn_t *coefs,cuyasheint_t *d_polyCRT,const int N, const int NPolis,cudaStream_t stream){
 
 	const int size = N;
 	int ADDGRIDXDIM = (size%ADDBLOCKXDIM == 0? 
@@ -772,7 +778,8 @@ __host__ void  CUDAFunctions::write_crt_primes(){
     
     if(CUDAFunctions::Mpis)
     	cudaFree(CUDAFunctions::Mpis);
-    cudaMallocManaged((void**)&CUDAFunctions::Mpis,Polynomial::CRTPrimes.size()*sizeof(cuyasheint_t));
+    result = cudaMallocManaged((void**)&CUDAFunctions::Mpis,Polynomial::CRTPrimes.size()*sizeof(cuyasheint_t));
+  	assert(result == cudaSuccess);
     for(unsigned int i = 0; i < Polynomial::CRTPrimes.size();i++)
     	get_words(&CUDAFunctions::Mpis[i],Polynomial::CRTMpi[i]);
 

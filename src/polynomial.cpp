@@ -16,19 +16,37 @@ Polynomial *(Polynomial::global_phi) = NULL;
 bool Polynomial::phi_set = false;
 std::map<ZZ, bn_t*> Polynomial::reciprocals;
 
-
+const uint32_t PRIMES_BUCKET[] = {536870909, 536870879, 536870869, 536870849, 536870839, 536870837, 536870819, 536870813, 536870791, 536870779, 536870767, 536870743, 536870729, 536870723, 536870717, 536870701, 536870683, 536870657, 536870641, 536870627, 536870611, 536870603, 536870599, 536870573, 536870569, 536870563, 536870561, 536870513, 536870501, 536870497, 536870473, 536870401, 536870363, 536870317, 536870303, 536870297, 536870273, 536870267, 536870239, 536870233, 536870219, 536870171, 536870167, 536870153, 536870123, 536870063, 536870057, 536870041, 536870027, 536869999, 536869951, 536869943, 536869937, 536869919, 536869901, 536869891, 536869831, 536869829, 536869793, 536869787, 536869777, 536869771, 536869769, 536869747, 536869693, 536869679, 536869651, 536869637, 536869633, 536869631, 536869607, 536869603, 536869589, 536869583, 536869573, 536869559, 536869549, 536869523, 536869483, 536869471, 536869447, 536869423, 536869409, 536869387, 536869331, 536869283, 536869247, 536869217, 536869189, 536869159, 536869153, 536869117, 536869097, 536869043, 536868979, 536868977, 536868973, 536868961, 536868953, 536868901};
+const int PRIMES_BUCKET_SIZE = 201;
 
 Polynomial Polynomial::operator+(Polynomial &b){
-  return common_addition<Polynomial>(this,&b);
+  Polynomial p = common_addition<Polynomial>(this,&b);
+
+  ZZ M = Polynomial::CRTProduct;  
+  p.icrt();
+  // p.modn(M);
+  p.crt();
+  return p;
 }
 
 Polynomial Polynomial::operator+=(Polynomial &b){
   common_addition_inplace<Polynomial>(this,&b);
+
+  ZZ M = Polynomial::CRTProduct;  
+  this->icrt();
+  // this->modn(M);
+  this->crt();
   return *this;
 }
 
 Polynomial Polynomial::operator*(Polynomial &b){
-  return common_multiplication<Polynomial>(this,&b);
+  Polynomial p = common_multiplication<Polynomial>(this,&b);
+ 
+  ZZ M = Polynomial::CRTProduct;  
+  p.icrt();
+  // p.modn(M);
+  p.crt();
+  return p;
 }
 
 Polynomial Polynomial::operator*(ZZ b){
@@ -76,7 +94,7 @@ void Polynomial::copy_device_crt_residues(Polynomial &b){
     return;
 
   // std::cout << "Will copy residues on device memory" << std::endl;
-
+  this->set_device_crt_residues(this->get_device_crt_residues());
 
   // Adjusts CRTSPACING
   // Here we don't use update_crt_spacing(). The reason
@@ -84,19 +102,19 @@ void Polynomial::copy_device_crt_residues(Polynomial &b){
   // update_crt_spacing() may not just update the spacing, but
   // also update device data. And in this context, we know
   // that there is no relevant data to update.
-  cuyasheint_t *aux;
-  this->CRTSPACING = b.get_crt_spacing();
+  // cuyasheint_t *aux;
+  // this->CRTSPACING = b.get_crt_spacing();
 
-  cudaError_t result = cudaMalloc((void**)&aux,
-                      this->get_crt_spacing()*(Polynomial::CRTPrimes.size())*sizeof(cuyasheint_t));
-  assert(result == cudaSuccess);
-  result = cudaMemcpyAsync(aux,
-                      b.get_device_crt_residues(),
-                      this->get_crt_spacing()*(Polynomial::CRTPrimes.size())*sizeof(cuyasheint_t),
-                      cudaMemcpyDeviceToDevice);      
-  assert(result == cudaSuccess);
+  // cudaError_t result = cudaMalloc((void**)&aux,
+  //                     this->get_crt_spacing()*(Polynomial::CRTPrimes.size())*sizeof(cuyasheint_t));
+  // assert(result == cudaSuccess);
+  // result = cudaMemcpyAsync(aux,
+  //                     b.get_device_crt_residues(),
+  //                     this->get_crt_spacing()*(Polynomial::CRTPrimes.size())*sizeof(cuyasheint_t),
+  //                     cudaMemcpyDeviceToDevice);      
+  // assert(result == cudaSuccess);
 
-  this->set_device_crt_residues(aux);
+  // this->set_device_crt_residues(aux);
   // end = get_cycles();
   // std::cout << (end-start) << " cycles" << std::endl;
 }
@@ -139,6 +157,39 @@ __host__ ZZ get_ZZ(bn_t *a){
   return b;
 }
 
+void Polynomial::crt(){
+  callCRT(this->bn_coefs[0],
+          this->bn_coefs.size(),
+          this->get_device_crt_residues(),
+          this->get_crt_spacing(),
+          Polynomial::CRTPrimes.size(),
+          this->get_stream()
+    );
+  this->set_crt_computed(true);
+}
+
+void Polynomial::icrt(){  
+  this->bn_coefs.clear();
+
+  bn_t *coefs;
+  cudaMallocManaged((void**)&coefs, this->get_crt_spacing()*sizeof(bn_t));
+  cudaError_t result = cudaDeviceSynchronize();
+  assert(result == cudaSuccess);
+  for(int i =0; i < this->get_crt_spacing(); i++){
+    bn_new(&coefs[i]);
+    bn_coefs.push_back(&coefs[i]);
+  }
+
+  callICRT( this->bn_coefs[0],
+        this->get_device_crt_residues(),
+        this->get_crt_spacing(),
+        Polynomial::CRTPrimes.size(),
+        this->get_stream()
+      );
+
+  this->set_icrt_computed(true);
+}
+
 void Polynomial::update_device_data(){
   /**
    * This function copy the polynomial to GPU's memory in bn_t format
@@ -172,12 +223,18 @@ void Polynomial::update_device_data(){
           try{
             result = cudaDeviceSynchronize();
             assert(result == cudaSuccess);
-            result = cudaFree(bn_coefs[i]->dp);
+            
+            bn_free(bn_coefs[i]);
+            assert(result == cudaSuccess);
+            if(result != cudaSuccess)
+              std::cout << "cudaFree error: " << cudaGetErrorString(result) << std::endl;
+
             assert(result == cudaSuccess);
           }catch(string s){
-            // To-do
+            std::cout << "Erro no cudaFree: " << s <<std::endl; 
+          }catch(...){
+            std::cout << "Erro no cudaFree" << std::endl; 
           }
-          // result = cudaFree(bn_coefs[i]);
         }
     bn_coefs.clear();
   }
@@ -212,13 +269,7 @@ void Polynomial::update_device_data(){
   /**
   *  CRT
   */
-  crt( this->bn_coefs[0],
-      this->bn_coefs.size(),
-      this->get_device_crt_residues(),
-      this->get_crt_spacing(),
-      Polynomial::CRTPrimes.size(),
-      this->get_stream()
-    );
+  this->crt();
 
   result = cudaDeviceSynchronize();
   assert(result == cudaSuccess);
@@ -231,34 +282,14 @@ void Polynomial::update_host_data(){
   
     if(get_host_updated())
       return;
-    if(!get_icrt_computed()){
-          this->bn_coefs.clear();
-
-          bn_t *coefs;
-          cudaMallocManaged((void**)&coefs, this->get_crt_spacing()*sizeof(bn_t));
-          cudaError_t result = cudaDeviceSynchronize();
-          assert(result == cudaSuccess);
-          for(unsigned int i =0; i < this->get_crt_spacing(); i++){
-
-            bn_new(&coefs[i]);
-            bn_coefs.push_back(&coefs[i]);
-          }
-          icrt( this->bn_coefs[0],
-                this->get_device_crt_residues(),
-                this->get_crt_spacing(),
-                Polynomial::CRTPrimes.size(),
-                this->get_stream()
-              );
-        }
-
+    if(!get_icrt_computed())
+      this->icrt();
 
     #ifdef VERBOSE
     std::cout << "Copying data to CPU." << std::endl;
     #endif
 
     assert(Polynomial::CRTPrimes.size() > 0);
-    if(this->polyCRT.size() != Polynomial::CRTPrimes.size())
-      this->polyCRT.resize(Polynomial::CRTPrimes.size());
 
     // Prepare this polynomial to receive this->deg()+1 coefficients
     if((int)coefs.size() <= this->deg())
@@ -273,7 +304,7 @@ void Polynomial::update_host_data(){
     this->set_coeffs(this->deg()+1);
     for(int i = 0; i <= this->deg(); i++){
       // ZZ coef = get_ZZ(bn_coefs[i]);
-      ZZ coef = get_ZZ(bn_coefs[i]) % Polynomial::CRTProduct;
+      ZZ coef = get_ZZ(bn_coefs[i])% Polynomial::CRTProduct;
       this->set_coeff(i,coef);
     }
     

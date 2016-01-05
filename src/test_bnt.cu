@@ -155,7 +155,7 @@ int main(void){
 	cudaStream_t stream;
 	cudaStreamCreate(&stream);
 
-	crt(value,1,(cuyasheint_t*)d_polyCRT,1,nprimes,stream);
+	callCRT(value,1,(cuyasheint_t*)d_polyCRT,1,nprimes,stream);
 
 	/**
 	 * Print residues for check
@@ -182,7 +182,7 @@ int main(void){
 	//
 	//void icrt(bn_t *coefs,cuyasheint_t *d_polyCRT,const int N, const int NPolis,cudaStream_t stream){
 	//
-	icrt(value, (cuyasheint_t*)d_polyCRT,1,nprimes,stream);
+	callICRT(value, (cuyasheint_t*)d_polyCRT,1,nprimes,stream);
 
 	cuResult = cudaDeviceSynchronize();
 	assert(cuResult == cudaSuccess);
