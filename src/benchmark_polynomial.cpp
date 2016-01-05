@@ -15,10 +15,12 @@
 
 #define BILLION  1000000000L
 #define MILLION  1000000L
-#define N 100
+#define N 1
 
 
 int main(int argc,char* argv[]){
+  std::cout << "Starting. N = " << N << std::endl;
+
   cout << fixed;
   cout.precision(2);
 
@@ -229,6 +231,9 @@ int main(int argc,char* argv[]){
     // Time measured without memory copy
     Polynomial::random(&a,d-1);
     Polynomial::random(&b,d-1);
+  cudaDeviceReset();
+
+    exit(0);
 
     a.update_device_data();
     b.update_device_data();
@@ -281,4 +286,7 @@ int main(int argc,char* argv[]){
     gpu_mult_without_memcopy << d << " " << diff  << std::endl;
 
   }
+
+  cudaDeviceReset();
+
 }

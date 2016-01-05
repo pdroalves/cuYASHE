@@ -94,7 +94,7 @@ void Polynomial::copy_device_crt_residues(Polynomial &b){
     return;
 
   // std::cout << "Will copy residues on device memory" << std::endl;
-  this->set_device_crt_residues(this->get_device_crt_residues());
+
 
   // Adjusts CRTSPACING
   // Here we don't use update_crt_spacing(). The reason
@@ -102,19 +102,19 @@ void Polynomial::copy_device_crt_residues(Polynomial &b){
   // update_crt_spacing() may not just update the spacing, but
   // also update device data. And in this context, we know
   // that there is no relevant data to update.
-  // cuyasheint_t *aux;
-  // this->CRTSPACING = b.get_crt_spacing();
+  cuyasheint_t *aux;
+  this->CRTSPACING = b.get_crt_spacing();
 
-  // cudaError_t result = cudaMalloc((void**)&aux,
-  //                     this->get_crt_spacing()*(Polynomial::CRTPrimes.size())*sizeof(cuyasheint_t));
-  // assert(result == cudaSuccess);
-  // result = cudaMemcpyAsync(aux,
-  //                     b.get_device_crt_residues(),
-  //                     this->get_crt_spacing()*(Polynomial::CRTPrimes.size())*sizeof(cuyasheint_t),
-  //                     cudaMemcpyDeviceToDevice);      
-  // assert(result == cudaSuccess);
+  cudaError_t result = cudaMalloc((void**)&aux,
+                      this->get_crt_spacing()*(Polynomial::CRTPrimes.size())*sizeof(cuyasheint_t));
+  assert(result == cudaSuccess);
+  result = cudaMemcpyAsync(aux,
+                      b.get_device_crt_residues(),
+                      this->get_crt_spacing()*(Polynomial::CRTPrimes.size())*sizeof(cuyasheint_t),
+                      cudaMemcpyDeviceToDevice);      
+  assert(result == cudaSuccess);
 
-  // this->set_device_crt_residues(aux);
+  this->set_device_crt_residues(aux);
   // end = get_cycles();
   // std::cout << (end-start) << " cycles" << std::endl;
 }
@@ -169,17 +169,42 @@ void Polynomial::crt(){
 }
 
 void Polynomial::icrt(){  
-  this->bn_coefs.clear();
+  cudaError_t result;
 
-  bn_t *coefs;
-  cudaMallocManaged((void**)&coefs, this->get_crt_spacing()*sizeof(bn_t));
-  cudaError_t result = cudaDeviceSynchronize();
-  assert(result == cudaSuccess);
-  for(int i =0; i < this->get_crt_spacing(); i++){
-    bn_new(&coefs[i]);
-    bn_coefs.push_back(&coefs[i]);
+  // Adjusts bn_coefs size
+  int diff = (int)bn_coefs.size() - this->get_crt_spacing();
+  if(diff < 0){
+    diff = -diff;
+
+    // Adds more coefficients
+    bn_t *coefs;
+    
+    // Doing this we need only one call to cudaMallocManaged
+    result = cudaMallocManaged((void**)&coefs, diff*sizeof(bn_t));
+    assert(result == cudaSuccess);
+
+    result = cudaDeviceSynchronize();
+    assert(result == cudaSuccess);
+    for(int i =0; i < diff; i++){
+      bn_new(&coefs[i]);
+      bn_coefs.push_back(&coefs[i]);
+    }
+  }else if(diff > 0){
+
+      // Releases unused coefficients
+      for(int i = 0; i < diff;i++){
+        bn_t *coef = bn_coefs.back();
+        bn_coefs.pop_back();
+
+        bn_free(coef);
+        result = cudaFree(coef);
+        assert(result == cudaSuccess);
+      }
   }
 
+  //////////////////////////////////////////////////
+  // At this point, bn_coefs.size() == CRTSPACING //
+  //////////////////////////////////////////////////
   callICRT( this->bn_coefs[0],
         this->get_device_crt_residues(),
         this->get_crt_spacing(),
@@ -217,47 +242,51 @@ void Polynomial::update_device_data(){
 
   result = cudaDeviceSynchronize();
   assert(result == cudaSuccess);
-  if(bn_coefs.size() > 0){
 
-    for(unsigned int i = 0; i < bn_coefs.size();i++){
-          try{
-            result = cudaDeviceSynchronize();
-            assert(result == cudaSuccess);
-            
-            bn_free(bn_coefs[i]);
-            assert(result == cudaSuccess);
-            if(result != cudaSuccess)
-              std::cout << "cudaFree error: " << cudaGetErrorString(result) << std::endl;
+  // Adjusts bn_coefs size
+  int diff = (int)bn_coefs.size() - this->get_crt_spacing();
+  if(diff < 0){
+    diff = -diff;
+    std::cout << "Smaller" << std::endl;
+    // Adds more coefficients
+    bn_t *coefs;
+    
+    // Doing this we need only one call to cudaMallocManaged
+    result = cudaMallocManaged((void**)&coefs, diff*sizeof(bn_t));
+    assert(result == cudaSuccess);
 
-            assert(result == cudaSuccess);
-          }catch(string s){
-            std::cout << "Erro no cudaFree: " << s <<std::endl; 
-          }catch(...){
-            std::cout << "Erro no cudaFree" << std::endl; 
-          }
-        }
-    bn_coefs.clear();
+    result = cudaDeviceSynchronize();
+    assert(result == cudaSuccess);
+    for(int i =0; i < diff; i++){
+      bn_new(&coefs[i]);
+      bn_coefs.push_back(&coefs[i]);
+    }
+  }else if(diff > 0){
+      std::cout << "Bigger" << std::endl;
+
+      // Releases unused coefficients
+      for(int i = 0; i < diff;i++){
+        bn_t *coef = bn_coefs.back();
+        bn_coefs.pop_back();
+
+        bn_free(coef);
+        result = cudaFree(coef);
+        assert(result == cudaSuccess);
+      }
   }
   
+  /////////////////////////////////////////////////
+  // At this point bn_coefs.size() == CRTSPACING //
+  /////////////////////////////////////////////////
+
   /**
    * Converts ZZs to bn_t
    */
-  if((this->deg()+1) == 0){
-    bn_t *zero;
-    result = cudaMallocManaged((void**)&zero,sizeof(bn_t));
-    assert(result == cudaSuccess);
-    
-    bn_new(zero);
-    bn_zero(zero);
-    bn_coefs.push_back(zero);
-  }else{
-    bn_t *coefs;
-    result = cudaMallocManaged((void**)&coefs,(this->deg()+1)*sizeof(bn_t));
-    assert(result == cudaSuccess);
-    for(int i = 0; i <= this->deg(); i++){
-        get_words(&coefs[i],get_coeff(i));
-        bn_coefs.push_back(&coefs[i]);
-      }
+
+  for(int i = 0; i < bn_coefs.size(); i++){
+    if(bn_coefs[i] == NULL)
+      std::cout << "Achei!" << std::endl;
+    get_words(bn_coefs[i],get_coeff(i));
   }
 
   result = cudaMemsetAsync(this->get_device_crt_residues(),

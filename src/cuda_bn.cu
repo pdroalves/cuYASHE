@@ -730,6 +730,12 @@ void callICRT(bn_t *coefs,cuyasheint_t *d_polyCRT,const int N, const int NPolis,
 											CUDAFunctions::Mpis,
 											CUDAFunctions::invMpis,
 											inner_results);
+	
+	result = cudaDeviceSynchronize();
+	assert(result == cudaSuccess);
+  	
+	result = cudaFree(inner_results);
+	assert(result == cudaSuccess);
 }
 
 __host__ void  CUDAFunctions::write_crt_primes(){
