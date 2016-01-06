@@ -215,7 +215,9 @@ BOOST_AUTO_TEST_CASE(multipleAddsWithDifferentDegrees)
   std::cout << "b: " << b.to_string() << std::endl;
   std::cout << "b_ntl: " << b_ntl << std::endl;
   #endif
-
+  
+  b.normalize();
+ 
   BOOST_REQUIRE(NTL::deg(b_ntl) == b.deg());
   for(int i = 0;i <= b.deg();i++)
     BOOST_REQUIRE(conv<ZZ>(NTL::rep(b_ntl[i])[0]) == b.get_coeff(i));

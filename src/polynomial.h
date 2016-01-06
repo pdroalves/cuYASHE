@@ -220,10 +220,7 @@ class Polynomial{
       this->CRTSPACING = b.CRTSPACING;
       if(b.get_host_updated()){
         this->set_coeffs(b.get_coeffs());
-        this->aux_polyCRT = b.aux_polyCRT;
       }
-      if(b.get_crt_computed())
-        this->polyCRT = b.get_crt_residues();
       
       if(b.get_device_updated())
         // this->copy_device_crt_residues(b);
@@ -304,7 +301,11 @@ class Polynomial{
           }
       }
 
-      cuyasheint_t *d_result = CUDAFunctions::callPolynomialAddSub(this->stream,this->get_device_crt_residues(),b.get_device_crt_residues(),(int)(this->CRTSPACING*this->polyCRT.size()),SUB);
+      cuyasheint_t *d_result = CUDAFunctions::callPolynomialAddSub(this->stream,
+                                                                    this->get_device_crt_residues(),
+                                                                    b.get_device_crt_residues(),
+                                                                    (int)(this->CRTSPACING*Polynomial::CRTPrimes.size()),
+                                                                    SUB);
 
       Polynomial *c;
       c = new Polynomial(this->get_mod(),this->get_phi(),this->get_crt_spacing());
@@ -749,10 +750,6 @@ class Polynomial{
       // this->set_host_updated(true);      
       // this->update_crt_spacing(size);
     }
-    std::vector<std::vector<cuyasheint_t> > get_crt_residues(){
-      std::vector<std::vector<cuyasheint_t> > crt_residues_copy(this->polyCRT);
-      return crt_residues_copy;
-    }
     cuyasheint_t* get_device_crt_residues(){
       // Returns the address of crt residues at device memory
       if(this->d_polyCRT == NULL){
@@ -965,7 +962,7 @@ class Polynomial{
     void modn(ZZ n){
 
       bn_t *m;
-      cudaMallocManaged((void**)&m,sizeof(bn_t));
+      cudaMallocManaged(&m,sizeof(bn_t));
       get_words(m,n);
 
       bn_t *u = Polynomial::reciprocals[n];
@@ -1173,12 +1170,12 @@ class Polynomial{
       ZZ u_ZZ = (q*x)/q;
 
       bn_t *u;
-      cudaError_t result = cudaMallocManaged((void**)&u,sizeof(bn_t));
+      cudaError_t result = cudaMallocManaged(&u,sizeof(bn_t));
       assert(result == cudaSuccess);
       get_words(u,u_ZZ);
 
-      std::cout << "q: " << q << std::endl;
-      std::cout << "u_ZZ: " << u_ZZ << std::endl;
+      // std::cout << "q: " << q << std::endl;
+      // std::cout << "u_ZZ: " << u_ZZ << std::endl;
 
       Polynomial::reciprocals[q] = u;
     }
@@ -1194,7 +1191,7 @@ class Polynomial{
       // 154574299990385824925854615738L                     //
       ///////////////////////////////////////////////////////
       bn_t *u1;
-      result = cudaMallocManaged((void**)&u1,sizeof(bn_t));
+      result = cudaMallocManaged(&u1,sizeof(bn_t));
       assert(result == cudaSuccess);
 
       result = cudaDeviceSynchronize();
@@ -1214,9 +1211,6 @@ class Polynomial{
   protected:
     std::vector<ZZ> coefs;
     std::vector<bn_t*> bn_coefs;
-    
-    std::vector<std::vector<cuyasheint_t> > polyCRT; // Must be initialized by crt()
-    cuyasheint_t *aux_polyCRT = 0x0; // Must be initialized on CRTSPACING definition and updated by crt(), if needed
     
     cuyasheint_t *d_polyCRT = 0x0; // Must be initialized on CRTSPACING definition and updated by crt(), if needed
 

@@ -83,6 +83,19 @@ void Polynomial::operator delete(void *ptr){
     }
   }
 
+
+  for(unsigned int i = 0; i < p->bn_coefs.size();i++){
+    try
+    {
+      // bn_free(p->bn_coefs[i]);
+    }catch(string s){
+      #ifdef VERBOSE
+      std::cout << "Exception at cudaFree: " << s << std::endl;
+      #endif 
+      cudaGetLastError();//Reset last error
+    }
+  }
+  p->bn_coefs.clear();
   // free(ptr);
 }
 
@@ -180,7 +193,7 @@ void Polynomial::icrt(){
     bn_t *coefs;
     
     // Doing this we need only one call to cudaMallocManaged
-    result = cudaMallocManaged((void**)&coefs, diff*sizeof(bn_t));
+    result = cudaMallocManaged(&coefs, diff*sizeof(bn_t));
     assert(result == cudaSuccess);
 
     result = cudaDeviceSynchronize();
@@ -229,8 +242,8 @@ void Polynomial::update_device_data(){
   #endif
 
 
-  this->ON_COPY = true;
-  // Updated CRTSPACING    
+  this->ON_COPY = true
+;  // Updated CRTSPACING    
   // Verifica se o espaçamento é válido. Se não for, ajusta.
   if(this->get_crt_spacing() < this->deg()+1){
     const int new_spacing = this->deg()+1;
@@ -247,12 +260,12 @@ void Polynomial::update_device_data(){
   int diff = (int)bn_coefs.size() - this->get_crt_spacing();
   if(diff < 0){
     diff = -diff;
-    std::cout << "Smaller" << std::endl;
+    // std::cout << "Smaller" << std::endl;
     // Adds more coefficients
     bn_t *coefs;
     
     // Doing this we need only one call to cudaMallocManaged
-    result = cudaMallocManaged((void**)&coefs, diff*sizeof(bn_t));
+    result = cudaMallocManaged(&coefs, diff*sizeof(bn_t));
     assert(result == cudaSuccess);
 
     result = cudaDeviceSynchronize();
@@ -262,7 +275,7 @@ void Polynomial::update_device_data(){
       bn_coefs.push_back(&coefs[i]);
     }
   }else if(diff > 0){
-      std::cout << "Bigger" << std::endl;
+      // std::cout << "Bigger" << std::endl;
 
       // Releases unused coefficients
       for(int i = 0; i < diff;i++){
@@ -300,6 +313,15 @@ void Polynomial::update_device_data(){
   */
   this->crt();
 
+  /**
+   * Releases bn_t
+   */
+  
+  for(int i = 0; i < bn_coefs.size(); i++){
+    bn_free(bn_coefs[i]);
+  }
+  bn_coefs.clear();
+
   result = cudaDeviceSynchronize();
   assert(result == cudaSuccess);
 
@@ -336,6 +358,15 @@ void Polynomial::update_host_data(){
       ZZ coef = get_ZZ(bn_coefs[i])% Polynomial::CRTProduct;
       this->set_coeff(i,coef);
     }
+
+    /**
+    * Releases bn_t
+    */
+
+    for(int i = 0; i < bn_coefs.size(); i++){
+      bn_free(bn_coefs[i]);
+    }
+    bn_coefs.clear();
     
     this->set_host_updated(true);
 }

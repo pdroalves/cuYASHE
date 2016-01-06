@@ -21,6 +21,9 @@
 int main(int argc,char* argv[]){
   std::cout << "Starting. N = " << N << std::endl;
 
+  size_t f, t;
+  cudaSetDevice(0);
+
   cout << fixed;
   cout.precision(2);
 
@@ -46,6 +49,8 @@ int main(int argc,char* argv[]){
   std::string gpu_reduce_filename;
   std::string cpu_reduce_filename;
   std::string modq_filename;
+
+  cudaError_t result;
 
   if(argc == 2){
     char* suffix = argv[1];
@@ -152,48 +157,68 @@ int main(int argc,char* argv[]){
     for(int i = 0; i < N;i++){
       a.set_crt_computed(false);
       a.update_device_data();
-      cudaDeviceSynchronize();
+      result = cudaDeviceSynchronize();
+      assert(result == cudaSuccess);
     }
     clock_gettime( CLOCK_REALTIME, &stop);
     diff = compute_time_ms(start,stop)/N;
     std::cout << "CRT) Foward: " << diff << " ms" << std::endl;
     crt << d << " " << diff  << std::endl;
 
+    cudaMemGetInfo(&f, &t);
+    cout << "Free memory: " << f/(1024*1024) << std::endl << "Press Enter to Continue";
+    cin.ignore();
+
     clock_gettime( CLOCK_REALTIME, &start);
     a.update_host_data();
     for(int i = 0; i < N;i++){
       a.set_icrt_computed(false);
       a.update_host_data();
-      cudaDeviceSynchronize();
+      result = cudaDeviceSynchronize();
+      assert(result == cudaSuccess);
     }
     clock_gettime( CLOCK_REALTIME, &stop);
     diff = compute_time_ms(start,stop)/N;
     std::cout << "CRT) Inverse: " << diff << " ms" << std::endl;
     icrt << d << " " << diff  << std::endl;
 
+    cudaMemGetInfo(&f, &t);
+    cout << "Free memory: " << f/(1024*1024) << std::endl << "Press Enter to Continue";
+    cin.ignore();
+
     clock_gettime( CLOCK_REALTIME, &start);
     a.update_device_data();
     for(int i = 0; i < N;i++){
       a.reduce();
-      cudaDeviceSynchronize();
+      result = cudaDeviceSynchronize();
+      assert(result == cudaSuccess);
     }
     clock_gettime( CLOCK_REALTIME, &stop);
     diff = compute_time_ms(start,stop)/N;
     std::cout << "Reduce) GPU: " << diff << " ms" << std::endl;
     gpu_reduce << d << " " << diff  << std::endl;
 
+    cudaMemGetInfo(&f, &t);
+    cout << "Free memory: " << f/(1024*1024) << std::endl << "Press Enter to Continue";
+    cin.ignore();
+
     clock_gettime( CLOCK_REALTIME, &start);
     a.update_host_data();
     a.set_device_updated(false);
     for(int i = 0; i < N;i++){
       a.reduce();
-      cudaDeviceSynchronize();
+      result = cudaDeviceSynchronize();
       a.set_device_updated(false);
+      assert(result == cudaSuccess);
     }
     clock_gettime( CLOCK_REALTIME, &stop);
     diff = compute_time_ms(start,stop)/N;
     std::cout << "Reduce) CPU: " << diff << " ms" << std::endl;
     cpu_reduce << d << " " << diff  << std::endl;
+
+    cudaMemGetInfo(&f, &t);
+    cout << "Free memory: " << f/(1024*1024) << std::endl << "Press Enter to Continue";
+    cin.ignore();
 
     clock_gettime( CLOCK_REALTIME, &start);
     a.update_host_data();
@@ -206,7 +231,10 @@ int main(int argc,char* argv[]){
     std::cout << "%q): " << diff << " ms" << std::endl;
     modq << d << " " << diff  << std::endl;
 
-    
+    cudaMemGetInfo(&f, &t);
+    cout << "Free memory: " << f/(1024*1024) << std::endl << "Press Enter to Continue";
+    cin.ignore();
+
     
     ///////////////////////////////////////////////
     // ADD
@@ -221,8 +249,8 @@ int main(int argc,char* argv[]){
       Polynomial c = (a+b);
       a.set_device_updated(false);
       b.set_device_updated(false);
-      cudaDeviceSynchronize();
-
+      result = cudaDeviceSynchronize();
+      assert(result == cudaSuccess);
     }
     clock_gettime( CLOCK_REALTIME, &stop);
     diff = compute_time_ms(start,stop)/N;
@@ -231,9 +259,11 @@ int main(int argc,char* argv[]){
     // Time measured without memory copy
     Polynomial::random(&a,d-1);
     Polynomial::random(&b,d-1);
-  cudaDeviceReset();
+    
+        cudaMemGetInfo(&f, &t);
 
-    exit(0);
+    cout << "Free memory: " << f/(1024*1024) << std::endl << "Press Enter to Continue";
+    cin.ignore();
 
     a.update_device_data();
     b.update_device_data();
@@ -241,8 +271,8 @@ int main(int argc,char* argv[]){
     clock_gettime( CLOCK_REALTIME, &start);
     for(int i = 0; i < N;i++){
       Polynomial c = (a+b);
-      cudaDeviceSynchronize();
-
+      result = cudaDeviceSynchronize();
+      assert(result == cudaSuccess);
     }
     clock_gettime( CLOCK_REALTIME, &stop);
     diff = compute_time_ms(start,stop)/N;
@@ -260,13 +290,18 @@ int main(int argc,char* argv[]){
       Polynomial c = (a*b);
       a.set_device_updated(false);
       b.set_device_updated(false);
-      cudaDeviceSynchronize();
-
+      result = cudaDeviceSynchronize();
+      assert(result == cudaSuccess);
     }
     clock_gettime( CLOCK_REALTIME, &stop);
     diff = compute_time_ms(start,stop)/N;
     std::cout << "MUL) Time measured with memory copy: " << diff << " ms" << std::endl;
     gpu_mult_with_memcopy << d << " " << diff  << std::endl;
+    
+        cudaMemGetInfo(&f, &t);
+
+    cout << "Free memory: " << f/(1024*1024) << std::endl << "Press Enter to Continue";
+    cin.ignore();
 
     // Time measured without memory copy
     Polynomial::random(&a,d-1);
@@ -277,14 +312,19 @@ int main(int argc,char* argv[]){
     clock_gettime( CLOCK_REALTIME, &start);
     for(int i = 0; i < N;i++){
       Polynomial c = (a*b);
-      cudaDeviceSynchronize();
-
+      result = cudaDeviceSynchronize();
+      assert(result == cudaSuccess);
     }
     clock_gettime( CLOCK_REALTIME, &stop);
     diff = compute_time_ms(start,stop)/N;
     std::cout << "MUL) Time measured without memory copy: " << diff << " ms" << std::endl;
     gpu_mult_without_memcopy << d << " " << diff  << std::endl;
 
+    cudaMemGetInfo(&f, &t);
+    cout << "Free memory: " << f/(1024*1024) << std::endl << "Press Enter to Continue";
+    cin.ignore();
+
+    
   }
 
   cudaDeviceReset();
