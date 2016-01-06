@@ -74,7 +74,7 @@ __host__ void bn_new(bn_t *a){
   a->alloc = STD_BNT_ALLOC;
   a->sign = BN_POS;
   // std::cout << "Will alloc " << (a->alloc*sizeof(cuyasheint_t)) << " bytes" << std::endl;
-  cudaError_t result = cudaMallocManaged((void**)&(a->dp),a->alloc*sizeof(cuyasheint_t));
+  cudaError_t result = cudaMalloc((void**)&(a->dp),a->alloc*sizeof(cuyasheint_t));
   if(result != cudaSuccess)
   	std::cout << "cudaMalloc error: " << cudaGetErrorString(result) << std::endl;
   assert(result == cudaSuccess);
@@ -141,12 +141,12 @@ __host__ __device__ int bn_cmp_abs(const bn_t *a, const bn_t *b) {
  */
 __host__ void bn_grow(bn_t *a,const unsigned int new_size){
   // We expect that a->alloc <= new_size
-  if((unsigned int)a->alloc <= new_size)
+  if((unsigned int)a->alloc > new_size)
   	return;
 
   std::cout << "Will alloc " << (new_size*sizeof(cuyasheint_t)) << " bytes" << std::endl;
 
-  cudaMallocManaged(&(a->dp)+a->alloc,new_size*sizeof(cuyasheint_t));
+  cudaMalloc(&(a->dp)+a->alloc,new_size*sizeof(cuyasheint_t));
   a->alloc = new_size;
 
 }
@@ -718,21 +718,25 @@ void callICRT(bn_t *coefs,cuyasheint_t *d_polyCRT,const int N, const int NPolis,
 
 	cudaError_t result;
 
-	bn_t *inner_results;
-	result = cudaMallocManaged(&inner_results, N*sizeof(bn_t));
-
-	result = cudaDeviceSynchronize();
+	bn_t *h_inner_results;
+	bn_t *d_inner_results;
+	h_inner_results = (bn_t *) malloc ( N * sizeof(bn_t));
+	result = cudaMalloc(&inner_results, N*sizeof(bn_t));
 	assert(result == cudaSuccess);
 
 	for(unsigned int i =0; i < N; i++){
-		bn_new(&inner_results[i]);
+		bn_new(&h_inner_results[i]);
 		assert(inner_results[i].alloc >= CUDAFunctions::M.alloc);
 			// bn_grow(&inner_results[i],CUDAFunctions::M.alloc-inner_results[i].alloc);
 	}
 
-	result = cudaDeviceSynchronize();
-	assert(result == cudaSuccess);
-  	
+	result = cudaMemcpyAsync(	d_inner_results,
+								h_inner_results,
+								N*sizeof(bn_t),
+								cudaMemcpyHostToDevice,
+								stream 
+							);
+
 	cuICRT<<<gridDim,blockDim,0,stream>>>(	coefs,
 											d_polyCRT,
 											N,
@@ -740,15 +744,16 @@ void callICRT(bn_t *coefs,cuyasheint_t *d_polyCRT,const int N, const int NPolis,
 											CUDAFunctions::M,
 											CUDAFunctions::Mpis,
 											CUDAFunctions::invMpis,
-											inner_results);
+											d_inner_results);
 	
 	result = cudaDeviceSynchronize();
 	assert(result == cudaSuccess);
   	
 	for(unsigned int i =0; i < N; i++)
-  		bn_free(inner_results);
+  		bn_free(h_inner_results);
   	
-	result = cudaFree(inner_results);
+	free(h_inner_results);
+	result = cudaFree(d_inner_results);
 	assert(result == cudaSuccess);
 }
 
@@ -789,20 +794,25 @@ __host__ void  CUDAFunctions::write_crt_primes(){
 
     // if(M)
     	// cudaFree(M);
-    // cudaMallocManaged((void**)&M,sizeof(bn_t));
+    // cudaMalloc((void**)&M,sizeof(bn_t));
     // get_words(M,Polynomial::CRTProduct);
 
     //////////////
     // Copy Mpi //
     //////////////
     
+
+    bn_t *h_Mpis;
+    h_Mpis = (bn_t*) malloc( Polynomial::CRTPrimes.size()*sizeof(cuyasheint_t) );
+
     if(CUDAFunctions::Mpis)
     	cudaFree(CUDAFunctions::Mpis);
-    result = cudaMallocManaged(&CUDAFunctions::Mpis,Polynomial::CRTPrimes.size()*sizeof(cuyasheint_t));
+    result = cudaMalloc(&CUDAFunctions::Mpis,Polynomial::CRTPrimes.size()*sizeof(cuyasheint_t));
   	assert(result == cudaSuccess);
     for(unsigned int i = 0; i < Polynomial::CRTPrimes.size();i++)
-    	get_words(&CUDAFunctions::Mpis[i],Polynomial::CRTMpi[i]);
+    	get_words(&h_Mpis[i],Polynomial::CRTMpi[i]);
 
+    free(h_Mpis);
     /////////////////
     // Copy InvMpi //
     /////////////////

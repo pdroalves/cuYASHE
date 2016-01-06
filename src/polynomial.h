@@ -961,21 +961,21 @@ class Polynomial{
     void icrt();
     void modn(ZZ n){
 
-      bn_t *m;
-      cudaMallocManaged(&m,sizeof(bn_t));
-      get_words(m,n);
+      // bn_t *m;
+      // cudaMallocManaged(&m,sizeof(bn_t));
+      // get_words(m,n);
 
-      bn_t *u = Polynomial::reciprocals[n];
-      assert( u != NULL);
+      // bn_t *u = Polynomial::reciprocals[n];
+      // assert( u != NULL);
 
-      callCuModN( bn_coefs[0],
-                  bn_coefs[0],
-                  get_crt_spacing(),
-                  m->dp,
-                  m->used,
-                  u->dp,
-                  u->used,
-                  get_stream());
+      // callCuModN( bn_coefs[0],
+      //             bn_coefs[0],
+      //             get_crt_spacing(),
+      //             m->dp,
+      //             m->used,
+      //             u->dp,
+      //             u->used,
+      //             get_stream());
     }
     int deg(){
       if(!get_host_updated())
@@ -1170,12 +1170,26 @@ class Polynomial{
       ZZ u_ZZ = (q*x)/q;
 
       bn_t *u;
-      cudaError_t result = cudaMallocManaged(&u,sizeof(bn_t));
+      cudaError_t result = cudaMalloc(&u,sizeof(bn_t));
       assert(result == cudaSuccess);
+      bn_t *h_u;
+      h_u = (bn_t*) malloc (sizeof(bn_t));
       get_words(u,u_ZZ);
 
-      // std::cout << "q: " << q << std::endl;
-      // std::cout << "u_ZZ: " << u_ZZ << std::endl;
+      cuyasheint_t *aux = h_u->dp;
+      h_u->dp = NULL;
+      result = cudaMalloc(&h_u->dp,sizeof(cuyasheint_t));
+      assert(result == cudaSuccess);
+      result = cudaMalloc((void**)&h_u->dp,h_u->alloc*sizeof(cuyasheint_t));
+      assert(result == cudaSuccess);
+      result = cudaMemcpy(h_u->dp,aux,h_u->alloc*sizeof(cuyasheint_t),cudaMemcpyHostToDevice);
+      assert(result == cudaSuccess);
+
+      free(aux);
+  
+
+      result = cudaMemcpy(u,h_u,sizeof(cuyasheint_t),cudaMemcpyHostToDevice);
+      assert(result == cudaSuccess);
 
       Polynomial::reciprocals[q] = u;
     }
@@ -1210,7 +1224,7 @@ class Polynomial{
     }    
   protected:
     std::vector<ZZ> coefs;
-    std::vector<bn_t*> bn_coefs;
+    bn_t* bn_coefs;
     
     cuyasheint_t *d_polyCRT = 0x0; // Must be initialized on CRTSPACING definition and updated by crt(), if needed
 

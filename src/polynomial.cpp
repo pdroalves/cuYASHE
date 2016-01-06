@@ -146,17 +146,28 @@ void Polynomial::copy_device_crt_residues(Polynomial &b){
  * @param a input: operand
  */
 __host__ void get_words(bn_t *b,ZZ a){
-  cudaError_t result = cudaDeviceSynchronize();
-  assert(result == cudaSuccess);
+  bn_t *h_b;
 
-  bn_new(b);
-  for(ZZ x = a; x > 0; x=(x>>WORD),b->used++){
-    if(b->used >= b->alloc)
-      bn_grow(b,b->alloc+STD_BNT_ALLOC);
-    b->dp[b->used] = conv<uint32_t>(x&UINT32_MAX);
+  // Alloc
+  h_b = (bn_t*)malloc(sizeof(bn_t));
+  bn_new(h_b);
+
+  // Compute 
+  cuyasheint_t *h_dp;
+  int used = 0;
+  int alloc = STD_BNT_ALLOC;
+  h_dp = (cuyasheint_t *) malloc (alloc*sizeof(cuyasheint_t));
+
+  for(ZZ x = a; x > 0; x=(x>>WORD),used++){
+    if(used >= alloc){
+      h_dp = (cuyasheint_t*)realloc(h_dp,alloc+STD_BNT_ALLOC);
+      alloc += STD_BNT_ALLOC;
+    }
+    h_dp[used] = conv<uint32_t>(x&UINT32_MAX);
   }
-}
 
+  b = h_b;
+}
 /**
  * Convert an array of words into a NTL ZZ
  * @param  a input:array of words
@@ -184,46 +195,40 @@ void Polynomial::crt(){
 void Polynomial::icrt(){  
   cudaError_t result;
 
-  // Adjusts bn_coefs size
-  int diff = (int)bn_coefs.size() - this->get_crt_spacing();
-  if(diff < 0){
-    diff = -diff;
-
-    // Adds more coefficients
-    bn_t *coefs;
-    
-    // Doing this we need only one call to cudaMallocManaged
-    result = cudaMallocManaged(&coefs, diff*sizeof(bn_t));
+  ///////////
+  // Alloc //
+  ///////////
+  if(bn_coefs != NULL){
+    result = cudaFree(bn_coefs);  
     assert(result == cudaSuccess);
-
-    result = cudaDeviceSynchronize();
-    assert(result == cudaSuccess);
-    for(int i =0; i < diff; i++){
-      bn_new(&coefs[i]);
-      bn_coefs.push_back(&coefs[i]);
-    }
-  }else if(diff > 0){
-
-      // Releases unused coefficients
-      for(int i = 0; i < diff;i++){
-        bn_t *coef = bn_coefs.back();
-        bn_coefs.pop_back();
-
-        bn_free(coef);
-        result = cudaFree(coef);
-        assert(result == cudaSuccess);
-      }
   }
 
-  //////////////////////////////////////////////////
-  // At this point, bn_coefs.size() == CRTSPACING //
-  //////////////////////////////////////////////////
-  callICRT( this->bn_coefs[0],
-        this->get_device_crt_residues(),
-        this->get_crt_spacing(),
+  bn_t *h_bn_coefs;
+  h_bn_coefs = (bn_t*)malloc(get_crt_spacing()*sizeof(bn_t));
+  for(int i = 0; i < get_crt_spacing(); i++)
+    bn_new(h_bn_coefs[i]);
+
+  result = cudaMalloc((void**)&bn_coefs,get_crt_spacing()*sizeof(bn_t));
+  assert(result == cudaSuccess);
+  result = cudaMemcpyAsync( bn_coefs,
+                            h_bn_coefs,
+                            get_crt_spacing()*sizeof(bn_t),
+                            cudaMemcpyHostToDevice 
+                            );
+  assert(result == cudaSuccess);
+
+  //////////
+  // ICRT //
+  //////////
+  callICRT( bn_coefs,
+        get_device_crt_residues(),
+        get_crt_spacing(),
         Polynomial::CRTPrimes.size(),
-        this->get_stream()
+        get_stream()
       );
+
+  // Release
+  free(h_bn_coefs);
 
   this->set_icrt_computed(true);
 }
@@ -256,38 +261,17 @@ void Polynomial::update_device_data(){
   result = cudaDeviceSynchronize();
   assert(result == cudaSuccess);
 
-  // Adjusts bn_coefs size
-  int diff = (int)bn_coefs.size() - this->get_crt_spacing();
-  if(diff < 0){
-    diff = -diff;
-    // std::cout << "Smaller" << std::endl;
-    // Adds more coefficients
-    bn_t *coefs;
-    
-    // Doing this we need only one call to cudaMallocManaged
-    result = cudaMallocManaged(&coefs, diff*sizeof(bn_t));
+  ///////////////////////////
+  // Adjusts bn_coefs size //
+  ///////////////////////////
+  if(bn_coefs != NULL){
+    result = cudaFree(bn_coefs);  
     assert(result == cudaSuccess);
-
-    result = cudaDeviceSynchronize();
-    assert(result == cudaSuccess);
-    for(int i =0; i < diff; i++){
-      bn_new(&coefs[i]);
-      bn_coefs.push_back(&coefs[i]);
-    }
-  }else if(diff > 0){
-      // std::cout << "Bigger" << std::endl;
-
-      // Releases unused coefficients
-      for(int i = 0; i < diff;i++){
-        bn_t *coef = bn_coefs.back();
-        bn_coefs.pop_back();
-
-        bn_free(coef);
-        result = cudaFree(coef);
-        assert(result == cudaSuccess);
-      }
   }
   
+  bn_t *h_bn_coefs;
+  h_bn_coefs = (bn_t*)malloc((deg()+1)*sizeof(bn_t));
+
   /////////////////////////////////////////////////
   // At this point bn_coefs.size() == CRTSPACING //
   /////////////////////////////////////////////////
@@ -299,19 +283,42 @@ void Polynomial::update_device_data(){
   for(int i = 0; i < bn_coefs.size(); i++){
     if(bn_coefs[i] == NULL)
       std::cout << "Achei!" << std::endl;
-    get_words(bn_coefs[i],get_coeff(i));
+    get_words(h_bn_coefs[i],get_coeff(i));
   }
 
-  result = cudaMemsetAsync(this->get_device_crt_residues(),
-                  0,
-                  this->get_crt_spacing()*Polynomial::CRTPrimes.size()*sizeof(cuyasheint_t),
-                  this->get_stream());
+  ////////////////////
+  // Copy to device //
+  ////////////////////
+
+  for(int i = 0; i < deg()+1;i++){
+    bn_t *aux = h_bn_coefs[i].dp;
+    h_bn_coefs[i].dp = NULL;
+    result = cudaMalloc((void**)&h_bn_coefs[i].dp,h_bn_coefs[i].alloc*sizeof(cuyasheint_t));
+    assert(result == cudaSuccess);
+    result = cudaMemcpyAsync(h_bn_coefs[i].dp,aux,h_bn_coefs[i].alloc*sizeof(cuyasheint_t),get_stream());
+    assert(result == cudaSuccess);
+
+    free(aux);
+  }
+  result = cudaDeviceSynchronize();
+  assert(result == cudaSuccess);
+
+  result = cudaMemcpyAsync(bn_coefs,h_bn_coefs,(deg()+1)*sizeof(cuyasheint_t),get_stream());
   assert(result == cudaSuccess);
 
   /**
   *  CRT
   */
   this->crt();
+
+  result = cudaMalloc((void**)&bn_coefs,(deg()+1)*sizeof(bn_t));
+  assert(result == cudaSuccess);
+  result = cudaMemcpyAsync( bn_coefs,
+                            h_bn_coefs,
+                            (deg()+1)*sizeof(bn_t),
+                            cudaMemcpyHostToDevice 
+                            );
+  assert(result == cudaSuccess);
 
   /**
    * Releases bn_t
@@ -336,37 +343,74 @@ void Polynomial::update_host_data(){
     if(!get_icrt_computed())
       this->icrt();
 
+    //////////
+    // Copy //
+    //////////
+    ///
+
     #ifdef VERBOSE
     std::cout << "Copying data to CPU." << std::endl;
     #endif
 
+    bn_t *h_aux_bn_coefs;
+    h_aux_bn_coefs = (bn_t*)malloc(get_crt_spacing()*sizeof(bn_t));
+
+    cudaError_t result = cudaMemcpy(h_aux_bn_coefs,
+                                    bn_coefs,
+                                    get_crt_spacing()*sizeof(bn_t),
+                                    cudaMemcpyDeviceToHost
+                                    );
+    assert(result == cudaSuccess);
+
+    bn_t *h_bn_coefs;
+    h_bn_coefs = (bn_t*)malloc(get_crt_spacing()*sizeof(bn_t));
+    for(int i = 0; i < get_crt_spacing();i++){
+      h_bn_coefs[i].used = h_aux_bn_coefs[i].used;
+      h_bn_coefs[i].alloc = h_aux_bn_coefs[i].alloc;
+      
+      h_bn_coefs[i].dp = (cuyasheint_t*)malloc(h_bn_coefs[i].alloc*sizeof(cuyasheint_t));
+      result = cudaMemcpyAsync( h_bn_coefs[i].dp,
+                                h_aux_bn_coefs[i].dp,
+                                h_bn_coefs[i].alloc*sizeof(cuyasheint_t),
+                                cudaMemcpyDeviceToHost,
+                                get_stream());
+      assert(result == cudaSuccess);
+    }
+
+    result = cudaDeviceSynchronize();
+    assert(result == cudaSuccess); 
+
     assert(Polynomial::CRTPrimes.size() > 0);
 
-    // Prepare this polynomial to receive this->deg()+1 coefficients
+    ///////////////////////////////////////////////////////////////////
+    // Prepare this polynomial to receive this->deg()+1 coefficients //
+    ///////////////////////////////////////////////////////////////////
     if((int)coefs.size() <= this->deg())
       set_coeffs(this->deg()+1);
 
-    cudaError_t result = cudaDeviceSynchronize();
-    assert(result == cudaSuccess);
+    ////////////////////////
+    // Convert bn_t to ZZ //
+    ////////////////////////
 
-    /**
-     * Convert bn_t to ZZ
-     */
     this->set_coeffs(this->deg()+1);
     for(int i = 0; i <= this->deg(); i++){
       // ZZ coef = get_ZZ(bn_coefs[i]);
-      ZZ coef = get_ZZ(bn_coefs[i])% Polynomial::CRTProduct;
+      ZZ coef = get_ZZ(h_bn_coefs[i])% Polynomial::CRTProduct;
       this->set_coeff(i,coef);
     }
 
-    /**
-    * Releases bn_t
-    */
-
-    for(int i = 0; i < bn_coefs.size(); i++){
-      bn_free(bn_coefs[i]);
+    ////////////////////
+    // Release memory //
+    ////////////////////
+    for(int i = 0; i < get_crt_spacing();i++){
+      free(h_bn_coefs[i].dp);
+      result = cudaFree(h_aux_bn_coefs[i].dp);    
+      assert(result == cudaSuccess);
     }
-    bn_coefs.clear();
+    free(h_aux_bn_coefs); 
+    free(h_bn_coefs); 
+    result = cudaFree(bn_coefs);
+    assert(result == cudaSuccess);
     
     this->set_host_updated(true);
 }
