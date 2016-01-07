@@ -10,7 +10,14 @@
 
 
 #ifdef NTTMUL
- ZZ PZZ = conv<ZZ>("18446744069414584321");
+// #define PRIMEP (int)2147483647
+// #define PRIMITIVE_ROOT (int)7;//2^31-1 fails the test(P-1)%N
+// #define PRIMEP (uint32_t)4294955009
+// #define PRIMITIVE_ROOT (int)3
+#define PRIMEP (uint32_t)4293918721
+#define PRIMITIVE_ROOT (int)19
+
+ ZZ PZZ = to_ZZ(PRIMEP); 
 
 cuyasheint_t CUDAFunctions::wN = 0;
 cuyasheint_t *CUDAFunctions::d_W = NULL;
@@ -47,9 +54,9 @@ __host__ cuyasheint_t* CUDAFunctions::callRealignCRTResidues(cudaStream_t stream
                                                               const int residuesQty){
   if(oldSpacing == newSpacing)
     return NULL;
-  #ifdef VERBOSE
+  // #ifdef VERBOSE
   std::cout << "Realigning..." << std::endl;
-  #endif
+  // #endif
   
   int size;
   if(newSpacing < oldSpacing)
@@ -106,83 +113,14 @@ __host__ cuyasheint_t* CUDAFunctions::callPolynomialAddSub(cudaStream_t stream,c
   cudaError_t result = cudaMalloc((void**)&d_new_array,size*sizeof(cuyasheint_t));
   assert(result == cudaSuccess);
 
-  polynomialAddSub <<< gridDim,blockDim,1,stream  >>> (OP,a,b,d_new_array,size,N);
+  polynomialAddSub <<< gridDim,blockDim,0,stream  >>> (OP,a,b,d_new_array,size,N);
+  assert(cudaGetLastError() == cudaSuccess);
   #ifdef VERBOSE
-  std::cout << gridDim.x << " " << blockDim.x << std::endl;
   std::cout << "polynomialAdd kernel:" << cudaGetErrorString(cudaGetLastError()) << std::endl;
   #endif
 
   return d_new_array;
 }
-
-// __host__ cuyasheint_t* CUDAFunctions::callPolynomialAddSub( const cudaStream_t stream,
-//                                                             const cuyasheint_t *a,
-//                                                             const int A_N,
-//                                                             const bool realign_A,
-//                                                             const cuyasheint_t *b,
-//                                                             const int B_N,
-//                                                             const bool realign_B,
-//                                                             const int N,
-//                                                             const int NPolis,
-//                                                             const int OP){
-
-//   /////////////////////
-//   // Realign if need //
-//   /////////////////////
-//   if(realign_A){
-//     int size;
-//     const int newSpacing = N;
-//     const int oldSpacing = A_N;
-
-//     if(newSpacing < oldSpacing)
-//       size = newSpacing*NPolis;
-//     else
-//       size = oldSpacing*NPolis;
-
-//     const int ADDGRIDXDIM = (size%ADDBLOCKXDIM == 0? size/ADDBLOCKXDIM : size/ADDBLOCKXDIM + 1);
-//     dim3 gridDim(ADDGRIDXDIM);
-//     dim3 blockDim(ADDBLOCKXDIM);
-//     callRealignCRTResidues<<< gridDim,blockDim,1,stream >>>(stream,A_N,N,d_a,N,NPolis);
-//     assert(cudaGetLastError() == cudaSuccess);
-//   }
-
-//   if(realign_B){
-//     int size;
-//     const int newSpacing = N;
-//     const int oldSpacing = B_N;
-
-//     if(newSpacing < oldSpacing)
-//       size = newSpacing*NPolis;
-//     else
-//       size = oldSpacing*NPolis;
-
-//     const int ADDGRIDXDIM = (size%ADDBLOCKXDIM == 0? size/ADDBLOCKXDIM : size/ADDBLOCKXDIM + 1);
-//     dim3 gridDim(ADDGRIDXDIM);
-//     dim3 blockDim(ADDBLOCKXDIM);
-//     callRealignCRTResidues<<< gridDim,blockDim,1,stream >>>(stream,B_N,N,d_b,N,NPolis);
-//     assert(cudaGetLastError() == cudaSuccess);
-//   }
-
-//   ////////////////////
-//   // Call operation //
-//   ////////////////////
-//   const int size = N*NPolis 
-//   const int ADDGRIDXDIM = (size%ADDBLOCKXDIM == 0? size/ADDBLOCKXDIM : size/ADDBLOCKXDIM + 1);
-//   dim3 gridDim(ADDGRIDXDIM);
-//   dim3 blockDim(ADDBLOCKXDIM);
-
-//   cuyasheint_t *d_new_array;
-//   cudaError_t result = cudaMalloc((void**)&d_new_array,size*sizeof(cuyasheint_t));
-//   assert(result == cudaSuccess);
-
-//   polynomialAddSub <<< gridDim,blockDim,1,stream  >>> (OP,a,b,d_new_array,size,N);
-//   #ifdef VERBOSE
-//   std::cout << gridDim.x << " " << blockDim.x << std::endl;
-//   std::cout << "polynomialAdd kernel:" << cudaGetErrorString(cudaGetLastError()) << std::endl;
-//   #endif
-
-//   return d_new_array;
-// }
 
 __global__ void polynomialAddSubInPlace(const int OP, cuyasheint_t *a,const cuyasheint_t *b,const int size,const int N){
   // We have one thread per polynomial coefficient on 32 threads-block.
@@ -193,13 +131,16 @@ __global__ void polynomialAddSubInPlace(const int OP, cuyasheint_t *a,const cuya
   cuyasheint_t b_value;
 
   if(tid < size ){
+      // printf("A[0]: %d\nB[0]: %d\n\n",a[tid],b[tid]);
       // Coalesced access to global memory. Doing this way we reduce required bandwich.
       a_value = a[tid];
       b_value = b[tid];
 
-      if(OP == ADD)
+      if(OP == ADD){
         a_value += b_value;
-      else
+        if(a_value < a[tid])
+          printf("Overflow!\n");
+      }else
         a_value -= b_value;
 
       a[tid] = a_value;
@@ -213,9 +154,9 @@ __host__ void CUDAFunctions::callPolynomialAddSubInPlace(cudaStream_t stream,cuy
   dim3 gridDim(ADDGRIDXDIM);
   dim3 blockDim(ADDBLOCKXDIM);
 
-  polynomialAddSubInPlace <<< gridDim,blockDim,1,stream >>> (OP,a,b,size,N);
+  polynomialAddSubInPlace <<< gridDim,blockDim,0,stream >>> (OP,a,b,size,N);
+  assert(cudaGetLastError() == cudaSuccess);
   #ifdef VERBOSE
-  std::cout << gridDim.x << " " << blockDim.x << std::endl;
   std::cout << "polynomialAdd kernel:" << cudaGetErrorString(cudaGetLastError()) << std::endl;
   #endif
 }
@@ -334,140 +275,61 @@ __device__ __host__ bool overflow(const uint64_t a, const uint64_t b){
   return (a+b) < a;
 }
 
-__device__ __host__ uint64_t s_rem (uint64_t a){
-  const uint64_t P = 0xffffffff00000001;
-  // Special reduction for prime 2^64-2^32+1
+__device__ __host__ uint32_t s_rem (uint64_t a){
+
+  // Special reduction for prime 2147483647
   //
-  // x3 * 2^96 + x2 * 2^64 + x1 * 2^32 + x0 \equiv
-  // (x1+x2) * 2^32 + x0 - x3 - x2 mod p
-  //
-  // Here: x3 = 0, x2 = 0, x1 = (a >> 32), x0 = a-(x1 << 32)
-  // const uint64_t p = 0xffffffff00000001;
-  // uint64_t x3 = 0;
-  // uint64_t x2 = 0;
+  // c = c_1 * 2^31 + c_0 
+  // 
+  // So, c \mod P = (c >> 31) + (c & 0x7FFFFFFF);
 
-  uint64_t x1 = (a >> 32);
-  uint64_t x0 = (a & UINT32_MAX);
+  // uint32_t res = (a>>31) + (a & P);
+  // // Doing this way we avoid branching
+  // res -= P*(res>=P);
 
-  // uint64_t res = ((x1+x2)<<32 + x0-x3-x2);
-  uint64_t res = ((x1<<32) + x0);
+  // return res;
 
-  if(res >= P){
-    res -= P;
-    x1 = (res >> 32);
-    x0 = (res & UINT32_MAX);
-    res = ((x1<<32) + x0);
-  }
-
-  return res;
+  return a % PRIMEP;
 }
 
-__device__ __host__  uint64_t s_mul(uint64_t a,uint64_t b){
-  // Multiply and reduce a and b by prime 2^64-2^32+1
-  const uint64_t P = 0xffffffff00000001;
+__device__ __host__  uint32_t s_mul(volatile uint32_t a,volatile uint32_t b){
+  // Multiply and reduce a and b by prime PRIMEP
 
   // Multiply
-  #ifdef __CUDA_ARCH__
-  const uint64_t GAP = (UINT64_MAX-P+1);
-
-  const uint64_t cHi = __umul64hi(a,b);
-  const uint64_t cLo = a*b;
-
-  // Reduce
-  const uint64_t x3 = (cHi >> 32);
-  const uint64_t x2 = (cHi & UINT32_MAX);
-  const uint64_t x1 = (cLo >> 32);
-  const uint64_t x0 = (cLo & UINT32_MAX);
-
-  const uint64_t X1 = (x1<<32);
-  const uint64_t X2 = (x2<<32);
-
-  ///////////////////////////////
-  //
-  // Here we can see three kinds of overflows:
-  //
-  // * Negative overflow: Result is negative. 
-  // Since uint64_t uses mod UINT64_MAX, we need to translate to the correct value mod P.
-  // * Simple overflow: Result is bigger than P but not enough to exceed UINT64_MAX.
-  //  We solve this in the same way we solve negative overflow, just translate to the correct value mod P.
-  // * Double overflow
-
-  uint64_t res = X1+X2+x0-x2-x3;
-  const bool testA = (x2+x3 > X1+X2+x0) && !( overflow(X1,X2) ||  overflow(X1+X2,x0) ); // Negative overflow
-  const bool testB = ( res >= P ); // Simple overflow
-  const bool testC = (overflow(X1,X2) || overflow(X1+X2,x0)) && (X1+X2+x0 > x2+x3); // Double overflow
-
-  // This avoids conditional branchs
-  // res = (P-res)*(testA) + (res-P)*(!testA && testB) + (P - (UINT64_MAX-res))*(!testA && !testB && testC) + (res)*(!testA && !testB && !testC);
-  res =   (P-res)*(testA) 
-        + (res-P)*(!testA && testB) 
-        + (res+GAP)*(!testA && !testB && testC) 
-        + (res)*(!testA && !testB && !testC);
-
-
-  // if(((x2+x3) > X1+X2+x0) && !((X1+X2 < X1) ||  ((X1+X2)+x0 < x0))) {
-  //   // printf("Negative Overflow!\n");
-  //   res = P - res;
-  //  }else if ((res >= P) ){
-  //   // printf(" Overflow!\n");
-  //   res -= P;
-  //  }else if(((X1+X2 < X1) ||  ((X1+X2)+x0 < x0))){
-  //   // printf(" Double Overflow\n");
-  //   res += 4294967295L;
-  // }
-
-   #else
-  uint64_t res = (((__uint128_t)a) * ((__uint128_t)b) )%P;
-  // __uint128_t c = ((__uint128_t)a) * ((__uint128_t)b);
-  // uint64_t cHi = (c>>64);
-  // uint64_t cLo = (c & UINT64_MAX);
-  #endif
-  return res;
+  uint32_t res = s_rem(
+      (uint64_t)a * (uint64_t)b
+    );
+  uint32_t tmp = res;
+  return tmp;
 }
 
-__device__ __host__  uint64_t s_add( uint64_t a, uint64_t b){
-  // const uint64_t P = 0xffffffff00000001;
+__device__ __host__  uint32_t s_add( uint32_t a, uint32_t b){
 
-  // Add and reduce a and b by prime 2^64-2^32+1
-  // 4294967295L == UINT64_MAX - P
-  uint64_t res = a+b;
-  // res += (res < a)*4294967295L;
-  if(res < a)
-    res += 4294967295L;
-  res = s_rem(res);  
-  
-  #ifdef __CUDA_ARCH__
-  __syncthreads();
-  #endif
-  return res;
+  // Add and reduce a and b by prime PRIMEP
+  const uint32_t diff = UINT32_MAX-PRIMEP+1;
+
+  uint32_t res = s_rem(
+        (a+b) + diff*((a+b) < a)
+      );
+  return res;  // Modular reduction by P  
 }
 
 
-__device__ __host__ uint64_t s_sub( uint64_t a, uint64_t b){
-  const uint64_t P = 0xffffffff00000001;
+__device__ __host__ uint32_t s_sub( uint32_t a, uint32_t b){
   // Computes a-b % P
-  // 4294967295L == UINT64_MAX - P
+  // Because CRT primes are smaller than 30 bits, a and b < P
 
-  uint64_t res;
-  if(b > a){
-    res = P;
-    res -= b;
-    res += a;
-  }
-  else
-    res = a-b;
-  // res = (a-b) + (b > a)*P; 
+  // Doing this way we avoid branching
+  uint32_t res = ((PRIMEP-b)+a)*(b > a) +
+                 (a-b)*(b <= a);
 
-  #ifdef __CUDA_ARCH__
-  __syncthreads();
-  #endif
   return res;
 }
 
-__host__ __device__ void butterfly(uint64_t *v){
+__host__ __device__ void butterfly(uint32_t *v){
   // Butterfly
-  const uint64_t v0 = s_rem(v[0]);
-  const uint64_t v1 = s_rem(v[1]);
+  const uint32_t v0 = s_rem(v[0]);
+  const uint32_t v1 = s_rem(v[1]);
   v[0] = s_add(v0,v1);
   v[1] = s_sub(v0,v1);
 }
@@ -493,7 +355,7 @@ __device__ __host__ void NTTIteration(cuyasheint_t *W,
                                       const cuyasheint_t* data0,
                                       cuyasheint_t *data1,
                                       const int type){
-	uint64_t v[2] = {0,0};
+	uint32_t v[2] = {0,0};
 	const int idxS = j+residue_index;
   int w_index = ((j%Ns)*N)/(Ns*R);
 
@@ -508,6 +370,8 @@ __device__ __host__ void NTTIteration(cuyasheint_t *W,
 	const int idxD = expand(j,Ns,R)+residue_index;
 	for(int r=0; r<R;r++){
   		data1[idxD+r*Ns] = v[r];
+      if(data1[idxD+r*Ns] < v[r])
+        printf("Overflow! NTT");
     #ifdef __CUDA_ARCH__
     __syncthreads();
     #endif
@@ -546,12 +410,11 @@ __global__ void polynomialNTTMul(cuyasheint_t *a,const cuyasheint_t *b,const int
 
   if(tid < size ){
       // Coalesced access to global memory. Doing this way we reduce required bandwich.
-      uint64_t a_value = a[tid];
-      uint64_t b_value = b[tid];
+      uint32_t a_value = a[tid];
+      uint32_t b_value = b[tid];
 
       // In-place
       a[tid] = s_mul(a_value,b_value);
-      // a[tid] = a_value*b_value % 18446744069414584321;
   }
 }
 #endif
@@ -888,16 +751,17 @@ __host__ void CUDAFunctions::init(int N){
   CUDAFunctions::N = N;
 
   #ifdef NTTMUL
-  // #ifdef VERBOSE
+  #ifdef VERBOSE
   std::cout << "Will compute W -- N = " << N << std::endl;
-  // #endif
+  #endif
 
   cuyasheint_t *h_W;
   cuyasheint_t *h_WInv;
 
-  cuyasheint_t k = conv<cuyasheint_t>(PZZ-1)/N;
-  ZZ wNZZ = NTL::PowerMod(ZZ(7),k,PZZ);
   assert((PZZ-1)%(N) == 0);
+
+  cuyasheint_t k = conv<cuyasheint_t>(PZZ-1)/N;
+  ZZ wNZZ = NTL::PowerMod(ZZ(PRIMITIVE_ROOT),k,PZZ);
 
   wN = conv<cuyasheint_t>(wNZZ);
 
@@ -911,7 +775,8 @@ __host__ void CUDAFunctions::init(int N){
 
   // Computes 1-th column from W
   for(int j = 0; j < N; j++)
-      h_W[j] = conv<cuyasheint_t>(NTL::PowerMod(wNZZ,j,PZZ));
+    h_W[j] = conv<cuyasheint_t>(NTL::PowerMod(wNZZ,j,PZZ));
+  
 
   // Computes 1-th column from WInv
   for(int j = 0; j < N; j++)

@@ -183,13 +183,15 @@ BOOST_AUTO_TEST_CASE(multipleAdds)
   Polynomial::random(&a,degree-1);
 
   Polynomial b;
-  for(int count = 0; count < NTESTS;count ++)
+  for(int count = 0; count < NTESTS;count++){
     b += a;
+    // std::cout << "b: " << b.to_string() << std::endl;
+  }
 
-  #ifdef VERBOSE
+  // #ifdef VERBOSE
   std::cout << "a: " << a.to_string() << std::endl;
   std::cout << "b: " << b.to_string() << std::endl;
-  #endif
+  // #endif
   BOOST_REQUIRE(b == (a*NTESTS)%(b.get_mod()));
 }
 
@@ -231,17 +233,27 @@ BOOST_AUTO_TEST_CASE(zeroAdd)
   Polynomial::random(&a,degree-1);
 
 
-  // #ifdef VERBOSE
+  #ifdef VERBOSE
   std::cout << "M: "<<Polynomial::CRTProduct << std::endl;
   std::cout << "a: " << a.to_string() <<std::endl;
   std::cout << "b: " << b.to_string() <<std::endl;
-  // #endif
+  std::cout << "r: " << r.to_string() << std::endl;
+  #endif
   Polynomial r = a + b;
   
-  std::cout << "r: " << r.to_string() << std::endl;
   BOOST_REQUIRE(r == a);
 
 }
+
+BOOST_AUTO_TEST_CASE(zeroJustCRT)
+{
+  Polynomial a;
+  a.update_device_data();
+  a.set_host_updated(false);
+  a.normalize();
+  assert(a.deg() < 0);
+}
+
 
 #ifdef NTTMUL
 BOOST_AUTO_TEST_CASE(wNTest)
@@ -259,9 +271,9 @@ BOOST_AUTO_TEST_CASE(wNTest)
   BOOST_REQUIRE(result == cudaSuccess);
 
   cuyasheint_t wN = CUDAFunctions::wN;
-  ZZ PZZ = conv<ZZ>("18446744069414584321");
+  ZZ PZZ = conv<ZZ>("4293918721");
   cuyasheint_t k = conv<cuyasheint_t>(PZZ-1)/N;
-  ZZ wNZZ = NTL::PowerMod(ZZ(7),k,PZZ);
+  ZZ wNZZ = NTL::PowerMod(ZZ(19),k,PZZ);
   std::cout << wNZZ << std::endl;
 
   BOOST_REQUIRE(wNZZ == NTL::to_ZZ(wN));
@@ -276,25 +288,25 @@ BOOST_AUTO_TEST_CASE(wNTest)
 //   for(int i = 0; i < 100*NTESTS;i++){
 //     uint64_t a = rand()*pow(2,31);
 //     cuyasheint_t result = s_rem(a);
-//     // std::cout << "a: " << a << std::endl << "result: " << result << " == " << (a%2147483647)<<std::endl;
-//     BOOST_REQUIRE(result == (a%2147483647));
+//     // std::cout << "a: " << a << std::endl << "result: " << result << " == " << (a%4293918721)<<std::endl;
+//     BOOST_REQUIRE(result == (a%4293918721));
 //   }
 
 // }
 #ifdef NTTMUL
 BOOST_AUTO_TEST_CASE(smulTest)
 {
-  const uint64_t P = 18446744069414584321L;
+  const uint32_t P = 4293918721;
   for(int i = 0; i < 100*NTESTS;i++){
-    uint64_t a = (((long long)rand() << 32) | rand());
-    uint64_t b = (((long long)rand() << 32) | rand());
-    uint64_t result = s_mul(a,b);
+    uint32_t a = rand();
+    uint32_t b = rand();
+    uint32_t result = s_mul(a,b);
     BOOST_REQUIRE(result == ((__uint128_t)(a)*(__uint128_t)(b) % P));
   }
   for(int i = 0; i < 100*NTESTS;i++){
-    uint64_t a = rand();
-    uint64_t b = rand();
-    uint64_t result = s_mul(a,b);
+    uint32_t a = rand();
+    uint32_t b = rand();
+    uint32_t result = s_mul(a,b);
     BOOST_REQUIRE(result == ((__uint128_t)(a)*(__uint128_t)(b) % P));
   }
 
@@ -400,7 +412,7 @@ BOOST_AUTO_TEST_CASE(simpleMultiplyByPolynomial)
     NTL::SetCoeff(b_ntl,i,conv<ZZ_p>(b.get_coeff(i)));
 
   Polynomial c = a*b;
-  // c.normalize();
+  c.normalize();
 
   ZZ_pEX c_ntl = a_ntl*b_ntl;
   // c_ntl %= conv<ZZ_pEX>(NTL_Phi);
@@ -726,12 +738,13 @@ BOOST_AUTO_TEST_CASE(modularInversion)
   
   Polynomial result = a*aInv;
   
-  // std::cout << "a: " << a.to_string() << std::endl;
-  // std::cout << "aInv: " << aInv.to_string() << std::endl;
-  // std::cout << "result before reduce: " << result.to_string() << std::endl;
+  std::cout << "a: " << a.to_string() << std::endl;
+  std::cout << "aInv: " << aInv.to_string() << std::endl;
+  std::cout << "result before reduce: " << result.to_string() << std::endl;
+  result %= a.get_mod();
   result.reduce();
   result %= a.get_mod();
-  // std::cout << "result after reduce: " << result.to_string() << std::endl;
+  std::cout << "result after reduce: " << result.to_string() << std::endl;
 
   Polynomial one = Polynomial();
   one.set_coeff(0,1);
