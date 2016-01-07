@@ -271,7 +271,7 @@ void Polynomial::update_device_data(){
     result = cudaDeviceSynchronize();
     assert(result == cudaSuccess);
     for(int i =0; i < diff; i++){
-      bn_new(&coefs[i]);
+      // bn_new(&coefs[i]);
       bn_coefs.push_back(&coefs[i]);
     }
   }else if(diff > 0){
@@ -320,6 +320,7 @@ void Polynomial::update_device_data(){
   for(int i = 0; i < bn_coefs.size(); i++){
     bn_free(bn_coefs[i]);
   }
+  cudaFree(bn_coefs[0]);
   bn_coefs.clear();
 
   result = cudaDeviceSynchronize();
@@ -327,6 +328,7 @@ void Polynomial::update_device_data(){
 
   this->ON_COPY = false;
   this->set_device_updated(true);
+
 }
 
 void Polynomial::update_host_data(){
@@ -366,9 +368,11 @@ void Polynomial::update_host_data(){
     for(int i = 0; i < bn_coefs.size(); i++){
       bn_free(bn_coefs[i]);
     }
+    cudaFree(bn_coefs[0]);
     bn_coefs.clear();
     
     this->set_host_updated(true);
+
 }
 
 void Polynomial::DivRem(Polynomial a,Polynomial b,Polynomial &quot,Polynomial &rem){

@@ -92,14 +92,15 @@ __host__ void bn_free(bn_t *a){
   cudaError_t result = cudaDeviceSynchronize();
   assert(result == cudaSuccess);
 
-  if(a->dp != NULL && a->alloc > 0){
-	result = cudaFree((a->dp));
-	if(result != cudaSuccess){
-		std::cout << cudaGetErrorString(result) << std::endl;
-		cudaGetLastError();//Reset
-	}
-  	// assert(result == cudaSuccess);
-  }
+  if(a->alloc > 0)
+	  if(a->dp != NULL){
+		result = cudaFree((a->dp));
+		if(result != cudaSuccess){
+			std::cout << cudaGetErrorString(result) << std::endl;
+			cudaGetLastError();//Reset
+		}
+	  	// assert(result == cudaSuccess);
+	  }
 
   a->used = 0;
   a->alloc = 0;  
@@ -144,7 +145,7 @@ __host__ void bn_grow(bn_t *a,const unsigned int new_size){
   if((unsigned int)a->alloc <= new_size)
   	return;
 
-  std::cout << "Will alloc " << (new_size*sizeof(cuyasheint_t)) << " bytes" << std::endl;
+  std::cout << "Will grow " << (new_size*sizeof(cuyasheint_t)) << " bytes" << std::endl;
 
   cudaMallocManaged(&(a->dp)+a->alloc,new_size*sizeof(cuyasheint_t));
   a->alloc = new_size;
@@ -622,7 +623,8 @@ __global__ void cuICRT(	bn_t *poly,
 	 			// Computes the inner result
 	 			bn_t inner_result = inner_results[cid];
 	 			bn_zero(&inner_result);
-	 	
+	 		
+
 	 			/**
 	 			 * Inner
 	 			 */
@@ -795,13 +797,13 @@ __host__ void  CUDAFunctions::write_crt_primes(){
     //////////////
     // Copy Mpi //
     //////////////
-    
+    	
     if(CUDAFunctions::Mpis)
     	cudaFree(CUDAFunctions::Mpis);
-    result = cudaMallocManaged(&CUDAFunctions::Mpis,Polynomial::CRTPrimes.size()*sizeof(cuyasheint_t));
+    result = cudaMallocManaged(&CUDAFunctions::Mpis,Polynomial::CRTPrimes.size()*sizeof(bn_t));
   	assert(result == cudaSuccess);
     for(unsigned int i = 0; i < Polynomial::CRTPrimes.size();i++)
-    	get_words(&CUDAFunctions::Mpis[i],Polynomial::CRTMpi[i]);
+    	get_words(&(CUDAFunctions::Mpis[i]),Polynomial::CRTMpi[i]);
 
     /////////////////
     // Copy InvMpi //

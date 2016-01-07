@@ -1144,6 +1144,15 @@ class Polynomial{
       cudaStreamCreate(&this->stream);
     }
     static void operator delete(void *ptr);
+    void release(){
+      cudaError_t result = cudaDeviceSynchronize();
+      assert(result == cudaSuccess);
+      for(unsigned int i = 0; i < bn_coefs.size(); i++){
+        bn_free(bn_coefs[i]);
+        result = cudaFree(bn_coefs[i]);
+        assert(result == cudaSuccess);
+      }
+    }
   private:
     // Attributes
     bool ON_COPY;
