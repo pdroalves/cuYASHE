@@ -150,9 +150,6 @@ BOOST_AUTO_TEST_CASE(justCRT)
     #ifdef VERBOSE
     std::cout << std::endl << a.to_string() << " == " << std::endl<< b.to_string() << std::endl;
     #endif
-    if(a != b){
-          std::cout << a.to_string() << std::endl;
-          std::cout << b.to_string() << std::endl;}
     BOOST_REQUIRE(a == b);
   }
 }

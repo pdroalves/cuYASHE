@@ -982,9 +982,9 @@ class Polynomial{
       if(!get_host_updated())
         update_host_data();
       // Remove last 0-coefficients
-      while(this->coefs.size() > 0 &&
-            this->coefs.back() == 0)
-        this->coefs.pop_back();
+      // while(this->coefs.size() > 0 &&
+            // this->coefs.back() == 0)
+        // this->coefs.pop_back();
       return coefs.size()-1;
     }
     ZZ lead_coeff(){
@@ -1010,7 +1010,7 @@ class Polynomial{
     void update_crt_spacing(const int new_spacing){
       
       #ifdef VERBOSE
-      std::cout << "update_crt_spacing" << std::endl;
+      std::cout << "update_crt_spacing - " << new_spacing << std::endl;
       #endif
 
       if(new_spacing <= 0)

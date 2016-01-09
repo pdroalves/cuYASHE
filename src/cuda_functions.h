@@ -26,6 +26,7 @@ class CUDAFunctions{
     static bn_t M;
     static bn_t* Mpis;
     static cuyasheint_t *invMpis;
+    static bn_t *d_inner_results;
 
     #ifdef NTTMUL
     /////////

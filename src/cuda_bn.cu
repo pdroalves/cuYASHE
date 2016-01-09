@@ -598,6 +598,8 @@ __global__ void cuICRT(	bn_t *poly,
 	 	if(poly[cid].alloc < 0)
 	 		printf("Achei!\n");
 	 	bn_zero(&poly[cid]);
+ 		
+ 		bn_t inner_result = inner_results[cid];
 	 	for(unsigned int rid = 0; rid < NPolis;rid++){
 				cuyasheint_t carry;
 	 			cuyasheint_t x;
@@ -605,8 +607,6 @@ __global__ void cuICRT(	bn_t *poly,
 	 			// Get a prime
 	 			cuyasheint_t pi = CRTPrimesConstant[rid];
 	 	
-	 			// Computes the inner result
-	 			bn_t inner_result = inner_results[cid];
 	 			bn_zero(&inner_result);
 	 	
 	 			/**
@@ -661,6 +661,7 @@ __global__ void cuICRT(	bn_t *poly,
 
  				__syncthreads();
 	 		}
+ 			bn_zero(&inner_result);
 
 	 ////////////////////////////////////////////////
 	 // To-do: Modular reduction of poly[cid] by M //
@@ -709,31 +710,6 @@ void callICRT(bn_t *coefs,cuyasheint_t *d_polyCRT,const int N, const int NPolis,
 	dim3 gridDim(ADDGRIDXDIM);
 	dim3 blockDim(ADDBLOCKXDIM);
 
-	cudaError_t result;
-
-	bn_t *h_inner_results;
-	bn_t *d_inner_results;
-	h_inner_results = (bn_t *) malloc ( N * sizeof(bn_t));
-	result = cudaMalloc((void**)&d_inner_results, N*sizeof(bn_t));
-	assert(result == cudaSuccess);
-
-	for(unsigned int i =0; i < N; i++){
-		h_inner_results[i].used = 0;
-		h_inner_results[i].alloc = std::max(CUDAFunctions::M.alloc,STD_BNT_ALLOC);
-    	h_inner_results[i].sign = BN_POS;
-		result = cudaMalloc((void**)&h_inner_results[i].dp,
-							h_inner_results[i].alloc*sizeof(cuyasheint_t)
-							);
-		assert(result == cudaSuccess);
-	}
-
-	result = cudaMemcpyAsync(	d_inner_results,
-								h_inner_results,
-								N*sizeof(bn_t),
-								cudaMemcpyHostToDevice,
-								stream 
-							);
-
 	cuICRT<<<gridDim,blockDim,0,stream>>>(	coefs,
 											d_polyCRT,
 											N,
@@ -741,15 +717,8 @@ void callICRT(bn_t *coefs,cuyasheint_t *d_polyCRT,const int N, const int NPolis,
 											CUDAFunctions::M,
 											CUDAFunctions::Mpis,
 											CUDAFunctions::invMpis,
-											d_inner_results);
-	result = cudaGetLastError();
-	assert(result == cudaSuccess);
-
-	for(unsigned int i =0; i < N; i++)
-		cudaFree(h_inner_results[i].dp);
-  	
-	free(h_inner_results);
-	result = cudaFree(d_inner_results);
+											CUDAFunctions::d_inner_results);
+	cudaError_t result = cudaGetLastError();
 	assert(result == cudaSuccess);
 }
 

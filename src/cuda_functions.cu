@@ -22,6 +22,8 @@
 cuyasheint_t CUDAFunctions::wN = 0;
 cuyasheint_t *CUDAFunctions::d_W = NULL;
 cuyasheint_t *CUDAFunctions::d_WInv = NULL;
+bn_t *CUDAFunctions::d_inner_results = NULL;
+
 #elif defined(CUFFTMUL)
 cufftHandle CUDAFunctions::plan;
 typedef double2 Complex;
@@ -815,6 +817,34 @@ __host__ void CUDAFunctions::init(int N){
     #ifdef VERBOSE
     #endif
   #endif
+        /**
+     * Alloc memory for d_inner_results
+     */
+    
+    bn_t *h_inner_results;
+    h_inner_results = (bn_t *) malloc ( N * sizeof(bn_t));
+    result = cudaMalloc((void**)&CUDAFunctions::d_inner_results, N*sizeof(bn_t));
+    assert(result == cudaSuccess);
+
+    for(unsigned int i =0; i < N; i++){
+      h_inner_results[i].used = 0;
+      h_inner_results[i].alloc = std::max(CUDAFunctions::M.alloc,STD_BNT_ALLOC);
+      h_inner_results[i].sign = BN_POS;
+      result = cudaMalloc((void**)&h_inner_results[i].dp,
+                h_inner_results[i].alloc*sizeof(cuyasheint_t)
+                );
+      assert(result == cudaSuccess);
+      result = cudaMemsetAsync(h_inner_results[i].dp,0,h_inner_results[i].alloc*sizeof(cuyasheint_t));
+      assert(result == cudaSuccess);
+    }
+
+
+    result = cudaMemcpy( CUDAFunctions::d_inner_results,
+                  h_inner_results,
+                  N*sizeof(bn_t),
+                  cudaMemcpyHostToDevice
+                );
+    free(h_inner_results);
 }
 
 __global__ void polynomialReduction(cuyasheint_t *a,const int half,const int N,const int NPolis){     

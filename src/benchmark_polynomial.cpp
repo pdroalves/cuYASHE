@@ -151,6 +151,10 @@ int main(int argc,char* argv[]){
     Polynomial a;
     Polynomial b;
     ///////////////////////////////////////////////
+    
+    std::cout << "Starting!" <<std::endl;
+
+    ///////////////////////////////////////////////
     // CRT/ICRT
     //
     Polynomial::random(&a,d-1);
@@ -175,7 +179,7 @@ int main(int argc,char* argv[]){
     a.update_host_data();
     for(int i = 0; i < N;i++){
       a.set_host_updated(false);
-      a.update_host_data();
+      a.icrt();
       result = cudaDeviceSynchronize();
       assert(result == cudaSuccess);
     }

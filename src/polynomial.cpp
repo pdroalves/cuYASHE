@@ -157,40 +157,30 @@ void get_words(bn_t *b,ZZ a){
     h_dp[used] = conv<uint32_t>(x&UINT32_MAX);
   }
 
-  /** 
-   * Release old data
-   */
-  cudaError_t result;
-  if(b->alloc > 0 && b->dp != NULL){
-    try{
-      result = cudaFree(b->dp);
-      assert(result == cudaSuccess);
-    }catch(string s){
-      std::cerr << "Error on cudaFree: " << s << std::endl;  
-    }catch(...){
-      std::cerr << "Error on cudaFree"<< std::endl;  
+  // if(b->alloc != alloc && alloc > 0){
+    cudaError_t result;
+    if(b->alloc != alloc){
+      // If b->dp was allocated with less data than we need
+      if(b->alloc != 0){
+        result = cudaFree(b->dp);
+        assert(result == cudaSuccess); 
+      }
+    
+      result = cudaMalloc((void**)&b->dp,alloc*sizeof(cuyasheint_t));
+      assert(result == cudaSuccess);  
     }
-  }
 
-  assert(alloc > 0);
-  /**
-   * Release memory
-   */
-  if(b->alloc != alloc && b->alloc > 0 && alloc > 0){
-    result = cudaFree(b->dp);
+    result = cudaMemcpy(b->dp,h_dp,used*sizeof(cuyasheint_t),cudaMemcpyHostToDevice);
     assert(result == cudaSuccess);
-  }
-  /** 
+
+  // }
+  /*
    * Copy new data to device memory
    */
 
   b->used = used;
   b->alloc = alloc;
   b->sign = (a>=0?BN_POS:BN_NEG);
-  result = cudaMalloc((void**)&b->dp,alloc*sizeof(cuyasheint_t));
-  assert(result == cudaSuccess);
-  result = cudaMemcpy(b->dp,h_dp,used*sizeof(cuyasheint_t),cudaMemcpyHostToDevice);
-  assert(result == cudaSuccess);
 
   free(h_dp);
 }
@@ -251,7 +241,6 @@ void Polynomial::update_device_data(){
 
   for(int i = 0; i < (deg()+1); i++)
     get_words(&h_bn_coefs[i],get_coeff(i));  
-  
 
   ////////////////////
   // Copy to device //
