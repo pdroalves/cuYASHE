@@ -230,13 +230,13 @@ BOOST_AUTO_TEST_CASE(zeroAdd)
   Polynomial::random(&a,degree-1);
 
 
+  Polynomial r = a + b;
   #ifdef VERBOSE
   std::cout << "M: "<<Polynomial::CRTProduct << std::endl;
   std::cout << "a: " << a.to_string() <<std::endl;
   std::cout << "b: " << b.to_string() <<std::endl;
   std::cout << "r: " << r.to_string() << std::endl;
   #endif
-  Polynomial r = a + b;
   
   BOOST_REQUIRE(r == a);
 
@@ -735,13 +735,12 @@ BOOST_AUTO_TEST_CASE(modularInversion)
   
   Polynomial result = a*aInv;
   
-  std::cout << "a: " << a.to_string() << std::endl;
-  std::cout << "aInv: " << aInv.to_string() << std::endl;
-  std::cout << "result before reduce: " << result.to_string() << std::endl;
-  result %= a.get_mod();
+  // std::cout << "a: " << a.to_string() << std::endl;
+  // std::cout << "aInv: " << aInv.to_string() << std::endl;
+  // std::cout << "result before reduce: " << result.to_string() << std::endl;
   result.reduce();
   result %= a.get_mod();
-  std::cout << "result after reduce: " << result.to_string() << std::endl;
+  // std::cout << "result after reduce: " << result.to_string() << std::endl;
 
   Polynomial one = Polynomial();
   one.set_coeff(0,1);

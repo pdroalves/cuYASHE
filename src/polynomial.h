@@ -961,22 +961,33 @@ class Polynomial{
     void crt();
     void icrt();
     void modn(ZZ n){
+      cudaError_t result;
 
-      // bn_t *m;
-      // cudaMallocManaged(&m,sizeof(bn_t));
-      // get_words(m,n);
+      bn_t *h_m;
+      h_m = (bn_t*)malloc(sizeof(bn_t));
+      h_m->alloc = 0;
+      get_words(h_m,n);
+      
+      std::pair<cuyasheint_t*,int> pair = Polynomial::reciprocals[n];
+      cuyasheint_t *u = std::get<0>(pair);
+      int su = std::get<1>(pair);
 
-      // bn_t *u = Polynomial::reciprocals[n];
-      // assert( u != NULL);
+      assert( u != NULL);
+      assert( su > 0);
 
-      // callCuModN( bn_coefs[0],
-      //             bn_coefs[0],
-      //             get_crt_spacing(),
-      //             m->dp,
-      //             m->used,
-      //             u->dp,
-      //             u->used,
-      //             get_stream());
+      callCuModN( d_bn_coefs,
+                  d_bn_coefs,
+                  get_crt_spacing(),
+                  h_m->dp,
+                  h_m->used,
+                  u,
+                  su,
+                  get_stream());
+      result = cudaDeviceSynchronize();
+      assert(result == cudaSuccess);
+
+      bn_free(h_m);
+      free(h_m);
     }
     int deg(){
       if(!get_host_updated())
@@ -1228,7 +1239,7 @@ class Polynomial{
     bool CRT_COMPUTED;
     bool ICRT_COMPUTED;
     bool RECIPROCAL_COMPUTED;
-    static std::map<ZZ, bn_t*> reciprocals;
+    static std::map<ZZ, std::pair<cuyasheint_t*,int>> reciprocals;
 
     //Functions and methods
     
@@ -1242,9 +1253,8 @@ class Polynomial{
      */
     static void compute_reciprocal(ZZ q){
       // x = 2^e (e >= 0)
-      ZZ x = power2_ZZ(2*192);
-      ZZ u_ZZ = (q*x)/q;
-
+      ZZ x = power2_ZZ(2*NTL::NumBits(q));
+      ZZ u_ZZ = x/q;
       bn_t *h_u;
       h_u = (bn_t*) malloc (sizeof(bn_t));
       h_u->alloc = 0;
@@ -1257,17 +1267,18 @@ class Polynomial{
       cudaError_t result;
       
       // Copy words
-      bn_t *d_u;        
+      cuyasheint_t *d_u;        
       
       // Copy to device
-      result = cudaMalloc((void**)&d_u,sizeof(bn_t));
+      result = cudaMalloc((void**)&d_u,h_u->alloc*sizeof(cuyasheint_t));
       assert(result == cudaSuccess);
       
-      result = cudaMemcpy(d_u,h_u,sizeof(bn_t),cudaMemcpyHostToDevice);
+      result = cudaMemcpy(d_u,h_u->dp,h_u->alloc*sizeof(cuyasheint_t),cudaMemcpyHostToDevice);
       assert(result == cudaSuccess);
 
-      Polynomial::reciprocals[q] = d_u;
+      Polynomial::reciprocals[q] = std::pair<cuyasheint_t*,int>(d_u,h_u->used);
       
+      free(h_u);
     }
 
     /**

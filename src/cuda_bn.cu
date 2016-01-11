@@ -561,8 +561,13 @@ __global__ void cuCRT(	cuyasheint_t *d_polyCRT,
 													CRTPrimesConstant[rid]
 													);
 	
-	}
+	}	
 }	
+
+__global__ void testData(cuyasheint_t *d_polyCRT, int N){
+	for(int i = 0; i < N;i++)
+		printf("%d) %d\n",i,d_polyCRT[i]);
+}
 
 /**
  * cuICRT computes ICRT on GPU
@@ -643,6 +648,9 @@ __global__ void cuICRT(	bn_t *poly,
 				int min = b.used;
 
 				/* Grow the result. */
+				if(poly[cid].alloc <= max){
+					printf("Fodeu!\n ");
+				}	
 				assert(poly[cid].alloc > max);
 
 				if (a.used == b.used) {
@@ -669,11 +677,6 @@ __global__ void cuICRT(	bn_t *poly,
 	 }
 
 }
-
-	/**
-	 * This function should be executed with N*Npolis threads. 
-	 * Each thread computes one coefficient of each residue of d_polyCRT
-	 */
 	
 void callCRT(bn_t *coefs,const int used_coefs,cuyasheint_t *d_polyCRT,const int N, const int NPolis,cudaStream_t stream){
 	const int size = used_coefs;
@@ -689,14 +692,16 @@ void callCRT(bn_t *coefs,const int used_coefs,cuyasheint_t *d_polyCRT,const int 
 	dim3 gridDim(ADDGRIDXDIM);
 	dim3 blockDim(ADDBLOCKXDIM);
 	
+	// std::cout << "CRT" << std::endl;
+		
 	cuCRT<<<gridDim,blockDim,0,stream>>>(d_polyCRT,coefs,used_coefs,N,NPolis);
+	// testData<<<1,1,0,stream>>>(d_polyCRT,N*NPolis);
 	result = cudaGetLastError();
 	assert(result == cudaSuccess);
+	cudaDeviceSynchronize();
+	assert(result == cudaSuccess);
+
 }
-	/**
-	 * This function should be executed with N threads.
-	 * Each thread j computes a Mpi*( invMpi*(value) % pi) and adds to poly[j]
-	 */
 
 void callICRT(bn_t *coefs,cuyasheint_t *d_polyCRT,const int N, const int NPolis,cudaStream_t stream){
 
@@ -710,6 +715,8 @@ void callICRT(bn_t *coefs,cuyasheint_t *d_polyCRT,const int N, const int NPolis,
 	dim3 gridDim(ADDGRIDXDIM);
 	dim3 blockDim(ADDBLOCKXDIM);
 
+	// std::cout << "ICRT" << std::endl;
+	// testData<<<1,1,0,stream>>>(d_polyCRT,N*NPolis);
 	cuICRT<<<gridDim,blockDim,0,stream>>>(	coefs,
 											d_polyCRT,
 											N,
@@ -720,6 +727,9 @@ void callICRT(bn_t *coefs,cuyasheint_t *d_polyCRT,const int N, const int NPolis,
 											CUDAFunctions::d_inner_results);
 	cudaError_t result = cudaGetLastError();
 	assert(result == cudaSuccess);
+	cudaDeviceSynchronize();
+	assert(result == cudaSuccess);
+
 }
 
 __host__ void  CUDAFunctions::write_crt_primes(){

@@ -29,7 +29,7 @@ tests:  polynomial.o cuda_functions.o cuda_bn.o test.o test_ctpt.o test_ct_mul.o
 	# $(CUDA_CC) $(CUDA_ARCH) $(LCUDA) $(ICUDA) -o $(TESTBIN)_crt test_crt.o polynomial.o cuda_functions.o cuda_bn.o ciphertext.o distribution.o yashe.o common.o integer.o -lcufft -Xcompiler $(OPENMP) $(NTL)
 	# $(CUDA_CC) $(CUDA_ARCH) $(LCUDA) $(ICUDA) -o $(TESTBIN)_reduce test_reduce.o polynomial.o cuda_functions.o cuda_bn.o ciphertext.o distribution.o yashe.o common.o integer.o -lcufft -Xcompiler $(OPENMP) $(NTL)
 	# $(CUDA_CC) $(CUDA_ARCH) $(LCUDA) $(ICUDA) -o $(TESTBIN)_ct_mul test_ct_mul.o polynomial.o cuda_functions.o cuda_bn.o ciphertext.o distribution.o yashe.o common.o integer.o -lcufft -Xcompiler $(OPENMP) $(NTL)
-	# $(CUDA_CC) $(CUDA_ARCH) $(LCUDA) $(ICUDA) -o $(TESTBIN)_mul test_mul.o polynomial.o cuda_functions.o cuda_bn.o ciphertext.o distribution.o yashe.o common.o integer.o -lcufft -Xcompiler $(OPENMP) $(NTL)
+	$(CUDA_CC) $(CUDA_ARCH) $(LCUDA) $(ICUDA) -o $(TESTBIN)_mul test_mul.o polynomial.o cuda_functions.o cuda_bn.o ciphertext.o distribution.o yashe.o common.o integer.o -lcufft -Xcompiler $(OPENMP) $(NTL)
 	$(CUDA_CC) $(CUDA_ARCH) $(LCUDA) $(ICUDA) -o $(TESTBIN)_ntt test_ntt.o  polynomial.o cuda_functions.o cuda_bn.o ciphertext.o distribution.o yashe.o common.o integer.o -lcufft -Xcompiler $(OPENMP) $(NTL)
 	$(CUDA_CC) $(CUDA_ARCH) $(LCUDA) $(ICUDA) -o $(TESTBIN)_bnt test_bnt.o  polynomial.o cuda_functions.o cuda_bn.o ciphertext.o distribution.o yashe.o common.o integer.o -lcufft -Xcompiler $(OPENMP) $(NTL)
 	
@@ -77,7 +77,7 @@ test_crt.o: test_crt.cu
 	# $(CUDA_CC) -c test_crt.cu -o test_crt.o  $(NTL)
 
 test_mul.o: test_mul.cu
-	# $(CUDA_CC) -c test_mul.cu -o test_mul.o  $(NTL)
+	$(CUDA_CC) -c test_mul.cu -o test_mul.o  $(NTL)
 
 test_reduce.o: test_reduce.cu
 	# $(CUDA_CC) -c test_reduce.cu -o test_reduce.o  $(NTL)
