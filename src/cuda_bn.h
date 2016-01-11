@@ -19,10 +19,10 @@ NTL_CLIENT
 typedef uint64_t dcuyasheint_t;
 #define BN_DIGIT WORD
 typedef struct bn_st{
-	int alloc;
-	int used;
-	int sign;
-	cuyasheint_t *dp;
+	int alloc = 0;
+	int used = 0;
+	int sign = BN_POS;
+	cuyasheint_t *dp = NULL;
 } bn_t;
 
 __host__  void bn_new(bn_t *a);
@@ -30,7 +30,6 @@ __host__ __device__ void bn_zero(bn_t *a);
 __host__ __device__ void bn_set_dig(bn_t *a, cuyasheint_t digit);
 __host__  void bn_free(bn_t *a);
 __host__ void bn_grow(bn_t *a,const unsigned int new_size);
-__host__ void get_words(bn_t *b,ZZ a);
 __host__ __device__ cuyasheint_t bn_mod1_low(const cuyasheint_t *a,
 									const int size,
 									const cuyasheint_t b);

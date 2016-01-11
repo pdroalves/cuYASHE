@@ -26,6 +26,7 @@ class CUDAFunctions{
     static bn_t M;
     static bn_t* Mpis;
     static cuyasheint_t *invMpis;
+    static bn_t *d_inner_results;
 
     #ifdef NTTMUL
     /////////
@@ -79,9 +80,9 @@ class CUDAFunctions{
   private:
 };
 #ifdef NTTMUL
-__device__ __host__ inline uint64_t s_rem (uint64_t a);
-__device__ __host__  uint64_t s_mul(uint64_t a,
-                                    uint64_t b);
+__device__ __host__ inline uint32_t s_rem (uint64_t a);
+__device__ __host__  uint32_t s_mul(uint32_t a,
+                                    uint32_t b);
 #endif
 
 #endif

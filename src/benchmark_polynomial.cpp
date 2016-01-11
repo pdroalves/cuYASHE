@@ -15,7 +15,7 @@
 
 #define BILLION  1000000000L
 #define MILLION  1000000L
-#define N 10
+#define N 100
 
 
 int main(int argc,char* argv[]){
@@ -122,7 +122,8 @@ int main(int argc,char* argv[]){
   Polynomial phi;
   phi.set_mod(Polynomial::global_mod);
 
-  for(int d = 1024;d <= 4096;d *= 2){
+  // for(int d = 1024;d <= 4096;d *= 2){
+  for(int d = 1024;d <= 1024;d *= 2){
 
     std::cout << "d: " << d << std::endl;
 
@@ -150,12 +151,16 @@ int main(int argc,char* argv[]){
     Polynomial a;
     Polynomial b;
     ///////////////////////////////////////////////
+    
+    std::cout << "Starting!" <<std::endl;
+
+    ///////////////////////////////////////////////
     // CRT/ICRT
     //
     Polynomial::random(&a,d-1);
     clock_gettime( CLOCK_REALTIME, &start);
     for(int i = 0; i < N;i++){
-      a.set_crt_computed(false);
+      a.set_device_updated(false);
       a.update_device_data();
       result = cudaDeviceSynchronize();
       assert(result == cudaSuccess);
@@ -166,14 +171,15 @@ int main(int argc,char* argv[]){
     crt << d << " " << diff  << std::endl;
 
     cudaMemGetInfo(&f, &t);
-    cout << "Free memory: " << f/(1024*1024) << std::endl << "Press Enter to Continue";
+    // cout << "Free memory: " << f/(1024*1024) << std::endl;
+    // std::cout << "Press Enter to Continue" << std::endl;
     //cin.ignore();
 
     clock_gettime( CLOCK_REALTIME, &start);
     a.update_host_data();
     for(int i = 0; i < N;i++){
-      a.set_icrt_computed(false);
-      a.update_host_data();
+      a.set_host_updated(false);
+      a.icrt();
       result = cudaDeviceSynchronize();
       assert(result == cudaSuccess);
     }
@@ -183,7 +189,8 @@ int main(int argc,char* argv[]){
     icrt << d << " " << diff  << std::endl;
 
     cudaMemGetInfo(&f, &t);
-    cout << "Free memory: " << f/(1024*1024) << std::endl << "Press Enter to Continue";
+    // cout << "Free memory: " << f/(1024*1024) << std::endl;
+    // std::cout << "Press Enter to Continue" << std::endl;
     //cin.ignore();
 
     clock_gettime( CLOCK_REALTIME, &start);
@@ -199,7 +206,8 @@ int main(int argc,char* argv[]){
     gpu_reduce << d << " " << diff  << std::endl;
 
     cudaMemGetInfo(&f, &t);
-    cout << "Free memory: " << f/(1024*1024) << std::endl << "Press Enter to Continue";
+    // cout << "Free memory: " << f/(1024*1024) << std::endl;
+    // std::cout << "Press Enter to Continue" << std::endl;
     //cin.ignore();
 
     clock_gettime( CLOCK_REALTIME, &start);
@@ -217,7 +225,8 @@ int main(int argc,char* argv[]){
     cpu_reduce << d << " " << diff  << std::endl;
 
     cudaMemGetInfo(&f, &t);
-    cout << "Free memory: " << f/(1024*1024) << std::endl << "Press Enter to Continue";
+    // cout << "Free memory: " << f/(1024*1024) << std::endl;
+    // std::cout << "Press Enter to Continue" << std::endl;
     //cin.ignore();
 
     clock_gettime( CLOCK_REALTIME, &start);
@@ -232,7 +241,8 @@ int main(int argc,char* argv[]){
     modq << d << " " << diff  << std::endl;
 
     cudaMemGetInfo(&f, &t);
-    cout << "Free memory: " << f/(1024*1024) << std::endl << "Press Enter to Continue";
+    // cout << "Free memory: " << f/(1024*1024) << std::endl;
+    // std::cout << "Press Enter to Continue" << std::endl;
     //cin.ignore();
 
     
@@ -264,7 +274,8 @@ int main(int argc,char* argv[]){
     
         cudaMemGetInfo(&f, &t);
 
-    cout << "Free memory: " << f/(1024*1024) << std::endl << "Press Enter to Continue";
+    // cout << "Free memory: " << f/(1024*1024) << std::endl;
+    // std::cout << "Press Enter to Continue" << std::endl;
     //cin.ignore();
 
     a.update_device_data();
@@ -284,8 +295,6 @@ int main(int argc,char* argv[]){
     std::cout << "ADD) Time measured without memory copy: " << diff << " ms" << std::endl;
     gpu_add_without_memcopy << d << " " << diff  << std::endl;
 
-    cudaDeviceReset();
-    return 0;
 
     ///////////////////////////////////////////////
     // MUL
@@ -306,10 +315,11 @@ int main(int argc,char* argv[]){
     std::cout << "MUL) Time measured with memory copy: " << diff << " ms" << std::endl;
     gpu_mult_with_memcopy << d << " " << diff  << std::endl;
     
-        cudaMemGetInfo(&f, &t);
+    //     cudaMemGetInfo(&f, &t);
 
-    cout << "Free memory: " << f/(1024*1024) << std::endl << "Press Enter to Continue";
-    //cin.ignore();
+    // cout << "Free memory: " << f/(1024*1024) << std::endl;
+    // // std::cout << "Press Enter to Continue" << std::endl;
+    // //cin.ignore();
 
     // Time measured without memory copy
     Polynomial::random(&a,d-1);
@@ -329,8 +339,10 @@ int main(int argc,char* argv[]){
     gpu_mult_without_memcopy << d << " " << diff  << std::endl;
 
     cudaMemGetInfo(&f, &t);
-    cout << "Free memory: " << f/(1024*1024) << std::endl << "Press Enter to Continue";
-    //cin.ignore();
+    cout << "Used memory: " << (t-f)/(1024*1024) << std::endl;
+    cout << "Free memory: " << f/(1024*1024) << std::endl;
+    // // std::cout << "Press Enter to Continue" << std::endl;
+    // //cin.ignore();
 
     
   }

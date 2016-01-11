@@ -484,11 +484,12 @@ class Polynomial{
     }
     Polynomial operator%=(ZZ b){
       if(!this->get_host_updated()){
-        if(!this->get_icrt_computed())
-          this->icrt();
+        // if(!this->get_icrt_computed())
+        //   this->icrt();
 
-        this->modn(b);
-        return *this;
+        // this->modn(b);
+        // return *this;
+        update_host_data();
       }
 
       // #pragma omp parallel for
@@ -616,8 +617,8 @@ class Polynomial{
         this->update_host_data();
 
       // Remove last 0-coefficients
-      while(this->deg() >= 0 &&
-            this->get_coeff(this->deg()) == ZZ(0))
+      while(this->coefs.size() > 0 &&
+            this->coefs.back() == 0)
         this->coefs.pop_back();
       this->update_crt_spacing();
     }
@@ -960,28 +961,42 @@ class Polynomial{
     void crt();
     void icrt();
     void modn(ZZ n){
+      cudaError_t result;
 
-      bn_t *m;
-      cudaMallocManaged(&m,sizeof(bn_t));
-      get_words(m,n);
+      bn_t *h_m;
+      h_m = (bn_t*)malloc(sizeof(bn_t));
+      h_m->alloc = 0;
+      get_words(h_m,n);
+      
+      std::pair<cuyasheint_t*,int> pair = Polynomial::reciprocals[n];
+      cuyasheint_t *u = std::get<0>(pair);
+      int su = std::get<1>(pair);
 
-      bn_t *u = Polynomial::reciprocals[n];
       assert( u != NULL);
+      assert( su > 0);
 
-      callCuModN( bn_coefs[0],
-                  bn_coefs[0],
+      callCuModN( d_bn_coefs,
+                  d_bn_coefs,
                   get_crt_spacing(),
-                  m->dp,
-                  m->used,
-                  u->dp,
-                  u->used,
+                  h_m->dp,
+                  h_m->used,
+                  u,
+                  su,
                   get_stream());
+      result = cudaDeviceSynchronize();
+      assert(result == cudaSuccess);
+
+      bn_free(h_m);
+      free(h_m);
     }
     int deg(){
       if(!get_host_updated())
-        return bn_coefs.size()-1;
-      else
-        return coefs.size()-1;
+        update_host_data();
+      // Remove last 0-coefficients
+      // while(this->coefs.size() > 0 &&
+            // this->coefs.back() == 0)
+        // this->coefs.pop_back();
+      return coefs.size()-1;
     }
     ZZ lead_coeff(){
       if(this->deg() >= 0){
@@ -1006,13 +1021,18 @@ class Polynomial{
     void update_crt_spacing(const int new_spacing){
       
       #ifdef VERBOSE
-      std::cout << "update_crt_spacing" << std::endl;
+      std::cout << "update_crt_spacing - " << new_spacing << std::endl;
       #endif
 
       if(new_spacing <= 0)
         // Do nothing
         return;
 
+      /**
+       * Adjust CRTSPACING
+       *
+       * Realloc *_bn_coefs and d_poly_CRT either
+       */
       if(this->get_crt_spacing() == new_spacing && get_device_updated()){
         // Data lies in GPU's global memory and has the correct alignment
         #ifdef VERBOSE
@@ -1020,18 +1040,85 @@ class Polynomial{
         #endif
         return;
       }else if(!get_device_updated()){
+        cudaError_t result;
+
         // Data isn't updated on GPU's global memory
         // Just set the spacing and update gpu
-        if(this->get_crt_spacing() != new_spacing)
-          this->CRTSPACING = new_spacing;
+        this->CRTSPACING = new_spacing;
 
+        /**
+         * Update bn_coefs
+         */
+        
+       if(h_bn_coefs)
+          free(h_bn_coefs);
+        h_bn_coefs = (bn_t*)malloc(new_spacing*sizeof(bn_t));
+        for(int i = 0; i < new_spacing; i++){
+          h_bn_coefs[i].alloc = STD_BNT_ALLOC;
+          h_bn_coefs[i].used = 0;
+          h_bn_coefs[i].sign = BN_POS;
+
+          result = cudaMalloc((void**)&h_bn_coefs[i].dp,h_bn_coefs[i].alloc*sizeof(cuyasheint_t));
+          assert(result == cudaSuccess);
+          result = cudaMemsetAsync(h_bn_coefs[i].dp,0,h_bn_coefs[i].alloc*sizeof(cuyasheint_t));
+          assert(result == cudaSuccess);
+        }
+
+        if(d_bn_coefs){
+          result = cudaFree(d_bn_coefs);
+          assert(result == cudaSuccess);
+        } 
+        result = cudaMalloc((void**)&d_bn_coefs,new_spacing*sizeof(bn_t));
+        assert(result == cudaSuccess);
+
+        result = cudaMemcpyAsync(d_bn_coefs,h_bn_coefs,new_spacing*sizeof(bn_t),cudaMemcpyHostToDevice,get_stream());
+        assert(result == cudaSuccess);
+
+        /**
+         * Update residues array
+         */
         cuyasheint_t *d_pointer;
-        cudaError_t result = cudaMalloc((void**)&d_pointer,new_spacing*(CRTPrimes.size())*sizeof(cuyasheint_t));        
+        result = cudaMalloc((void**)&d_pointer,new_spacing*(CRTPrimes.size())*sizeof(cuyasheint_t));        
+        assert(result == cudaSuccess);
+        result = cudaMemsetAsync(d_pointer,0,new_spacing*(CRTPrimes.size())*sizeof(cuyasheint_t));
         assert(result == cudaSuccess);
 
         set_device_crt_residues(d_pointer);
         return; 
       }else{
+        /**
+         * Update bn_coefs
+         */
+        cudaError_t result;
+
+       if(h_bn_coefs)
+          free(h_bn_coefs);
+        h_bn_coefs = (bn_t*)malloc(new_spacing*sizeof(bn_t));
+        for(int i = 0; i < new_spacing; i++){
+          h_bn_coefs[i].alloc = STD_BNT_ALLOC;
+          h_bn_coefs[i].used = 0;
+          h_bn_coefs[i].sign = BN_POS;
+
+          result = cudaMalloc((void**)&h_bn_coefs[i].dp,h_bn_coefs[i].alloc*sizeof(cuyasheint_t));
+          assert(result == cudaSuccess);
+          result = cudaMemsetAsync(h_bn_coefs[i].dp,0,h_bn_coefs[i].alloc*sizeof(cuyasheint_t));
+          assert(result == cudaSuccess);
+        }
+                
+        if(d_bn_coefs){
+          result = cudaFree(d_bn_coefs);
+          assert(result == cudaSuccess);
+        } 
+        result = cudaMalloc((void**)&d_bn_coefs,new_spacing*sizeof(bn_t));
+        assert(result == cudaSuccess);;
+
+        result = cudaMemcpyAsync(d_bn_coefs,h_bn_coefs,new_spacing*sizeof(bn_t),cudaMemcpyHostToDevice,get_stream());
+        assert(result == cudaSuccess);
+
+        /**
+         * Update residues array
+         */
+        
         // GPU has the updated data, but with wrong spacing
         // If updated data lies in gpu's global memory, realign it
 
@@ -1145,13 +1232,13 @@ class Polynomial{
     }
     static void operator delete(void *ptr);
     void release(){
-      cudaError_t result = cudaDeviceSynchronize();
-      assert(result == cudaSuccess);
-      for(unsigned int i = 0; i < bn_coefs.size(); i++){
-        bn_free(bn_coefs[i]);
-        result = cudaFree(bn_coefs[i]);
-        assert(result == cudaSuccess);
-      }
+      // cudaError_t result = cudaDeviceSynchronize();
+      // assert(result == cudaSuccess);
+      // for(unsigned int i = 0; i < bn_coefs.size(); i++){
+      //   bn_free(bn_coefs[i]);
+      //   result = cudaFree(bn_coefs[i]);
+      //   assert(result == cudaSuccess);
+      // }
     }
   private:
     // Attributes
@@ -1161,7 +1248,7 @@ class Polynomial{
     bool CRT_COMPUTED;
     bool ICRT_COMPUTED;
     bool RECIPROCAL_COMPUTED;
-    static std::map<ZZ, bn_t*> reciprocals;
+    static std::map<ZZ, std::pair<cuyasheint_t*,int>> reciprocals;
 
     //Functions and methods
     
@@ -1175,53 +1262,56 @@ class Polynomial{
      */
     static void compute_reciprocal(ZZ q){
       // x = 2^e (e >= 0)
-      ZZ x = power2_ZZ(2*192);
-      ZZ u_ZZ = (q*x)/q;
+      ZZ x = power2_ZZ(2*NTL::NumBits(q));
+      ZZ u_ZZ = x/q;
+      bn_t *h_u;
+      h_u = (bn_t*) malloc (sizeof(bn_t));
+      h_u->alloc = 0;
 
-      bn_t *u;
-      cudaError_t result = cudaMallocManaged(&u,sizeof(bn_t));
+      get_words(h_u,u_ZZ);  
+
+      //////////
+      // Copy //
+      //////////
+      cudaError_t result;
+      
+      // Copy words
+      cuyasheint_t *d_u;        
+      
+      // Copy to device
+      result = cudaMalloc((void**)&d_u,h_u->alloc*sizeof(cuyasheint_t));
       assert(result == cudaSuccess);
-      get_words(u,u_ZZ);
+      
+      result = cudaMemcpy(d_u,h_u->dp,h_u->alloc*sizeof(cuyasheint_t),cudaMemcpyHostToDevice);
+      assert(result == cudaSuccess);
 
-      // std::cout << "q: " << q << std::endl;
-      // std::cout << "u_ZZ: " << u_ZZ << std::endl;
-
-      Polynomial::reciprocals[q] = u;
+      Polynomial::reciprocals[q] = std::pair<cuyasheint_t*,int>(d_u,h_u->used);
+      
+      free(h_u);
     }
 
     /**
      * Computes the reciprocals for all expected Yashe::q
+     * This function looks like useless
      */
     static void compute_reciprocals(){
-      cudaError_t result;
+
+      assert(STD_BNT_ALLOC >= 4);
 
       /////////////////////////////////////////////////////////
       // The reciprocal of 77287149995192912462927307869L is//
       // 154574299990385824925854615738L                     //
       ///////////////////////////////////////////////////////
-      bn_t *u1;
-      result = cudaMallocManaged(&u1,sizeof(bn_t));
-      assert(result == cudaSuccess);
-
-      result = cudaDeviceSynchronize();
-      assert(result == cudaSuccess);
-
-      bn_new(u1);
-      assert(STD_BNT_ALLOC >= 4);
-      u1->dp[0] = 3131459770;
-      u1->dp[1] = 515080L;
-      u1->dp[2] = 4084522297;
-      u1->dp[3] = 1;
-
-      u1->used = 4;
-
-      Polynomial::reciprocals[to_ZZ("77287149995192912462927307869L")] = u1;
+      
+      compute_reciprocal(to_ZZ("77287149995192912462927307869L"));
     }    
   protected:
     std::vector<ZZ> coefs;
-    std::vector<bn_t*> bn_coefs;
-    
-    cuyasheint_t *d_polyCRT = 0x0; // Must be initialized on CRTSPACING definition and updated by crt(), if needed
+
+    // Must be initialized on CRTSPACING definition and updated by crt(), if needed
+    bn_t* h_bn_coefs = 0x0;
+    bn_t* d_bn_coefs = 0x0;
+    cuyasheint_t *d_polyCRT = 0x0;
 
     ZZ mod;
     Polynomial *phi;
