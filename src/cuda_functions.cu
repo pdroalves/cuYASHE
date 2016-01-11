@@ -820,7 +820,8 @@ __host__ void CUDAFunctions::init(int N){
         /**
      * Alloc memory for d_inner_results
      */
-    
+    assert(CUDAFunctions::M.alloc > 0);
+
     bn_t *h_inner_results;
     h_inner_results = (bn_t *) malloc ( N * sizeof(bn_t));
     result = cudaMalloc((void**)&CUDAFunctions::d_inner_results, N*sizeof(bn_t));
@@ -844,6 +845,7 @@ __host__ void CUDAFunctions::init(int N){
                   N*sizeof(bn_t),
                   cudaMemcpyHostToDevice
                 );
+    assert(result == cudaSuccess);
     free(h_inner_results);
 }
 

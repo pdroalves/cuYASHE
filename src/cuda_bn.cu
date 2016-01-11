@@ -623,6 +623,8 @@ __global__ void cuICRT(	bn_t *poly,
 	 								pi);
 
 	 			// Adjust available words in inner_result
+ 				if(inner_result.alloc < Mpis[rid].used+1)
+	 				printf("Fodeu!\n");
  				assert(inner_result.alloc >= Mpis[rid].used+1);
  					// bn_grow_d(&inner_result,1);
 
@@ -648,9 +650,6 @@ __global__ void cuICRT(	bn_t *poly,
 				int min = b.used;
 
 				/* Grow the result. */
-				if(poly[cid].alloc <= max){
-					printf("Fodeu!\n ");
-				}	
 				assert(poly[cid].alloc > max);
 
 				if (a.used == b.used) {
@@ -693,7 +692,8 @@ void callCRT(bn_t *coefs,const int used_coefs,cuyasheint_t *d_polyCRT,const int 
 	dim3 blockDim(ADDBLOCKXDIM);
 	
 	// std::cout << "CRT" << std::endl;
-		
+	result = cudaGetLastError();
+	assert(result == cudaSuccess);
 	cuCRT<<<gridDim,blockDim,0,stream>>>(d_polyCRT,coefs,used_coefs,N,NPolis);
 	// testData<<<1,1,0,stream>>>(d_polyCRT,N*NPolis);
 	result = cudaGetLastError();
@@ -767,11 +767,7 @@ __host__ void  CUDAFunctions::write_crt_primes(){
     // Copy M //
     ////////////
 
-    // if(M)
-    	// cudaFree(M);
-    // cudaMalloc((void**)&M,sizeof(bn_t));
-    // get_words(M,Polynomial::CRTProduct);
-
+    get_words(&M,Polynomial::CRTProduct);
     //////////////
     // Copy Mpi //
     //////////////
