@@ -156,7 +156,7 @@ __host__ void bn_grow(bn_t *a,const unsigned int new_size){
 __host__ __device__ cuyasheint_t bn_mod1_low(	const cuyasheint_t *a,
 												const int size,
 												const cuyasheint_t b) {
-	// Computes a % b
+	// Computes a % b, where b is a one-word number
 	
 	dcuyasheint_t w;
 	cuyasheint_t r;
@@ -307,7 +307,7 @@ __host__ __device__ cuyasheint_t bn_add1_low(cuyasheint_t *c, const cuyasheint_t
 // Subtract
 ////////////////////////
 /**
- * [bn_subn_low description]
+ * bn_subn_low computes a-b. If a < b, returns 1. Else returns 0.
  * @param  c    [description]
  * @param  a    [description]
  * @param  b    [description]

@@ -151,7 +151,7 @@ void get_words(bn_t *b,ZZ a){
   int alloc = std::max(STD_BNT_ALLOC,CUDAFunctions::M.alloc);
   h_dp = (cuyasheint_t *) calloc (alloc,sizeof(cuyasheint_t));
 
-  for(ZZ x = a; x > 0; x=(x>>WORD),used++){
+  for(ZZ x = NTL::abs(a); x > 0; x=(x>>WORD),used++){
     if(used >= alloc){
       h_dp = (cuyasheint_t*)realloc(h_dp,alloc+STD_BNT_ALLOC);
       alloc += STD_BNT_ALLOC;
@@ -162,7 +162,7 @@ void get_words(bn_t *b,ZZ a){
 
   // if(b->alloc != alloc && alloc > 0){
     cudaError_t result;
-    if(b->alloc != alloc){
+    if(b->alloc != alloc || b->dp == 0x0){
       // If b->dp was allocated with less data than we need
       if(b->alloc != 0){
         result = cudaFree(b->dp);
@@ -329,7 +329,7 @@ void Polynomial::update_host_data(){
     }
     
     this->set_host_updated(true);
-
+    normalize();
 }
 
 void Polynomial::DivRem(Polynomial a,Polynomial b,Polynomial &quot,Polynomial &rem){

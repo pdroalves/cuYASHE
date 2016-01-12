@@ -368,7 +368,7 @@ BOOST_AUTO_TEST_CASE(multiplyByZZOnGPU)
     a.update_device_data();
     a.set_host_updated(false);
 
-    Polynomial c = a*b % Polynomial::global_mod;
+    Polynomial c = a*b;
     c.normalize();
 
     ZZ_pEX c_ntl = a_ntl*conv<ZZ_p>(b);
@@ -377,7 +377,6 @@ BOOST_AUTO_TEST_CASE(multiplyByZZOnGPU)
     std::cout << "a: " << a.to_string() << " degree: " << a.deg() <<std::endl;
     std::cout << "b: " << b <<std::endl;
     std::cout << "c: " << c.to_string() << " degree: " << c.deg() <<std::endl;
-    std::cout << ": " << c_ntl << " degree: " << NTL::deg(c_ntl) << std::endl << std::endl;
     std::cout << "c_ntl: " << c_ntl << " degree: " << NTL::deg(c_ntl) << std::endl << std::endl;
     std::cout << "count: " << count << std::endl;
     #endif
@@ -880,7 +879,6 @@ BOOST_AUTO_TEST_CASE(phiReduceGPU)
         ntl_value = 0L;
       else
         ntl_value = conv<ZZ>(NTL::rep(NTL::coeff(a_ntl,i))[0]);
-      std::cout << a.get_coeff(i) << " ==? " << ntl_value << std::endl;
       BOOST_REQUIRE(a.get_coeff(i) == ntl_value);
     }
   }

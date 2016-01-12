@@ -144,6 +144,7 @@ Polynomial Integer::operator*(Polynomial &a){
   p->set_device_crt_residues(result);
 
   p->set_host_updated(false);
+  p->set_icrt_computed(false);
   p->set_device_updated(true);
 
   *(p) %= a.get_mod();

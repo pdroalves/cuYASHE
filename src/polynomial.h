@@ -888,8 +888,6 @@ class Polynomial{
         // std::cout << "Host data is updated" << std::endl;
         // #endif
       }else{        
-        this->set_icrt_computed(false);
-        this->set_coeffs();
         // this->set_coeffs();
         // #ifdef VERBOSE
         // std::cout << "Host data is NOT updated" << std::endl;
@@ -995,12 +993,11 @@ class Polynomial{
       free(h_m);
     }
     int deg(){
-      if(!get_host_updated())
+      if(!get_host_updated()){
         update_host_data();
-      // Remove last 0-coefficients
-      // while(this->coefs.size() > 0 &&
-            // this->coefs.back() == 0)
-        // this->coefs.pop_back();
+        // icrt();
+        // return CUDAFunctions::callDeg(d_bn_coefs,CRTSPACING);
+      }
       return coefs.size()-1;
     }
     ZZ lead_coeff(){
