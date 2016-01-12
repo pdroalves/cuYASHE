@@ -870,15 +870,8 @@ __global__ void polynomialReduction(cuyasheint_t *a,const int half,const int N,c
 
 __host__ void Polynomial::reduce(){
   // Just like DivRem, but here we reduce a with a cyclotomic polynomial
-  Polynomial *phi = (Polynomial::global_phi);
-
-  // #warning "Reduce on device has a bug. Deviating to host."
-      this->update_host_data();
-      
-  this->set_device_updated(false);
-  // if(!this->get_device_updated())
-    // this->update_device_data();
-
+  Polynomial *phi = Polynomial::global_phi;
+  ZZ q = Polynomial::global_mod;
 
   if(!this->get_device_updated()){
     #ifdef VERBOSE
@@ -890,6 +883,8 @@ __host__ void Polynomial::reduce(){
     this->copy(rem);
     this->update_crt_spacing(this->deg()+1);
   }else{
+
+    modn(q);
 
     #ifdef VERBOSE
     std::cout << "Reduce on device." << std::endl;
