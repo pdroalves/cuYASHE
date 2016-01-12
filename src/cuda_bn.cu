@@ -65,7 +65,7 @@ __host__ __device__ void bn_set_dig(bn_t *a, cuyasheint_t digit) {
 
 __host__ void bn_new(bn_t *a){
   a->used = 0;
-  a->alloc = STD_BNT_ALLOC;
+  a->alloc = STD_BNT_WORDS_ALLOC;
   a->sign = BN_POS;
   // std::cout << "Will alloc " << (a->alloc*sizeof(cuyasheint_t)) << " bytes" << std::endl;
   a->dp = (cuyasheint_t*) malloc(a->alloc*sizeof(cuyasheint_t));
@@ -73,7 +73,7 @@ __host__ void bn_new(bn_t *a){
 
 // __device__ void bn_new_d(bn_t *a){
 //   a->used = 0;
-//   a->alloc = STD_BNT_ALLOC;
+//   a->alloc = STD_BNT_WORDS_ALLOC;
 //   a->sign = BN_POS;
 //   cudaMalloc(&a->dp,a->alloc*sizeof(cuyasheint_t));
 // }
@@ -450,7 +450,7 @@ __device__ void bn_mod_barrt(bn_t *C, const bn_t *A,const int NCoefs,
 		cuyasheint_t *c = C[tid].dp;
 
 		unsigned long mu;
-		cuyasheint_t q[2*STD_BNT_ALLOC],t[2*STD_BNT_ALLOC],carry;
+		cuyasheint_t q[2*STD_BNT_WORDS_ALLOC],t[2*STD_BNT_WORDS_ALLOC],carry;
 		int sq, st;
 		int i;
 

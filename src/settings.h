@@ -22,9 +22,11 @@ extern const int PRIMES_BUCKET_SIZE;
 // #define VERBOSEMEMORYCOPY
 // #define MAYADDONCPU
 
-// CRT cannot use primes bigger than 32 bits
+// CRT cannot use primes bigger than =~15 bits
 #define WORD 32
-#define STD_BNT_ALLOC 32 // 1024 bits big integers
+
+// Standard number of words to allocate
+#define STD_BNT_WORDS_ALLOC 32 // 1024 bits big integers
 
 // We use cuyasheint_t as uint64_t to simplify operations
 // typedef uint64_t cuyasheint_t;

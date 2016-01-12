@@ -140,7 +140,7 @@ Polynomial Integer::operator*(Polynomial &a){
                                           Polynomial::CRTPrimes.size());
 
   Polynomial *p = new Polynomial();
-  p->CRTSPACING = a.get_crt_spacing();
+  p->update_crt_spacing(a.get_crt_spacing());
   p->set_device_crt_residues(result);
 
   p->set_host_updated(false);

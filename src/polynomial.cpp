@@ -148,13 +148,13 @@ void get_words(bn_t *b,ZZ a){
    */
   cuyasheint_t *h_dp;
   int used = 0;
-  int alloc = std::max(STD_BNT_ALLOC,CUDAFunctions::M.alloc);
+  int alloc = std::max(STD_BNT_WORDS_ALLOC,CUDAFunctions::M.alloc);
   h_dp = (cuyasheint_t *) calloc (alloc,sizeof(cuyasheint_t));
 
   for(ZZ x = NTL::abs(a); x > 0; x=(x>>WORD),used++){
     if(used >= alloc){
-      h_dp = (cuyasheint_t*)realloc(h_dp,alloc+STD_BNT_ALLOC);
-      alloc += STD_BNT_ALLOC;
+      h_dp = (cuyasheint_t*)realloc(h_dp,alloc+STD_BNT_WORDS_ALLOC);
+      alloc += STD_BNT_WORDS_ALLOC;
       std::cout << "get_words realloc!" << std::endl;
     }
     h_dp[used] = conv<uint32_t>(x&UINT32_MAX);
@@ -226,7 +226,11 @@ void Polynomial::update_device_data(){
   this->ON_COPY = true;
   // Verifica se o espaçamento é válido. Se não for, ajusta.
   if(this->get_crt_spacing() < (this->deg()+1)){
-    const int new_spacing = this->deg()+1;
+    int new_spacing;
+    if((this->deg()+1) > 0)
+    	new_spacing = this->deg()+1;
+    else
+    	new_spacing = Polynomial::global_phi->deg();
 
     // Data on device isn't updated (we check it on begginning)
     // So, update_crt_spacing(int) will only update CRTSpacing and alloc memory
@@ -271,9 +275,8 @@ void Polynomial::update_device_data(){
 }
 
 void Polynomial::icrt(){  
-    if(get_crt_spacing() > CUDAFunctions::N)
-      CUDAFunctions::init(get_crt_spacing());
-  
+  if(get_crt_spacing() > CUDAFunctions::N)
+	CUDAFunctions::init(get_crt_spacing());
   callICRT( d_bn_coefs,
         get_device_crt_residues(),
         get_crt_spacing(),
@@ -300,6 +303,8 @@ void Polynomial::update_host_data(){
     #ifdef VERBOSE
     std::cout << "Copying data to CPU." << std::endl;
     #endif
+    if(get_crt_spacing() == 0)
+    	update_crt_spacing(Polynomial::global_phi->deg());
     cudaError_t result = cudaMemcpy(h_bn_coefs,
                                     d_bn_coefs,
                                     get_crt_spacing()*sizeof(bn_t),
@@ -348,7 +353,7 @@ void Polynomial::DivRem(Polynomial a,Polynomial b,Polynomial &quot,Polynomial &r
     // No need to reduce
     if(a.deg() <= 0)
       return;
-    if(check_special_rem_format(b)){
+    if(check_special_rem_format(&b)){
       #ifdef VERBOSE
       std::cout << "Rem in special mode."<<std::endl;
       #endif
@@ -356,10 +361,10 @@ void Polynomial::DivRem(Polynomial a,Polynomial b,Polynomial &quot,Polynomial &r
       const unsigned int half = b.deg()-1;     
 
       rem.set_coeffs(half+1);
-      #pragma omp parallel for
+      // #pragma omp parallel for
       for(unsigned int i = 0;i <= half;i++)
         rem.set_coeff(i,a.get_coeff(i)-a.get_coeff(i+half+1));
-
+      rem.set_device_updated(false);
     }else{
       throw "DivRem: I don't know how to div this!";
     }

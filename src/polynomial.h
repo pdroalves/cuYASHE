@@ -57,8 +57,8 @@ class Polynomial{
         this->phi = Polynomial::global_phi; // Doesn't copy. Uses the reference.
 
         // If the irreductible polynomial have degree N, this polynomial's degree will be limited to N-1
-        if(Polynomial::global_phi->deg() >= 0)
-          this->update_crt_spacing(Polynomial::global_phi->deg());
+        // if(Polynomial::global_phi->deg() >= 0)
+          // this->update_crt_spacing(Polynomial::global_phi->deg());
       }
       
 
@@ -87,7 +87,7 @@ class Polynomial{
       //   // If a global phi is defined, use it
         this->phi = Polynomial::global_phi; // Doesn't copy. Uses the reference.
       }
-      this->update_crt_spacing(Polynomial::global_phi->deg());
+      // this->update_crt_spacing(Polynomial::global_phi->deg());
 
       if(Polynomial::phi_set){
         this->coefs.resize(this->get_phi().deg()+1);
@@ -114,7 +114,7 @@ class Polynomial{
 
       // CRT Spacing should store the expected number of coefficients
       // If the irreductible polynomial have degree N, this polynomial's degree will be limited to N-1
-      this->update_crt_spacing(this->phi->deg()+1);
+      // this->update_crt_spacing(this->phi->deg()+1);
 
       if(Polynomial::phi_set){
         this->coefs.resize(this->get_phi().deg()+1);
@@ -226,10 +226,10 @@ class Polynomial{
       // start = polynomial_get_cycles();
       #endif 
 
-      this->CRTSPACING = b.CRTSPACING;
-      if(b.get_host_updated()){
+      update_crt_spacing(b.get_crt_spacing());
+      if(b.get_host_updated())
         this->set_coeffs(b.get_coeffs());
-      }
+      
       
       if(b.get_device_updated())
         // this->copy_device_crt_residues(b);
@@ -672,6 +672,9 @@ class Polynomial{
       // }
 
       if((unsigned int)(index) >= this->coefs.size()){
+        if(value == 0)
+          return;
+
         #ifdef VERBOSE
           std::cout << "Resizing this->coefs from "<< this->coefs.size() << " to " << index+1 << std::endl;
         #endif
@@ -771,20 +774,6 @@ class Polynomial{
       return this->d_polyCRT;
     }
     void set_device_crt_residues(cuyasheint_t *residues){
-      if(d_polyCRT != 0x0){
-        try
-        {
-          cudaError_t result = cudaFree(d_polyCRT);
-          if(result != cudaSuccess)
-            throw string( cudaGetErrorString(result));
-          
-        }catch(string s){
-          #ifdef VERBOSE
-          std::cout << "Exception at cudaFree: " << s << std::endl;
-          #endif 
-          cudaGetLastError();//Reset last error
-        }
-      }
       d_polyCRT = residues;
     }
 
@@ -1007,15 +996,15 @@ class Polynomial{
         return ZZ(0);
       }
     }
-    static bool check_special_rem_format(Polynomial p){
-      if(p.get_coeff(0) != 1){
+    static bool check_special_rem_format(Polynomial *p){
+      if(p->get_coeff(0) != 1){
         return false;
       }
-      if(p.lead_coeff() != ZZ(1)){
+      if(p->lead_coeff() != ZZ(1)){
         return false;
       }
-      for(int i =1;i < p.deg();i++){
-        if(p.get_coeff(i) != 0)
+      for(int i =1;i < p->deg();i++){
+        if(p->get_coeff(i) != 0)
           return false;
       }
       return true;
@@ -1037,11 +1026,14 @@ class Polynomial{
        */
       if(this->get_crt_spacing() == new_spacing && get_device_updated()){
         // Data lies in GPU's global memory and has the correct alignment
-        // #ifdef VERBOSE
+        #ifdef VERBOSE
         std::cout << "No need to update crt spacing." << std::endl;
-        // #endif
+        #endif
         return;
       }else if(!get_device_updated()){
+        #ifdef VERBOSE
+        std::cout << "Will alloc memory  to update crt spacing." << std::endl;
+        #endif
         cudaError_t result;
 
         // Data isn't updated on GPU's global memory
@@ -1056,14 +1048,14 @@ class Polynomial{
           free(h_bn_coefs);
         h_bn_coefs = (bn_t*)malloc(new_spacing*sizeof(bn_t));
         for(int i = 0; i < new_spacing; i++){
-          h_bn_coefs[i].alloc = STD_BNT_ALLOC;
+          h_bn_coefs[i].alloc = STD_BNT_WORDS_ALLOC;
           h_bn_coefs[i].used = 0;
           h_bn_coefs[i].sign = BN_POS;
 
           result = cudaMalloc((void**)&h_bn_coefs[i].dp,h_bn_coefs[i].alloc*sizeof(cuyasheint_t));
           assert(result == cudaSuccess);
-          result = cudaMemsetAsync(h_bn_coefs[i].dp,0,h_bn_coefs[i].alloc*sizeof(cuyasheint_t));
-          assert(result == cudaSuccess);
+          // result = cudaMemsetAsync(h_bn_coefs[i].dp,0,h_bn_coefs[i].alloc*sizeof(cuyasheint_t));
+          // assert(result == cudaSuccess);
         }
 
         if(d_bn_coefs){
@@ -1082,12 +1074,15 @@ class Polynomial{
         cuyasheint_t *d_pointer;
         result = cudaMalloc((void**)&d_pointer,new_spacing*(CRTPrimes.size())*sizeof(cuyasheint_t));        
         assert(result == cudaSuccess);
-        result = cudaMemsetAsync(d_pointer,0,new_spacing*(CRTPrimes.size())*sizeof(cuyasheint_t));
+        result = cudaMemsetAsync(d_pointer,0,new_spacing*(CRTPrimes.size())*sizeof(cuyasheint_t),get_stream());
         assert(result == cudaSuccess);
 
         set_device_crt_residues(d_pointer);
         return; 
       }else{
+        #ifdef VERBOSE
+        std::cout << "Need a realign to update crt spacing." << std::endl;
+        #endif
         /**
          * Update bn_coefs
          */
@@ -1097,7 +1092,7 @@ class Polynomial{
           free(h_bn_coefs);
         h_bn_coefs = (bn_t*)malloc(new_spacing*sizeof(bn_t));
         for(int i = 0; i < new_spacing; i++){
-          h_bn_coefs[i].alloc = STD_BNT_ALLOC;
+          h_bn_coefs[i].alloc = STD_BNT_WORDS_ALLOC;
           h_bn_coefs[i].used = 0;
           h_bn_coefs[i].sign = BN_POS;
 

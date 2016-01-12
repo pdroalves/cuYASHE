@@ -830,7 +830,7 @@ __host__ void CUDAFunctions::init(int N){
 
     for(unsigned int i =0; i < N; i++){
       h_inner_results[i].used = 0;
-      h_inner_results[i].alloc = std::max(CUDAFunctions::M.alloc,STD_BNT_ALLOC);
+      h_inner_results[i].alloc = std::max(CUDAFunctions::M.alloc,STD_BNT_WORDS_ALLOC);
       h_inner_results[i].sign = BN_POS;
       result = cudaMalloc((void**)&h_inner_results[i].dp,
                 h_inner_results[i].alloc*sizeof(cuyasheint_t)
@@ -979,8 +979,11 @@ __host__ void Polynomial::reduce(){
   // Just like DivRem, but here we reduce a with a cyclotomic polynomial
   Polynomial *phi = (Polynomial::global_phi);
   ZZ q = (Polynomial::global_mod);
+  
+  // Until we debug reduction on GPU, we need this
   update_host_data();
   this->set_device_updated(false);
+
   if(!this->get_device_updated()){
     #ifdef VERBOSE
     std::cout << "Reduce on host." << std::endl;
@@ -988,12 +991,24 @@ __host__ void Polynomial::reduce(){
     /**
      * Reduce on host
      */
-    Polynomial quot;
-    Polynomial rem;
-    Polynomial::DivRem((*this),phi,quot, rem);
-    this->copy(rem);
+    if(check_special_rem_format(phi)){
+      #ifdef VERBOSE
+      std::cout << "Rem in special mode."<<std::endl;
+      #endif
+
+      const unsigned int half = phi->deg()-1;     
+
+      // #pragma omp parallel for
+      for(unsigned int i = 0;i <= half;i++){
+        this->set_coeff(i,this->get_coeff(i)-this->get_coeff(i+half+1));
+        this->set_coeff(i+half+1,0);
+      }
+    }else{
+      throw "Reduce: I don't know how to compute this!";
+    }
     *this %= q;
-    this->update_crt_spacing(this->deg()+1);
+    this->normalize();
+    // this->update_crt_spacing(this->deg()+1);
   }else{
 
     #ifdef VERBOSE
@@ -1003,12 +1018,6 @@ __host__ void Polynomial::reduce(){
      * Reduce on devicce
      */
     
-    ///////////////////////
-    // Modular reduction //
-    ///////////////////////
-
-     modn(q);
-
     //////////////////////////
     // Polynomial reduction //
     //////////////////////////
