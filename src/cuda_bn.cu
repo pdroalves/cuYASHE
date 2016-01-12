@@ -12,6 +12,7 @@
 __constant__ cuyasheint_t CRTPrimesConstant[MAX_PRIMES_ON_C_MEMORY];
 
 bn_t CUDAFunctions::M;
+bn_t CUDAFunctions::u;
 bn_t* CUDAFunctions::Mpis;
 cuyasheint_t* CUDAFunctions::invMpis;
 
@@ -152,9 +153,9 @@ __host__ void bn_grow(bn_t *a,const unsigned int new_size){
 //////////////
 
 // Mod
-__host__ __device__ cuyasheint_t bn_mod1_low(const cuyasheint_t *a,
-									const int size,
-									const cuyasheint_t b) {
+__host__ __device__ cuyasheint_t bn_mod1_low(	const cuyasheint_t *a,
+												const int size,
+												const cuyasheint_t b) {
 	// Computes a % b
 	
 	dcuyasheint_t w;
@@ -325,6 +326,22 @@ __host__ __device__ cuyasheint_t bn_subn_low(cuyasheint_t * c, const cuyasheint_
 		r0 = diff - carry;
 		carry = ((*a) < (*b)) || (carry && !diff);
 		(*c) = r0;
+	}
+	return carry;
+}
+
+__host__ __device__ cuyasheint_t bn_sub1_low(cuyasheint_t *c, const cuyasheint_t *a, cuyasheint_t digit, int size) {
+	int i;
+	cuyasheint_t carry, r0;
+
+	carry = digit;
+	for (i = 0; i < size && carry; i++, c++, a++) {
+		r0 = (*a) - carry;
+		carry = (r0 > (*a));
+		(*c) = r0;
+	}
+	for (; i < size; i++, a++, c++) {
+		(*c) = (*a);
 	}
 	return carry;
 }
@@ -504,7 +521,12 @@ __device__ void bn_mod_barrt(bn_t *C, const bn_t *A,const int NCoefs,
 
 __global__ void cuModN(bn_t * c, const bn_t * a, const int NCoefs,
 		const cuyasheint_t * m, int sm, const cuyasheint_t * u, int su){
-	bn_mod_barrt(c,a,NCoefs,m,sm,u,su);
+	/**
+	 * This function should be executed with NCoefs threads
+	 */
+	const unsigned int tid = threadIdx.x + blockIdx.x*blockDim.x;
+	if(tid < NCoefs)
+		bn_mod_barrt(c,a,NCoefs,m,sm,u,su);
 }
 
 __host__ void callCuModN(bn_t * c, const bn_t * a,int NCoefs,
@@ -537,8 +559,8 @@ __global__ void cuCRT(	cuyasheint_t *d_polyCRT,
 						const unsigned int NPolis
 						){
 	/**
-	 * This function should be executed with used_coefs threads. 
-	 * Each thread computes the residues for one coefficient
+	 * This function should be executed with used_coefs*NPolis threads. 
+	 * Each thread computes one residue of one coefficient
 	 *
 	 * x should be an array of N elements
 	 * d_polyCRT should be an array of N*NPolis elements
@@ -549,19 +571,19 @@ __global__ void cuCRT(	cuyasheint_t *d_polyCRT,
 	 * cid: coefficient id
 	 * rid: residue id
 	 */
-	const unsigned int cid = threadIdx.x + blockIdx.x*blockDim.x;
+	const unsigned int tid = threadIdx.x + blockIdx.x*blockDim.x;
+	const unsigned int cid = tid % (used_coefs);
+	const unsigned int rid = tid / (used_coefs);
 
 	// x can be copied to shared memory!
 	// 
-	if(cid < used_coefs){
-		for(unsigned int rid = 0; rid < NPolis; rid++)
-			// Computes x mod pi
-			d_polyCRT[cid + rid*N] = bn_mod1_low(	x[cid].dp,
-													x[cid].used,
-													CRTPrimesConstant[rid]
-													);
-	
-	}	
+	if(tid < used_coefs*NPolis)
+		// Computes x mod pi
+		d_polyCRT[cid + rid*N] = bn_mod1_low(	x[cid].dp,
+												x[cid].used,
+												CRTPrimesConstant[rid]
+												);
+
 }	
 
 __global__ void testData(cuyasheint_t *d_polyCRT, int N){
@@ -581,6 +603,7 @@ __global__ void cuICRT(	bn_t *poly,
 						const unsigned int N,
 						const unsigned int NPolis,
 						const bn_t M,
+						const bn_t u,
 						const bn_t *Mpis,
 						const cuyasheint_t *invMpis,
 						bn_t *inner_results
@@ -672,14 +695,18 @@ __global__ void cuICRT(	bn_t *poly,
  			bn_zero(&inner_result);
 
 	 ////////////////////////////////////////////////
-	 // To-do: Modular reduction of poly[cid] by M //
+	 // Modular reduction of poly[cid] by M //
 	 ////////////////////////////////////////////////
+ 	 	/**
+ 	 	 * At this point a thread i finished the computation of coefficient i
+ 	 	 */
+		// bn_mod_barrt(poly,poly,N,M.dp,M.used,u.dp,u.used);	 	
 	 }
 
 }
 	
 void callCRT(bn_t *coefs,const int used_coefs,cuyasheint_t *d_polyCRT,const int N, const int NPolis,cudaStream_t stream){
-	const int size = used_coefs;
+	const int size = used_coefs*NPolis;
 
 	if(size <= 0)
 		return;
@@ -723,6 +750,7 @@ void callICRT(bn_t *coefs,cuyasheint_t *d_polyCRT,const int N, const int NPolis,
 											N,
 											NPolis,
 											CUDAFunctions::M,
+											CUDAFunctions::u,
 											CUDAFunctions::Mpis,
 											CUDAFunctions::invMpis,
 											CUDAFunctions::d_inner_results);
@@ -767,8 +795,12 @@ __host__ void  CUDAFunctions::write_crt_primes(){
     ////////////
     // Copy M //
     ////////////
-
     get_words(&M,Polynomial::CRTProduct);
+    ////////////
+    // Copy u //
+    ////////////
+
+    u = get_reciprocal(Polynomial::CRTProduct);
     //////////////
     // Copy Mpi //
     //////////////    

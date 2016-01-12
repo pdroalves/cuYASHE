@@ -11,7 +11,7 @@ NTL = -Intl -lntl -lgmp
 LTIME_MEASURE = -lrt
 
 #LCUDA = -L/usr/local/cuda/lib64
-LCUDA = -lcuda -lcudart -lcudadevrt 
+LCUDA = -lcuda -lcudart -lcudadevrt
 ICUDA = -I/usr/local/cuda/include
 CUDA_ARCH = -arch=sm_35
 
@@ -24,10 +24,10 @@ BENCHMARKYASHEBIN= $(INSTALL)/benchmark_yashe
 all: tests benchmarks
 
 tests:  polynomial.o cuda_functions.o cuda_bn.o test.o test_ctpt.o test_ct_mul.o test_ntt.o test_mul.o test_crt.o test_reduce.o test_bnt.o ciphertext.o distribution.o yashe.o common.o integer.o
-	$(CUDA_CC) $(CUDA_ARCH) $(LCUDA) $(ICUDA) -o $(TESTBIN) test.o polynomial.o cuda_functions.o cuda_bn.o ciphertext.o distribution.o yashe.o common.o integer.o -lcufft -Xcompiler $(OPENMP) $(NTL) -lboost_unit_test_framework
+	$(CUDA_CC) $(CUDA_ARCH) $(LCUDA) $(ICUDA) -o $(TESTBIN) test.o polynomial.o cuda_functions.o cuda_bn.o ciphertext.o distribution.o yashe.o common.o integer.o -lcufft --relocatable-device-code true -Xcompiler $(OPENMP) $(NTL) -lboost_unit_test_framework
 	# $(CUDA_CC) $(CUDA_ARCH) $(LCUDA) $(ICUDA) -o $(TESTBIN)_ctpt test_ctpt.o polynomial.o cuda_functions.o cuda_bn.o ciphertext.o distribution.o yashe.o common.o integer.o -lcufft -Xcompiler $(OPENMP) $(NTL)
 	# $(CUDA_CC) $(CUDA_ARCH) $(LCUDA) $(ICUDA) -o $(TESTBIN)_crt test_crt.o polynomial.o cuda_functions.o cuda_bn.o ciphertext.o distribution.o yashe.o common.o integer.o -lcufft -Xcompiler $(OPENMP) $(NTL)
-	# $(CUDA_CC) $(CUDA_ARCH) $(LCUDA) $(ICUDA) -o $(TESTBIN)_reduce test_reduce.o polynomial.o cuda_functions.o cuda_bn.o ciphertext.o distribution.o yashe.o common.o integer.o -lcufft -Xcompiler $(OPENMP) $(NTL)
+	$(CUDA_CC) $(CUDA_ARCH) $(LCUDA) $(ICUDA) -o $(TESTBIN)_reduce test_reduce.o polynomial.o cuda_functions.o cuda_bn.o ciphertext.o distribution.o yashe.o common.o integer.o -lcufft -Xcompiler $(OPENMP) $(NTL)
 	# $(CUDA_CC) $(CUDA_ARCH) $(LCUDA) $(ICUDA) -o $(TESTBIN)_ct_mul test_ct_mul.o polynomial.o cuda_functions.o cuda_bn.o ciphertext.o distribution.o yashe.o common.o integer.o -lcufft -Xcompiler $(OPENMP) $(NTL)
 	$(CUDA_CC) $(CUDA_ARCH) $(LCUDA) $(ICUDA) -o $(TESTBIN)_mul test_mul.o polynomial.o cuda_functions.o cuda_bn.o ciphertext.o distribution.o yashe.o common.o integer.o -lcufft -Xcompiler $(OPENMP) $(NTL)
 	$(CUDA_CC) $(CUDA_ARCH) $(LCUDA) $(ICUDA) -o $(TESTBIN)_ntt test_ntt.o  polynomial.o cuda_functions.o cuda_bn.o ciphertext.o distribution.o yashe.o common.o integer.o -lcufft -Xcompiler $(OPENMP) $(NTL)
@@ -56,7 +56,7 @@ integer.o:integer.cpp
 	$(CC) -c integer.cpp -o integer.o $(NTL) $(LCUDA) $(OPENMP) $(ICUDA)
 
 cuda_functions.o:cuda_functions.cu
-	$(CUDA_CC) $(CUDA_ARCH) -c cuda_functions.cu $(LCUDA) $(ICUDA) -lcufft -Xcompiler $(OPENMP)
+	$(CUDA_CC) $(CUDA_ARCH) -c cuda_functions.cu $(LCUDA) $(ICUDA) -lcufft --relocatable-device-code true -Xcompiler $(OPENMP)
 
 cuda_bn.o:cuda_bn.cu
 	$(CUDA_CC) $(CUDA_ARCH) -c cuda_bn.cu $(LCUDA) $(ICUDA) --relocatable-device-code true -Xcompiler $(NTL)
@@ -80,7 +80,7 @@ test_mul.o: test_mul.cu
 	$(CUDA_CC) -c test_mul.cu -o test_mul.o  $(NTL)
 
 test_reduce.o: test_reduce.cu
-	# $(CUDA_CC) -c test_reduce.cu -o test_reduce.o  $(NTL)
+	$(CUDA_CC) -c test_reduce.cu -o test_reduce.o  $(NTL)
 
 test_ct_mul.o: test_ct_mul.cu
 	# $(CUDA_CC) -c test_ct_mul.cu -o test_ct_mul.o  $(NTL)

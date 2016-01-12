@@ -1,12 +1,13 @@
-#include "cuda_functions.h"
-#include "settings.h"
-#include "polynomial.h"
 #include <cuda.h>
 #include <cuda_runtime_api.h>
 #include <cuda_runtime.h>
 #include <iostream>
 #include <stdio.h>
 #include <assert.h>
+#include "cuda_functions.h"
+#include "cuda_bn.h"
+#include "settings.h"
+#include "polynomial.h"
 
 
 #ifdef NTTMUL
@@ -56,9 +57,9 @@ __host__ cuyasheint_t* CUDAFunctions::callRealignCRTResidues(cudaStream_t stream
                                                               const int residuesQty){
   if(oldSpacing == newSpacing)
     return NULL;
-  #ifdef VERBOSE
+  // #ifdef VERBOSE
   std::cout << "Realigning..." << std::endl;
-  #endif
+  // #endif
   
   int size;
   if(newSpacing < oldSpacing)
@@ -753,9 +754,9 @@ __host__ void CUDAFunctions::init(int N){
   CUDAFunctions::N = N;
 
   #ifdef NTTMUL
-  #ifdef VERBOSE
+  // #ifdef VERBOSE
   std::cout << "Will compute W -- N = " << N << std::endl;
-  #endif
+  // #endif
 
   cuyasheint_t *h_W;
   cuyasheint_t *h_WInv;
@@ -849,17 +850,29 @@ __host__ void CUDAFunctions::init(int N){
     free(h_inner_results);
 }
 
-__global__ void polynomialReduction(cuyasheint_t *a,const int half,const int N,const int NPolis){     
-  // This kernel must have (N-half)*Npolis threads
+__global__ void polynomialReduction(bn_t *a,const int half,const int N){     
+  ////////////////////////////////////////////////////////
+  // This kernel must be executed with (N-half) threads //
+  ////////////////////////////////////////////////////////
 
   const int tid = threadIdx.x + blockIdx.x*blockDim.x;
-  const int residueID = tid / (N-half); 
   const int cid = tid % (N-half);
 
-  if( (cid+half+1 < N) && (residueID*N + cid + half + 1 < N*NPolis)){
-    a[residueID*N + cid] -= a[residueID*N + cid + half + 1];
+  if(cid+half+1 < N){
+    int carry;
+    int max = max_d(a[cid].used,a[cid+half+1].used);
+    int min = min_d(a[cid].used,a[cid+half+1].used);
+
+    carry = bn_subn_low(a[cid].dp, a[cid].dp, a[cid+half+1].dp, min);
+
+    if (carry) {
+      assert(a[cid].alloc > max + 1);
+      a[cid].dp[max] = carry;
+      a[cid].used++;
+    }
+
     __syncthreads();
-    a[residueID*N + cid + half + 1] = 0;
+    a[cid + half + 1].dp = 0;
   }
   // else{
   //   if((reisdueID*N + cid < N*NPolis))
@@ -871,19 +884,16 @@ __global__ void polynomialReduction(cuyasheint_t *a,const int half,const int N,c
 __host__ void Polynomial::reduce(){
   // Just like DivRem, but here we reduce a with a cyclotomic polynomial
   Polynomial *phi = (Polynomial::global_phi);
-
-  // #warning "Reduce on device has a bug. Deviating to host."
-      this->update_host_data();
-      
-  this->set_device_updated(false);
-  // if(!this->get_device_updated())
-    // this->update_device_data();
-
-
+  ZZ q = (Polynomial::global_mod);
+  // update_host_data();
+  // this->set_device_updated(false);
   if(!this->get_device_updated()){
     #ifdef VERBOSE
     std::cout << "Reduce on host." << std::endl;
     #endif
+    /**
+     * Reduce on host
+     */
     Polynomial quot;
     Polynomial rem;
     Polynomial::DivRem((*this),phi,quot, rem);
@@ -894,26 +904,55 @@ __host__ void Polynomial::reduce(){
     #ifdef VERBOSE
     std::cout << "Reduce on device." << std::endl;
     #endif
+    /**
+     * Reduce on devicce
+     */
     
+    ///////////////////////
+    // Modular reduction //
+    ///////////////////////
+
+     // modn(q);
+
+    //////////////////////////
+    // Polynomial reduction //
+    //////////////////////////
+    
+
     const int half = phi->deg()-1;
     const int N = this->get_crt_spacing();
-    const int NPolis = this->CRTPrimes.size();
-    const int size = (N-half)*NPolis;
+    const int size = (N-half);
 
     if(size > 0){
+      if(!get_icrt_computed())
+        icrt();
+      
       dim3 blockDim(32);
       dim3 gridDim(size/32 + (size % 32 == 0? 0:1));
 
-      polynomialReduction<<< gridDim,blockDim, 1, this->get_stream()>>>( this->get_device_crt_residues(),
-                                                                        half,
-                                                                        N,
-                                                                        NPolis);
+      polynomialReduction<<< gridDim,blockDim, 1, get_stream()>>>( d_bn_coefs,
+                                                                          half,
+                                                                          N);
       cudaError_t result = cudaGetLastError();
       assert(result == cudaSuccess);
-      
-      this->set_host_updated(false);
-      this->set_device_updated(true);
-      this->update_crt_spacing(phi->deg());
+   
+      /**
+       * We can't use Polynomial::crt since it depends of Polynomial::deg
+       */
+      callCRT(d_bn_coefs,
+          phi->deg(),
+          get_device_crt_residues(),
+          get_crt_spacing(),
+          Polynomial::CRTPrimes.size(),
+          get_stream()
+      );
+      set_icrt_computed(false);
     }
+
+    ///////////////////////
+    // Modular reduction //
+    ///////////////////////
+
+     // modn(q);
   }
 }

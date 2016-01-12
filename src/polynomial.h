@@ -19,6 +19,9 @@ NTL_CLIENT
 
 cuyasheint_t polynomial_get_cycles();
 void get_words(bn_t* b,ZZ a);
+bn_t get_reciprocal(ZZ q);
+void compute_reciprocal(ZZ q);
+extern std::map<ZZ, std::pair<cuyasheint_t*,int>> reciprocals;
 
 
 // template Polynomial common_addition<Polynomial>(Polynomial *a,Polynomial *b);
@@ -63,7 +66,8 @@ class Polynomial{
         this->coefs.resize(this->get_phi().deg()+1);
       
 
-      Polynomial::compute_reciprocals();
+      if(this->mod != 0)
+        compute_reciprocal(this->mod);
       #ifdef VERBOSE
         std::cout << "Polynomial constructed with CRTSPACING " << this->CRTSPACING << " and no mod or phi elements" << std::endl;
       #endif
@@ -89,7 +93,8 @@ class Polynomial{
         this->coefs.resize(this->get_phi().deg()+1);
       }
       
-      Polynomial::compute_reciprocals();
+      if(this->mod != 0)
+        compute_reciprocal(this->mod);
       
       #ifdef VERBOSE
         std::cout << "Polynomial constructed with CRTSPACING " << this->CRTSPACING << ", mod "  << this->mod << " but no phi."<< std::endl;
@@ -115,7 +120,8 @@ class Polynomial{
         this->coefs.resize(this->get_phi().deg()+1);
       }
       
-      Polynomial::compute_reciprocals();
+      if(this->mod != 0)
+        compute_reciprocal(this->mod);
       
       #ifdef VERBOSE
         std::cout << "Polynomial constructed with CRTSPACING " << this->CRTSPACING << ", mod "  << this->mod <<" and phi " << this-> phi << std::endl;
@@ -145,7 +151,8 @@ class Polynomial{
       }
 
       
-      Polynomial::compute_reciprocals();
+      if(this->mod != 0)
+        compute_reciprocal(this->mod);
       
       #ifdef VERBOSE
         std::cout << "Polynomial constructed with CRTSPACING " << this->CRTSPACING << " and no mod or phi elements" << std::endl;
@@ -172,7 +179,8 @@ class Polynomial{
         this->coefs.resize(this->get_phi().deg()+1);
       }
       
-      Polynomial::compute_reciprocals();
+      if(this->mod != 0)
+        compute_reciprocal(this->mod);
       
       #ifdef VERBOSE
         std::cout << "Polynomial constructed with CRTSPACING " << this->CRTSPACING << ", mod "  << this->mod <<" and phi " << this->phi << std::endl;
@@ -196,7 +204,8 @@ class Polynomial{
         this->coefs.resize(this->get_phi().deg()+1);
       }
       
-      Polynomial::compute_reciprocals();
+      if(this->mod != 0)
+        compute_reciprocal(this->mod);
       
       #ifdef VERBOSE
         std::cout << "Polynomial constructed with CRTSPACING " << this->CRTSPACING << ", mod "  << this->mod << std::endl;
@@ -824,7 +833,7 @@ class Polynomial{
         }
 
         #ifndef CUFFTMUL
-        Polynomial::compute_reciprocal(M);
+        compute_reciprocal(M);
         #endif
 
         Polynomial::CRTProduct = M;
@@ -961,6 +970,7 @@ class Polynomial{
     void crt();
     void icrt();
     void modn(ZZ n){
+
       cudaError_t result;
 
       bn_t *h_m;
@@ -968,20 +978,15 @@ class Polynomial{
       h_m->alloc = 0;
       get_words(h_m,n);
       
-      std::pair<cuyasheint_t*,int> pair = Polynomial::reciprocals[n];
-      cuyasheint_t *u = std::get<0>(pair);
-      int su = std::get<1>(pair);
-
-      assert( u != NULL);
-      assert( su > 0);
+      bn_t u = get_reciprocal(n);
 
       callCuModN( d_bn_coefs,
                   d_bn_coefs,
                   get_crt_spacing(),
                   h_m->dp,
                   h_m->used,
-                  u,
-                  su,
+                  u.dp,
+                  u.used,
                   get_stream());
       result = cudaDeviceSynchronize();
       assert(result == cudaSuccess);
@@ -1035,9 +1040,9 @@ class Polynomial{
        */
       if(this->get_crt_spacing() == new_spacing && get_device_updated()){
         // Data lies in GPU's global memory and has the correct alignment
-        #ifdef VERBOSE
+        // #ifdef VERBOSE
         std::cout << "No need to update crt spacing." << std::endl;
-        #endif
+        // #endif
         return;
       }else if(!get_device_updated()){
         cudaError_t result;
@@ -1247,8 +1252,6 @@ class Polynomial{
     bool DEVICE_IS_UPDATE;
     bool CRT_COMPUTED;
     bool ICRT_COMPUTED;
-    bool RECIPROCAL_COMPUTED;
-    static std::map<ZZ, std::pair<cuyasheint_t*,int>> reciprocals;
 
     //Functions and methods
     
@@ -1256,55 +1259,6 @@ class Polynomial{
     // u = q * 2^(2*192)//q //
     //////////////////////////
 
-    /**
-     * Computes the reciprocal for an arbitrary ZZ
-     * @param b [description]
-     */
-    static void compute_reciprocal(ZZ q){
-      // x = 2^e (e >= 0)
-      ZZ x = power2_ZZ(2*NTL::NumBits(q));
-      ZZ u_ZZ = x/q;
-      bn_t *h_u;
-      h_u = (bn_t*) malloc (sizeof(bn_t));
-      h_u->alloc = 0;
-
-      get_words(h_u,u_ZZ);  
-
-      //////////
-      // Copy //
-      //////////
-      cudaError_t result;
-      
-      // Copy words
-      cuyasheint_t *d_u;        
-      
-      // Copy to device
-      result = cudaMalloc((void**)&d_u,h_u->alloc*sizeof(cuyasheint_t));
-      assert(result == cudaSuccess);
-      
-      result = cudaMemcpy(d_u,h_u->dp,h_u->alloc*sizeof(cuyasheint_t),cudaMemcpyHostToDevice);
-      assert(result == cudaSuccess);
-
-      Polynomial::reciprocals[q] = std::pair<cuyasheint_t*,int>(d_u,h_u->used);
-      
-      free(h_u);
-    }
-
-    /**
-     * Computes the reciprocals for all expected Yashe::q
-     * This function looks like useless
-     */
-    static void compute_reciprocals(){
-
-      assert(STD_BNT_ALLOC >= 4);
-
-      /////////////////////////////////////////////////////////
-      // The reciprocal of 77287149995192912462927307869L is//
-      // 154574299990385824925854615738L                     //
-      ///////////////////////////////////////////////////////
-      
-      compute_reciprocal(to_ZZ("77287149995192912462927307869L"));
-    }    
   protected:
     std::vector<ZZ> coefs;
 
