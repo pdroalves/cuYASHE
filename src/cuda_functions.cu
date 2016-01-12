@@ -1,12 +1,13 @@
-#include "cuda_functions.h"
-#include "settings.h"
-#include "polynomial.h"
 #include <cuda.h>
 #include <cuda_runtime_api.h>
 #include <cuda_runtime.h>
 #include <iostream>
 #include <stdio.h>
 #include <assert.h>
+#include "cuda_functions.h"
+#include "cuda_bn.h"
+#include "settings.h"
+#include "polynomial.h"
 
 
 #ifdef NTTMUL
@@ -56,9 +57,9 @@ __host__ cuyasheint_t* CUDAFunctions::callRealignCRTResidues(cudaStream_t stream
                                                               const int residuesQty){
   if(oldSpacing == newSpacing)
     return NULL;
-  #ifdef VERBOSE
+  // #ifdef VERBOSE
   std::cout << "Realigning..." << std::endl;
-  #endif
+  // #endif
   
   int size;
   if(newSpacing < oldSpacing)
@@ -753,9 +754,9 @@ __host__ void CUDAFunctions::init(int N){
   CUDAFunctions::N = N;
 
   #ifdef NTTMUL
-  #ifdef VERBOSE
+  // #ifdef VERBOSE
   std::cout << "Will compute W -- N = " << N << std::endl;
-  #endif
+  // #endif
 
   cuyasheint_t *h_W;
   cuyasheint_t *h_WInv;

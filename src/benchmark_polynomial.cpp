@@ -157,43 +157,44 @@ int main(int argc,char* argv[]){
     ///////////////////////////////////////////////
     // CRT/ICRT
     //
+    // Polynomial::random(&a,d-1);
+    // clock_gettime( CLOCK_REALTIME, &start);
+    // for(int i = 0; i < N;i++){
+    //   a.set_device_updated(false);
+    //   a.update_device_data();
+    //   result = cudaDeviceSynchronize();
+    //   assert(result == cudaSuccess);
+    // }
+    // clock_gettime( CLOCK_REALTIME, &stop);
+    // diff = compute_time_ms(start,stop)/N;
+    // std::cout << "CRT) Foward: " << diff << " ms" << std::endl;
+    // crt << d << " " << diff  << std::endl;
+
+    // cudaMemGetInfo(&f, &t);
+    // // cout << "Free memory: " << f/(1024*1024) << std::endl;
+    // // std::cout << "Press Enter to Continue" << std::endl;
+    // //cin.ignore();
+
+    // clock_gettime( CLOCK_REALTIME, &start);
+    // a.update_host_data();
+    // for(int i = 0; i < N;i++){
+    //   a.set_host_updated(false);
+    //   a.icrt();
+    //   result = cudaDeviceSynchronize();
+    //   assert(result == cudaSuccess);
+    // }
+    // clock_gettime( CLOCK_REALTIME, &stop);
+    // diff = compute_time_ms(start,stop)/N;
+    // std::cout << "CRT) Inverse: " << diff << " ms" << std::endl;
+    // icrt << d << " " << diff  << std::endl;
+
+    // cudaMemGetInfo(&f, &t);
+    // cout << "Free memory: " << f/(1024*1024) << std::endl;
+    // std::cout << "Press Enter to Continue" << std::endl;
+    //cin.ignore();
+
+    clock_gettime( CLOCK_REALTIME, &start);
     Polynomial::random(&a,d-1);
-    clock_gettime( CLOCK_REALTIME, &start);
-    for(int i = 0; i < N;i++){
-      a.set_device_updated(false);
-      a.update_device_data();
-      result = cudaDeviceSynchronize();
-      assert(result == cudaSuccess);
-    }
-    clock_gettime( CLOCK_REALTIME, &stop);
-    diff = compute_time_ms(start,stop)/N;
-    std::cout << "CRT) Foward: " << diff << " ms" << std::endl;
-    crt << d << " " << diff  << std::endl;
-
-    cudaMemGetInfo(&f, &t);
-    // cout << "Free memory: " << f/(1024*1024) << std::endl;
-    // std::cout << "Press Enter to Continue" << std::endl;
-    //cin.ignore();
-
-    clock_gettime( CLOCK_REALTIME, &start);
-    a.update_host_data();
-    for(int i = 0; i < N;i++){
-      a.set_host_updated(false);
-      a.icrt();
-      result = cudaDeviceSynchronize();
-      assert(result == cudaSuccess);
-    }
-    clock_gettime( CLOCK_REALTIME, &stop);
-    diff = compute_time_ms(start,stop)/N;
-    std::cout << "CRT) Inverse: " << diff << " ms" << std::endl;
-    icrt << d << " " << diff  << std::endl;
-
-    cudaMemGetInfo(&f, &t);
-    // cout << "Free memory: " << f/(1024*1024) << std::endl;
-    // std::cout << "Press Enter to Continue" << std::endl;
-    //cin.ignore();
-
-    clock_gettime( CLOCK_REALTIME, &start);
     a.update_device_data();
     for(int i = 0; i < N;i++){
       a.reduce();

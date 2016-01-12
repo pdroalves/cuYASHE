@@ -869,7 +869,6 @@ BOOST_AUTO_TEST_CASE(phiReduceGPU)
     a.set_host_updated(false);
 
     a.reduce();
-    a %= Polynomial::global_mod;
 
     a_ntl %= conv<ZZ_pEX>(ZZ_pE::modulus());
     BOOST_REQUIRE(NTL::deg(a_ntl) == a.deg());
@@ -881,7 +880,8 @@ BOOST_AUTO_TEST_CASE(phiReduceGPU)
         ntl_value = 0L;
       else
         ntl_value = conv<ZZ>(NTL::rep(NTL::coeff(a_ntl,i))[0]);
-      BOOST_REQUIRE(a.get_coeff(i)%Polynomial::global_mod == ntl_value);
+      std::cout << a.get_coeff(i) << " ==? " << ntl_value << std::endl;
+      BOOST_REQUIRE(a.get_coeff(i) == ntl_value);
     }
   }
 }
