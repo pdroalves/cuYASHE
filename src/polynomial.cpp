@@ -174,6 +174,8 @@ void get_words(bn_t *b,ZZ a){
     }
 
     result = cudaMemcpy(b->dp,h_dp,used*sizeof(cuyasheint_t),cudaMemcpyHostToDevice);
+    if(result != cudaSuccess)
+    	std::cout << "Fodeu!" << std::endl;
     assert(result == cudaSuccess);
 
   // }
