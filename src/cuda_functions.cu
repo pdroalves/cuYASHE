@@ -57,9 +57,9 @@ __host__ cuyasheint_t* CUDAFunctions::callRealignCRTResidues(cudaStream_t stream
                                                               const int residuesQty){
   if(oldSpacing == newSpacing)
     return NULL;
-  // #ifdef VERBOSE
+  #ifdef VERBOSE
   std::cout << "Realigning..." << std::endl;
-  // #endif
+  #endif
   
   int size;
   if(newSpacing < oldSpacing)
@@ -106,23 +106,17 @@ __global__ void polynomialAddSub(const int OP,const cuyasheint_t *a,const cuyash
   }
 }
 
-__host__ cuyasheint_t* CUDAFunctions::callPolynomialAddSub(cudaStream_t stream,cuyasheint_t *a,cuyasheint_t *b,int size,int OP){
+__host__ void CUDAFunctions::callPolynomialAddSub(cuyasheint_t *c,cuyasheint_t *a,cuyasheint_t *b,int size,int OP,cudaStream_t stream){
   // This method expects that both arrays are aligned
   int ADDGRIDXDIM = (size%ADDBLOCKXDIM == 0? size/ADDBLOCKXDIM : size/ADDBLOCKXDIM + 1);
   dim3 gridDim(ADDGRIDXDIM);
   dim3 blockDim(ADDBLOCKXDIM);
 
-  cuyasheint_t *d_new_array;
-  cudaError_t result = cudaMalloc((void**)&d_new_array,size*sizeof(cuyasheint_t));
-  assert(result == cudaSuccess);
-
-  polynomialAddSub <<< gridDim,blockDim,0,stream  >>> (OP,a,b,d_new_array,size,N);
+  polynomialAddSub <<< gridDim,blockDim,0,stream  >>> (OP,a,b,c,size,N);
   assert(cudaGetLastError() == cudaSuccess);
   #ifdef VERBOSE
   std::cout << "polynomialAdd kernel:" << cudaGetErrorString(cudaGetLastError()) << std::endl;
   #endif
-
-  return d_new_array;
 }
 
 __global__ void polynomialAddSubInPlace(const int OP, cuyasheint_t *a,const cuyasheint_t *b,const int size,const int N){

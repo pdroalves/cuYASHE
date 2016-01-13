@@ -43,11 +43,12 @@ class CUDAFunctions{
     static cufftHandle plan;
     #endif
 
-    static cuyasheint_t* callPolynomialAddSub(cudaStream_t stream,
+    static void callPolynomialAddSub(cuyasheint_t *c,
                                             cuyasheint_t *a,
                                             cuyasheint_t *b,
                                             int size,
-                                            int OP);
+                                            int OP,
+                                            cudaStream_t stream);
     static void callPolynomialAddSubInPlace(cudaStream_t stream,
                                             cuyasheint_t *a,
                                             cuyasheint_t *b,

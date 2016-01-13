@@ -623,8 +623,6 @@ __global__ void cuICRT(	bn_t *poly,
 	
 	 if(tid < N){
 
-	 	if(poly[cid].alloc < 0)
-	 		printf("Achei!\n");
 	 	bn_zero(&poly[cid]);
  		
  		bn_t inner_result = inner_results[cid];
@@ -647,8 +645,6 @@ __global__ void cuICRT(	bn_t *poly,
 	 								pi);
 
 	 			// Adjust available words in inner_result
- 				if(inner_result.alloc < Mpis[rid].used+1)
-	 				printf("Fodeu!\n");
  				assert(inner_result.alloc >= Mpis[rid].used+1);
  					// bn_grow_d(&inner_result,1);
 
@@ -700,7 +696,7 @@ __global__ void cuICRT(	bn_t *poly,
  	 	/**
  	 	 * At this point a thread i finished the computation of coefficient i
  	 	 */
-		// bn_mod_barrt(poly,poly,N,M.dp,M.used,u.dp,u.used);	 	
+		bn_mod_barrt(poly,poly,N,M.dp,M.used,u.dp,u.used);	 	
 	 }
 
 }
@@ -726,8 +722,8 @@ void callCRT(bn_t *coefs,const int used_coefs,cuyasheint_t *d_polyCRT,const int 
 	// testData<<<1,1,0,stream>>>(d_polyCRT,N*NPolis);
 	result = cudaGetLastError();
 	assert(result == cudaSuccess);
-	cudaDeviceSynchronize();
-	assert(result == cudaSuccess);
+	// cudaDeviceSynchronize();
+	// assert(result == cudaSuccess);
 
 }
 
@@ -756,8 +752,8 @@ void callICRT(bn_t *coefs,cuyasheint_t *d_polyCRT,const int N, const int NPolis,
 											CUDAFunctions::d_inner_results);
 	cudaError_t result = cudaGetLastError();
 	assert(result == cudaSuccess);
-	cudaDeviceSynchronize();
-	assert(result == cudaSuccess);
+	// cudaDeviceSynchronize();
+	// assert(result == cudaSuccess);
 
 }
 

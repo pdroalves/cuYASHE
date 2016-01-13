@@ -310,15 +310,15 @@ class Polynomial{
           }
       }
 
-      cuyasheint_t *d_result = CUDAFunctions::callPolynomialAddSub(this->stream,
-                                                                    this->get_device_crt_residues(),
-                                                                    b.get_device_crt_residues(),
-                                                                    (int)(this->CRTSPACING*Polynomial::CRTPrimes.size()),
-                                                                    SUB);
-
       Polynomial *c;
       c = new Polynomial(this->get_mod(),this->get_phi(),this->get_crt_spacing());
-      c->set_device_crt_residues(d_result);
+      CUDAFunctions::callPolynomialAddSub(c->get_device_crt_residues(),
+                                          this->get_device_crt_residues(),
+                                          b.get_device_crt_residues(),
+                                          (int)(this->CRTSPACING*Polynomial::CRTPrimes.size()),
+                                          SUB,
+                                          this->stream);
+
       c->set_host_updated(false);
       c->set_device_updated(true);
       // cudaDeviceSynchronize();
@@ -1081,37 +1081,35 @@ class Polynomial{
         result = cudaMemsetAsync(d_polyCRT,0,new_spacing*(CRTPrimes.size())*sizeof(cuyasheint_t),get_stream());
         assert(result == cudaSuccess);
 
-        set_device_crt_residues(d_polyCRT);
         return; 
       }else{
         #ifdef VERBOSE
         std::cout << "Need a realign to update crt spacing." << std::endl;
         #endif
+        cudaError_t result;
         /**
          * Update bn_coefs
          */
-        cudaError_t result;
-
-       if(h_bn_coefs)
-          free(h_bn_coefs);
-        h_bn_coefs = (bn_t*)malloc(new_spacing*sizeof(bn_t));
-        for(int i = 0; i < new_spacing; i++){
-          h_bn_coefs[i].alloc = STD_BNT_WORDS_ALLOC;
-          h_bn_coefs[i].used = 0;
-          h_bn_coefs[i].sign = BN_POS;
-
-          result = cudaMalloc((void**)&h_bn_coefs[i].dp,h_bn_coefs[i].alloc*sizeof(cuyasheint_t));
-          assert(result == cudaSuccess);
-          result = cudaMemsetAsync(h_bn_coefs[i].dp,0,h_bn_coefs[i].alloc*sizeof(cuyasheint_t));
-          assert(result == cudaSuccess);
-        }
-                
         if(d_bn_coefs){
           result = cudaFree(d_bn_coefs);
           assert(result == cudaSuccess);
         } 
+       if(h_bn_coefs)
+          free(h_bn_coefs);
+
+        cuyasheint_t *tmp;
+        result = cudaMalloc((void**)&tmp,new_spacing*STD_BNT_WORDS_ALLOC*sizeof(cuyasheint_t));
+        assert(result == cudaSuccess);
         result = cudaMalloc((void**)&d_bn_coefs,new_spacing*sizeof(bn_t));
-        assert(result == cudaSuccess);;
+        assert(result == cudaSuccess);
+        h_bn_coefs = (bn_t*)malloc(new_spacing*sizeof(bn_t));
+
+        for(int i = 0; i < new_spacing; i++,tmp += STD_BNT_WORDS_ALLOC){
+          h_bn_coefs[i].alloc = STD_BNT_WORDS_ALLOC;
+          h_bn_coefs[i].used = 0;
+          h_bn_coefs[i].sign = BN_POS;
+          h_bn_coefs[i].dp = tmp;
+        }
 
         result = cudaMemcpyAsync(d_bn_coefs,h_bn_coefs,new_spacing*sizeof(bn_t),cudaMemcpyHostToDevice,get_stream());
         assert(result == cudaSuccess);

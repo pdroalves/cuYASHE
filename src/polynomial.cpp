@@ -35,9 +35,14 @@ const int PRIMES_BUCKET_SIZE = 200;                                             
 Polynomial Polynomial::operator+(Polynomial &b){
   Polynomial p = common_addition<Polynomial>(this,&b);
 
+  // uint64_t start,end;
+  // start = get_cycles();
   p.icrt();
-  p.modn(CRTProduct);
-  p.crt();
+  // cudaDeviceSynchronize();
+  // end = get_cycles();
+  // std::cout << (end-start) << " cycles" << std::endl;
+  // p.modn(CRTProduct);
+  // p.crt();
   return p;
 }
 
@@ -45,8 +50,8 @@ Polynomial Polynomial::operator+=(Polynomial &b){
   common_addition_inplace<Polynomial>(this,&b);
 
   this->icrt();
-  this->modn(CRTProduct);
-  this->crt();
+  // this->modn(CRTProduct);
+  // this->crt();
   return *this;
 }
 
@@ -54,8 +59,8 @@ Polynomial Polynomial::operator*(Polynomial &b){
   Polynomial p = common_multiplication<Polynomial>(this,&b);
  
   p.icrt();
-  p.modn(CRTProduct);
-  p.crt();
+  // p.modn(CRTProduct);
+  // p.crt();
   return p;
 }
 
@@ -174,8 +179,6 @@ void get_words(bn_t *b,ZZ a){
     }
 
     result = cudaMemcpy(b->dp,h_dp,used*sizeof(cuyasheint_t),cudaMemcpyHostToDevice);
-    if(result != cudaSuccess)
-    	std::cout << "Fodeu!" << std::endl;
     assert(result == cudaSuccess);
 
   // }
@@ -188,6 +191,49 @@ void get_words(bn_t *b,ZZ a){
   b->sign = (a>=0?BN_POS:BN_NEG);
 
   free(h_dp);
+}
+void get_words_allocatted(bn_t *b,ZZ a,cuyasheint_t *h_data, cuyasheint_t *d_data, int index,cudaStream_t stream){
+  /**
+   * Compute
+   */
+  cuyasheint_t *h_dp;
+  int used = 0;
+  int alloc = std::max(STD_BNT_WORDS_ALLOC,CUDAFunctions::M.alloc);
+  h_dp = h_data + index*alloc;
+
+  for(ZZ x = NTL::abs(a); x > 0; x=(x>>WORD),used++){
+    if(used >= alloc){
+      h_dp = (cuyasheint_t*)realloc(h_dp,alloc+STD_BNT_WORDS_ALLOC);
+      alloc += STD_BNT_WORDS_ALLOC;
+      std::cout << "get_words realloc!" << std::endl;
+    }
+    h_dp[used] = conv<uint32_t>(x&UINT32_MAX);
+  }
+
+  // if(b->alloc != alloc && alloc > 0){
+    cudaError_t result;
+    if(b->alloc != alloc || b->dp == 0x0){
+      // If b->dp was allocated with less data than we need
+      if(b->alloc != 0){
+        result = cudaFree(b->dp);
+        assert(result == cudaSuccess); 
+      }
+    
+      b->dp = d_data + index*alloc;
+      assert(result == cudaSuccess);  
+    }
+
+    result = cudaMemcpyAsync(b->dp,h_dp,used*sizeof(cuyasheint_t),cudaMemcpyHostToDevice,stream);
+    assert(result == cudaSuccess);
+
+  // }
+  /*
+   * Copy new data to device memory
+   */
+
+  b->used = used;
+  b->alloc = alloc;
+  b->sign = (a>=0?BN_POS:BN_NEG);
 }
 /**
  * Convert an array of words into a NTL ZZ
@@ -226,42 +272,47 @@ void Polynomial::update_device_data(){
   #endif
 
   this->ON_COPY = true;
-  // Verifica se o espaçamento é válido. Se não for, ajusta.
-  if(this->get_crt_spacing() < (this->deg()+1)){
-    int new_spacing;
-    if((this->deg()+1) > 0)
-    	new_spacing = this->deg()+1;
-    else
-    	new_spacing = Polynomial::global_phi->deg();
+  if(!get_device_updated()){
+	  // Verifica se o espaçamento é válido. Se não for, ajusta.
+	  if(this->get_crt_spacing() < (this->deg()+1)){
+	    int new_spacing;
+	    if((this->deg()+1) > 0)
+	    	new_spacing = this->deg()+1;
+	    else
+	    	new_spacing = Polynomial::global_phi->deg();
 
-    // Data on device isn't updated (we check it on begginning)
-    // So, update_crt_spacing(int) will only update CRTSpacing and alloc memory
-    this->update_crt_spacing(new_spacing);
-  }
+	    // Data on device isn't updated (we check it on begginning)
+	    // So, update_crt_spacing(int) will only update CRTSpacing and alloc memory
+	    this->update_crt_spacing(new_spacing);
+	  }
 
-  cudaError_t result;
-  /////////////////////////////////////////////////
-  // At this point bn_coefs.size() == CRTSPACING //
-  /////////////////////////////////////////////////
+	  cudaError_t result;
+	  /////////////////////////////////////////////////
+	  // At this point bn_coefs.size() == CRTSPACING //
+	  /////////////////////////////////////////////////
 
-  /**
-   * Converts ZZs to bn_t
-   */
+	  /**
+	   * Converts ZZs to bn_t
+	   */
+	  cuyasheint_t *data = (cuyasheint_t*)malloc((deg()+1)*STD_BNT_WORDS_ALLOC*sizeof(cuyasheint_t));
+	  cuyasheint_t *d_data;
+	  result = cudaMalloc((void**)&d_data,(deg()+1)*STD_BNT_WORDS_ALLOC*sizeof(cuyasheint_t));
+	  (cuyasheint_t*)malloc((deg()+1)*STD_BNT_WORDS_ALLOC*sizeof(cuyasheint_t));
+	  for(int i = 0; i < (deg()+1); i++)
+	    get_words_allocatted(&h_bn_coefs[i],get_coeff(i),data,d_data,i,get_stream());  
 
-  for(int i = 0; i < (deg()+1); i++)
-    get_words(&h_bn_coefs[i],get_coeff(i));  
-
-  ////////////////////
-  // Copy to device //
-  ////////////////////
-  result = cudaMemcpyAsync(d_bn_coefs,
-                      h_bn_coefs,
-                      (deg()+1)*sizeof(bn_t),
-                      cudaMemcpyHostToDevice,
-                      get_stream() 
-                      );
-  assert(result == cudaSuccess);
-
+	  ////////////////////
+	  // Copy to device //
+	  ////////////////////
+	  result = cudaMemcpyAsync(d_bn_coefs,
+	                      h_bn_coefs,
+	                      (deg()+1)*sizeof(bn_t),
+	                      cudaMemcpyHostToDevice,
+	                      get_stream() 
+	                      );
+	  assert(result == cudaSuccess);
+	  free(data);
+  }	
   /**
   *  CRT
   */

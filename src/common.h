@@ -64,10 +64,14 @@ P common_addition(P *a,P *b){
 	    }
 	}
 
-	cuyasheint_t *d_result = CUDAFunctions::callPolynomialAddSub(a->get_stream(),a->get_device_crt_residues(),b->get_device_crt_residues(),(int)(a->CRTSPACING*P::CRTPrimes.size()),ADD);
-
 	P c = P(a->get_mod(),a->get_phi(),new_spacing);
-	c.set_device_crt_residues(d_result);
+	CUDAFunctions::callPolynomialAddSub(c.get_device_crt_residues(),
+										a->get_device_crt_residues(),
+										b->get_device_crt_residues(),
+										(int)(a->CRTSPACING*P::CRTPrimes.size()),
+										ADD,
+										a->get_stream());
+
 	c.set_host_updated(false);
 	c.set_device_updated(true);
 	// cudaDeviceSynchronize();
