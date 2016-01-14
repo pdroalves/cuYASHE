@@ -15,8 +15,8 @@
 // #define PRIMITIVE_ROOT (int)7;//2^31-1 fails the test(P-1)%N
 // #define PRIMEP (uint32_t)4294955009
 // #define PRIMITIVE_ROOT (int)3
-#define PRIMEP (uint32_t)4293918721
-#define PRIMITIVE_ROOT (int)19
+#define PRIMEP (uint64_t)18446744069414584321
+#define PRIMITIVE_ROOT (int)7
 
  ZZ PZZ = to_ZZ(PRIMEP); 
 
@@ -272,61 +272,119 @@ __device__ __host__ bool overflow(const uint64_t a, const uint64_t b){
   return (a+b) < a;
 }
 
-__device__ __host__ uint32_t s_rem (uint64_t a){
-
-  // Special reduction for prime 2147483647
+__device__ __host__ uint64_t s_rem (uint64_t a)
+{
+  // Special reduction for prime 2^64-2^32+1
   //
-  // c = c_1 * 2^31 + c_0 
-  // 
-  // So, c \mod P = (c >> 31) + (c & 0x7FFFFFFF);
+  // x3 * 2^96 + x2 * 2^64 + x1 * 2^32 + x0 \equiv
+  // (x1+x2) * 2^32 + x0 - x3 - x2 mod p
+  //
+  // Here: x3 = 0, x2 = 0, x1 = (a >> 32), x0 = a-(x1 << 32)
+  // const uint64_t p = 0xffffffff00000001;
+  // uint64_t x3 = 0;
+  // uint64_t x2 = 0;
 
-  // uint32_t res = (a>>31) + (a & P);
-  // // Doing this way we avoid branching
-  // res -= P*(res>=P);
+  uint64_t x1 = (a >> 32);
+  uint64_t x0 = (a & UINT32_MAX);
 
-  // return res;
+  // uint64_t res = ((x1+x2)<<32 + x0-x3-x2);
+  uint64_t res = ((x1<<32) + x0);
 
-  return a % PRIMEP;
-}
-
-__device__ __host__  uint32_t s_mul(volatile uint32_t a,volatile uint32_t b){
-  // Multiply and reduce a and b by prime PRIMEP
-
-  // Multiply
-  uint32_t res = s_rem(
-      (uint64_t)a * (uint64_t)b
-    );
-  uint32_t tmp = res;
-  return tmp;
-}
-
-__device__ __host__  uint32_t s_add( uint32_t a, uint32_t b){
-
-  // Add and reduce a and b by prime PRIMEP
-  const uint32_t diff = UINT32_MAX-PRIMEP+1;
-
-  uint32_t res = s_rem(
-        (a+b) + diff*((a+b) < a)
-      );
-  return res;  // Modular reduction by P  
-}
-
-
-__device__ __host__ uint32_t s_sub( uint32_t a, uint32_t b){
-  // Computes a-b % P
-  // Because CRT primes are smaller than 30 bits, a and b < P
-
-  // Doing this way we avoid branching
-  uint32_t res = ((PRIMEP-b)+a)*(b > a) +
-                 (a-b)*(b <= a);
+  if(res >= PRIMEP){
+    res -= PRIMEP;
+    x1 = (res >> 32);
+    x0 = (res & UINT32_MAX);
+    res = ((x1<<32) + x0);
+  }
 
   return res;
 }
 
-__host__ __device__ void butterfly(uint32_t *v){
+__device__ __host__  uint64_t s_mul(volatile uint64_t a,volatile uint64_t b){
+  // Multiply and reduce a and b by prime 2^64-2^32+1
+  #ifdef __CUDA_ARCH__
+  const uint64_t GAP = (UINT64_MAX-PRIMEP+1);
+
+  const uint64_t cHi = __umul64hi(a,b);
+  const uint64_t cLo = a*b;
+
+
+  // Reduce
+  const uint64_t x3 = (cHi >> 32);
+  const uint64_t x2 = (cHi & UINT32_MAX);
+  const uint64_t x1 = (cLo >> 32);
+  const uint64_t x0 = (cLo & UINT32_MAX);
+
+  const uint64_t X1 = (x1<<32);
+  const uint64_t X2 = (x2<<32);
+
+  ///////////////////////////////
+  //
+  // Here we can see three kinds of overflows:
+  //
+  // * Negative overflow: Result is negative. 
+  // Since uint64_t uses mod UINT64_MAX, we need to translate to the correct value mod PRIMEP.
+  // * Simple overflow: Result is bigger than PRIMEP but not enough to exceed UINT64_MAX.
+  //  We solve this in the same way we solve negative overflow, just translate to the correct value mod PRIMEP.
+  // * Double overflow
+
+  uint64_t res = X1+X2+x0-x2-x3;
+  const bool testA = (x2+x3 > X1+X2+x0) && !( overflow(X1,X2) ||  overflow(X1+X2,x0) ); // Negative overflow
+  const bool testB = ( res >= PRIMEP ); // Simple overflow
+  const bool testC = (overflow(X1,X2) || overflow(X1+X2,x0)) && (X1+X2+x0 > x2+x3); // Double overflow
+
+  // This avoids conditional branchs
+  // res = (PRIMEP-res)*(testA) + (res-PRIMEP)*(!testA && testB) + (PRIMEP - (UINT64_MAX-res))*(!testA && !testB && testC) + (res)*(!testA && !testB && !testC);
+  res =   (PRIMEP-res)*(testA) 
+        + (res-PRIMEP)*(!testA && testB) 
+        + (res+GAP)*(!testA && !testB && testC) 
+        + (res)*(!testA && !testB && !testC);
+
+   #else
+  uint64_t res = (((__uint128_t)a) * ((__uint128_t)b) )%PRIMEP;
+  #endif
+  return res;
+}
+__device__ __host__  uint64_t s_add(volatile uint64_t a,volatile uint64_t b){
+  // Add and reduce a and b by prime 2^64-2^32+1
+  // 4294967295L == UINT64_MAX - P
+  uint64_t res = a+b;
+  // res += (res < a)*4294967295L;
+  if(res < a)
+    res += 4294967295L;
+  res = s_rem(res);  
+  
+  #ifdef __CUDA_ARCH__
+  __syncthreads();
+  #endif
+  return res;
+}
+
+
+__device__ __host__ uint64_t s_sub(volatile uint64_t a,volatile uint64_t b){
+  // Computes a-b % P
+  // 4294967295L == UINT64_MAX - P
+
+  uint64_t res;
+  if(b > a){
+    res = PRIMEP;
+    res -= b;
+    res += a;
+  }
+  else
+    res = a-b;
+  // res = (a-b) + (b > a)*P; 
+
+  #ifdef __CUDA_ARCH__
+  __syncthreads();
+  #endif
+  return res;
+}
+
+__host__ __device__ void butterfly(uint64_t *v){
   // Butterfly
-  const uint32_t v0 = s_rem(v[0]);
-  const uint32_t v1 = s_rem(v[1]);
+  const uint64_t v0 = s_rem(v[0]);
+  const uint64_t v1 = s_rem(v[1]);
   v[0] = s_add(v0,v1);
   v[1] = s_sub(v0,v1);
 }
@@ -352,7 +410,7 @@ __device__ __host__ void NTTIteration(cuyasheint_t *W,
                                       const cuyasheint_t* data0,
                                       cuyasheint_t *data1,
                                       const int type){
-	uint32_t v[2] = {0,0};
+	uint64_t v[2] = {0,0};
 	const int idxS = j+residue_index;
   int w_index = ((j%Ns)*N)/(Ns*R);
 
@@ -367,8 +425,6 @@ __device__ __host__ void NTTIteration(cuyasheint_t *W,
 	const int idxD = expand(j,Ns,R)+residue_index;
 	for(int r=0; r<R;r++){
   		data1[idxD+r*Ns] = v[r];
-      if(data1[idxD+r*Ns] < v[r])
-        printf("Overflow! NTT");
     #ifdef __CUDA_ARCH__
     __syncthreads();
     #endif
@@ -407,11 +463,12 @@ __global__ void polynomialNTTMul(cuyasheint_t *a,const cuyasheint_t *b,const int
 
   if(tid < size ){
       // Coalesced access to global memory. Doing this way we reduce required bandwich.
-      uint32_t a_value = a[tid];
-      uint32_t b_value = b[tid];
+      uint64_t a_value = a[tid];
+      uint64_t b_value = b[tid];
 
       // In-place
       a[tid] = s_mul(a_value,b_value);
+      // a[tid] = a_value*b_value % 18446744069414584321;
   }
 }
 #endif

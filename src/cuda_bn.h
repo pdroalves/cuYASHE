@@ -16,7 +16,6 @@ NTL_CLIENT
 #define CMP_GT 		 1
 #define CMP_EQ		 0
 
-typedef uint64_t dcuyasheint_t;
 #define BN_DIGIT WORD
 typedef struct bn_st{
 	int alloc = 0;
@@ -32,7 +31,7 @@ __host__  void bn_free(bn_t *a);
 __host__ void bn_grow(bn_t *a,const unsigned int new_size);
 __host__ __device__ cuyasheint_t bn_mod1_low(const cuyasheint_t *a,
 									const int size,
-									const cuyasheint_t b);
+									const uint32_t b);
 __host__ __device__ cuyasheint_t bn_addn_low(cuyasheint_t *c,
 									cuyasheint_t *a,
 									cuyasheint_t *b,

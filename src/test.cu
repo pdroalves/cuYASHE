@@ -293,17 +293,17 @@ BOOST_AUTO_TEST_CASE(wNTest)
 #ifdef NTTMUL
 BOOST_AUTO_TEST_CASE(smulTest)
 {
-  const uint32_t P = 4293918721;
+  const uint64_t P = 18446744069414584321L;
   for(int i = 0; i < 100*NTESTS;i++){
-    uint32_t a = rand();
-    uint32_t b = rand();
-    uint32_t result = s_mul(a,b);
+    uint64_t a = (((long long)rand() << 32) | rand());
+    uint64_t b = (((long long)rand() << 32) | rand());
+    uint64_t result = s_mul(a,b);
     BOOST_REQUIRE(result == ((__uint128_t)(a)*(__uint128_t)(b) % P));
   }
   for(int i = 0; i < 100*NTESTS;i++){
-    uint32_t a = rand();
-    uint32_t b = rand();
-    uint32_t result = s_mul(a,b);
+    uint64_t a = rand();
+    uint64_t b = rand();
+    uint64_t result = s_mul(a,b);
     BOOST_REQUIRE(result == ((__uint128_t)(a)*(__uint128_t)(b) % P));
   }
 

@@ -52,8 +52,8 @@ __host__ __device__ void dv_zero(cuyasheint_t *a, int digits) {
  */
 __host__ __device__ void bn_zero(bn_t *a) {
 	a->sign = BN_POS;
-	a->used = 1;
-	dv_zero(a->dp, a->alloc);
+	a->used = 0;
+	// dv_zero(a->dp, a->alloc);
 }
 
 /**
@@ -152,21 +152,31 @@ __host__ void bn_grow(bn_t *a,const unsigned int new_size){
 //////////////
 
 // Mod
-__host__ __device__ cuyasheint_t bn_mod1_low(	const cuyasheint_t *a,
+__host__ __device__ cuyasheint_t bn_mod1_low(	const uint64_t *a,
 												const int size,
-												const cuyasheint_t b) {
+												const uint32_t b) {
 	// Computes a % b, where b is a one-word number
 	
-	dcuyasheint_t w;
-	cuyasheint_t r;
+	uint64_t w;
+	uint32_t r;
 	int i;
 
 	w = 0;
 	for (i = size - 1; i >= 0; i--) {
-		w = (w << ((dcuyasheint_t)BN_DIGIT)) | ((dcuyasheint_t)a[i]);
+		// First 32 bits word
+		uint32_t lo = uint32_t(a[i] & 0xFFFFFFFF);
+		w = (w << ((uint64_t)32)) | ((uint64_t)lo);
 
-		r = (cuyasheint_t)(w/b)*(w >= b);
-		w -= (((dcuyasheint_t)r) * ((dcuyasheint_t)b))*(w >= b);
+		r = (uint32_t)(w/b)*(w >= b);
+		w -= (((uint64_t)r) * ((uint64_t)b))*(w >= b);
+
+		// Second 32 bits word
+		uint32_t hi = uint32_t(a[i] >> 32);
+		w = ((w << ((uint64_t)32)) | ((uint64_t)hi))*(hi > 0) + w*(hi == 0);
+
+		r = (uint32_t)(w/b)*(w >= b);
+		w -= (((uint64_t)r) * ((uint64_t)b))*(w >= b || hi > 0);
+		
 	}
 	return (cuyasheint_t)w;
 }
@@ -181,23 +191,39 @@ __host__ __device__ cuyasheint_t bn_mod1_low(	const cuyasheint_t *a,
  * @param  size  input: number of words in a
  * @return       output: result's last word
  */
-__host__ __device__ cuyasheint_t bn_mul1_low(cuyasheint_t *c,
-									const cuyasheint_t *a,
-									cuyasheint_t digit,
-									int size) {
+__host__ __device__ cuyasheint_t bn_mul1_low(uint64_t *c,
+											const uint64_t *a,
+											uint64_t digit,
+											int size) {
 	int i;
-	cuyasheint_t carry;
-	dcuyasheint_t r;
+	uint64_t carry;
 
 	carry = 0;
-	for (i = 0; i < size; i++, a++, c++) {
-		/* Multiply the digit *tmpa by b and accumulate with the previous
-		 * result in the same columns and the propagated carry. */
-		r = (dcuyasheint_t)(carry) + (dcuyasheint_t)(*a) * (dcuyasheint_t)(digit);
+	for (i = 0; i < size; i++, a++, c++) {	
+  		#ifdef __CUDA_ARCH__
+		////////////
+  		// device //
+		////////////
+  		
+		/**
+		 * Multiply the digit *a by b and propagate the carry
+		 */
+		uint64_t lo = (*a)*digit;
+		uint64_t hi = __umul64hi(*a,digit) + (lo + carry < lo);
+		lo = lo + carry;
+
 		/* Increment the column and assign the result. */
-		*c = (cuyasheint_t)r;
+		*c = lo;
 		/* Update the carry. */
-		carry = (cuyasheint_t)(r >> (dcuyasheint_t)BN_DIGIT);
+		carry = hi;
+		#else
+		//////////
+		// host //
+		//////////
+		__uint128_t r = (((__uint128_t)(*a)) * ((__uint128_t)digit) );
+		*c = (r & 0xffffffffffffffffL);
+		carry = (r>>64);
+		#endif
 	}
 
 	return carry;
@@ -213,38 +239,53 @@ __host__ __device__ cuyasheint_t bn_mul1_low(cuyasheint_t *c,
 __device__ void bn_64bits_mulmod(cuyasheint_t *result,
 									cuyasheint_t a,
 									cuyasheint_t b,
-									cuyasheint_t m
+									uint32_t m
 									){
+	/////////
+	// Mul //
+	/////////
+	uint64_t rHi = __umul64hi(a,b);
+	uint64_t rLo = a*b;
+
+	/////////
+	// Mod //
+	/////////
+	uint64_t r[] = {	(uint64_t)(rLo & 0xFFFFFFFF),
+					(uint64_t)(rLo >> 32),
+					(uint64_t)(rHi & 0xFFFFFFFF),
+					(uint64_t)(rHi >> 32) };
+	*result = bn_mod1_low(r,4,(uint64_t)m);
 	/**
 	 * http://stackoverflow.com/a/18680280/1541615
 	 */
-    uint64_t res = 0;
-    // uint64_t temp_b;
+ //    uint64_t res = 0;
+ //    uint64_t temp_b;
 
-    /* Only needed if b may be >= m */
-    b = b - 
-    	m*(
-    		(b >= m) && (m > UINT64_MAX / 2u)
-    	);
-    b = b*(
-    		(b < m) || 
-    		(
-				(b >= m) && (m > UINT64_MAX / 2u)
-			)
-		) + 
-    	(b%m)*(
-				(b >= m) && (m <= UINT64_MAX / 2u)
-			  ); 
+ //    /* Only needed if b may be >= m */
+ //    if (b >= m) {
+ //        if (m > UINT64_MAX / 2u)
+ //            b -= m;
+ //        else
+ //            b %= m;
+ //    }
 
-    while (a != 0) {
+ //    while (a != 0) {
+ //    	res = res + (a & 1)*(b - (b >= m - res)*m);
+ //        // if (a & 1) {
+ //        //     /* Add b to res, modulo m, without overflow */
+ //        //     if (b >= m - res) /* Equiv to if (res + b >= m), without overflow */
+ //        //         res -= m;
+ //        //     res += b;
+ //        // }
+ //        a >>= 1;
 
-        res = res - m*((a & 1) && (b >= m - res)) + b*(a & 1);
-        a >>= 1;
-
-        /* Double b, modulo m */
-        b += b*(b < m - b) + (b-m)*(b >= m - b);
-    }
-	*result = res;
+ //        /* Double b, modulo m */
+ //        temp_b = b - (b >= m - b)*m + (b < m - b)*b;
+ //        // if (b >= m - b)        Equiv to if (2 * b >= m), without overflow 
+ //        //     temp_b -= m;
+ //        // b += temp_b;
+ //    }
+	// *result = res;
 }
 
 // Add
@@ -354,14 +395,31 @@ __host__ __device__ cuyasheint_t bn_sub1_low(cuyasheint_t *c, const cuyasheint_t
  * @param[in] A				- the first digit to multiply.
  * @param[in] B				- the second digit to multiply.
  */
-#define COMBA_STEP_BN_MUL_LOW(R2, R1, R0, A, B)								\
-	dcuyasheint_t r = (dcuyasheint_t)(A) * (dcuyasheint_t)(B);										\
-	cuyasheint_t _r = (R1);														\
-	(R0) += (cuyasheint_t)(r);														\
-	(R1) += (R0) < (cuyasheint_t)(r);												\
-	(R2) += (R1) < _r;														\
-	(R1) += (cuyasheint_t)((r) >> (dcuyasheint_t)BN_DIGIT);								\
-	(R2) += (R1) < (cuyasheint_t)((r) >> (dcuyasheint_t)BN_DIGIT);
+#ifdef __CUDA_ARCH__	
+
+#define COMBA_STEP_BN_MUL_LOW(R2, R1, R0, A, B)														\
+	uint64_t rHi = __umul64hi((uint64_t)(A) , (uint64_t)(B));										\
+	uint64_t rLo = (uint64_t)(A) * (uint64_t)(B);													\
+	uint64_t _r = (R1);																				\
+	(R0) += rLo;																					\
+	(R1) += (R0) < rLo;																				\
+	(R2) += (R1) < _r;																				\
+	(R1) += rHi;																					\
+	(R2) += (R1) < rHi;
+
+#else
+
+#define COMBA_STEP_BN_MUL_LOW(R2, R1, R0, A, B)														\
+	__uint128_t r = (__uint128_t)((uint64_t)(A))*(__uint128_t)((uint64_t)(B));						\
+	uint64_t rHi = (r>>64);																			\
+	uint64_t rLo = (r&0xffffffffffffffffL);															\
+	uint64_t _r = (R1);																				\
+	(R0) += rLo;																					\
+	(R1) += (R0) < rLo;																				\
+	(R2) += (R1) < _r;																				\
+	(R1) += rHi;																					\
+	(R2) += (R1) < rHi;
+#endif							
 
 /**
  * Accumulates a single precision digit in a triple register variable.
@@ -372,7 +430,7 @@ __host__ __device__ cuyasheint_t bn_sub1_low(cuyasheint_t *c, const cuyasheint_t
  * @param[in] A				- the first digit to accumulate.
  */
 #define COMBA_ADD(R2, R1, R0, A)											\
-	cuyasheint_t __r = (R1);														\
+	cuyasheint_t __r = (R1);												\
 	(R0) += (A);															\
 	(R1) += (R0) < (A);														\
 	(R2) += (R1) < __r;														\
@@ -455,49 +513,45 @@ __device__ void bn_mod_barrt(bn_t *C, const bn_t *A,const int NCoefs,
 
 		mu = sm;
 		sq = sa - (mu - 1);
-		for (i = 0; i < sq; i++) {
+		for (i = 0; i < sq; i++) 
 			q[i] = a[i + (mu - 1)];
-		}
-
+		
 		if (sq > su) {
 			bn_muld_low(t, q, sq, u, su, mu, sq + su);
 		} else {
 			bn_muld_low(t, u, su, q, sq, mu - (su - sq) - 1, sq + su);
 		}
 		st = sq + su;
-		while (st > 0 && t[st - 1] == 0) {
+		while (st > 0 && t[st - 1] == 0)
 			--(st);
-		}
+		
 
 		sq = st - (mu + 1);
-		for (i = 0; i < sq; i++) {
+		for (i = 0; i < sq; i++)
 			q[i] = t[i + (mu + 1)];
-		}
 
-		if (sq > sm) {
+		if (sq > sm) 
 			bn_muld_low(t, q, sq, m, sm, 0, sq + 1);
-		} else {
+		else 
 			bn_muld_low(t, m, sm, q, sq, 0, mu + 1);
-		}
+		
 		st = mu + 1;
-		while (st > 0 && t[st - 1] == 0) {
+		while (st > 0 && t[st - 1] == 0)
 			st--;
-		}
 
 		sq = mu + 1;
-		for (i = 0; i < sq; i++) {
+		for (i = 0; i < sq; i++) 
 			q[i] = t[i];
-		}
+		
 
 		st = mu + 1;
-		for (i = 0; i < sq; i++) {
+		for (i = 0; i < sq; i++)
 			t[i] = a[i];
-		}
-		carry = bn_subn_low(t, t, q, sq);
-		while (st > 0 && t[st - 1] == 0) {
-			st--;
-		}
 
+		carry = bn_subn_low(t, t, q, sq);
+		while (st > 0 && t[st - 1] == 0)
+			st--;
+		
 		if (carry) {
 			sq = (mu + 1);
 			for (i = 0; i < sq - 1; i++) {
@@ -507,13 +561,11 @@ __device__ void bn_mod_barrt(bn_t *C, const bn_t *A,const int NCoefs,
 			bn_subn_low(t, q, t, sq);
 		}
 
-		while (bn_cmpn_low(t, m, sm) == 1) {
+		while (bn_cmpn_low(t, m, sm) == 1)
 			bn_subn_low(t, t, m, sm);
-		}
 
-		for (i = 0; i < st; i++) {
+		for (i = 0; i < st; i++)
 			c[i] = t[i];
-		}
 	}
 }
 
@@ -621,10 +673,10 @@ __global__ void cuICRT(	bn_t *poly,
 	const int cid = tid;
 	
 	 if(tid < N){
+	 	bn_t coef = poly[cid];
+	 	bn_t inner_result = inner_results[cid];
+	 	bn_zero(&coef); 
 
-	 	bn_zero(&poly[cid]);
- 		
- 		bn_t inner_result = inner_results[cid];
 	 	for(unsigned int rid = 0; rid < NPolis;rid++){
 				cuyasheint_t carry;
 	 			cuyasheint_t x;
@@ -633,7 +685,6 @@ __global__ void cuICRT(	bn_t *poly,
 	 			cuyasheint_t pi = CRTPrimesConstant[rid];
 	 	
 	 			bn_zero(&inner_result);
-	 		
 
 	 			/**
 	 			 * Inner
@@ -660,32 +711,33 @@ __global__ void cuICRT(	bn_t *poly,
  				 * Accumulate
  				 */
 
-				// bn_t a = ( bn_cmp_abs(&poly[cid],&inner_result) == CMP_GT? poly[cid] : inner_result );
-				// bn_t b = ( bn_cmp_abs(&poly[cid],&inner_result) == CMP_LT? poly[cid] : inner_result);
+				bn_t *a = ( bn_cmp_abs(&coef,&inner_result) == CMP_GT? &coef : &inner_result );
+				bn_t *b = ( bn_cmp_abs(&coef,&inner_result) == CMP_LT? &coef : &inner_result);
 
-				bn_t *a = &poly[cid];
-				bn_t *b = &inner_result;
-				if(bn_cmp_abs(a,b) == CMP_LT)
-					swap_d(a,b);
+				// bn_t *a = &coef;
+				// bn_t *b = &inner_result;
+				// if(bn_cmp_abs(a,b) == CMP_LT)
+					// swap_d(a,b);
 
 				int max = a->used;
 				int min = b->used;
 
-				assert(poly[cid].alloc > max);
+				assert(coef.alloc > max);
 
-				carry = bn_addn_low(poly[cid].dp, a->dp, b->dp, max*(a->used == b->used) + min*(a->used != b->used));
+				carry = bn_addn_low(coef.dp, a->dp, b->dp, max*(a->used == b->used) + min*(a->used != b->used));
 
 				if (a->used != b->used)
-					carry = bn_add1_low(poly[cid].dp + min, a->dp + min, carry, max - min);
+					carry = bn_add1_low(coef.dp + min, a->dp + min, carry, max - min);
 
-				poly[cid].used = max;
+				coef.used = max;
 				
 				/* Equivalent to "If has a carry, add as last word" */
-				assert(poly[cid].alloc > max + 1);
-				poly[cid].dp[max] = carry;
-				poly[cid].used += (carry > 0);
+				assert(coef.alloc > max + 1);
+				coef.dp[max] = carry;
+				coef.used += (carry > 0);
 
 	 		}
+	 		poly[cid] = coef;
  			bn_zero(&inner_result);
 
 	 ////////////////////////////////////////////////

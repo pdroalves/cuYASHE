@@ -12,7 +12,7 @@
 #ifdef CUFFTMUL
 #define CRTPRIMESIZE 10
 #else
-#define CRTPRIMESIZE 10
+#define CRTPRIMESIZE 29
 extern const uint32_t PRIMES_BUCKET[];
 extern const int PRIMES_BUCKET_SIZE;
 #endif
@@ -22,15 +22,15 @@ extern const int PRIMES_BUCKET_SIZE;
 // #define VERBOSEMEMORYCOPY
 // #define MAYADDONCPU
 
-// CRT cannot use primes bigger than =~15 bits
-#define WORD 32
+// CRT cannot use primes bigger than WORD/2 bits
+#define WORD 64
 
 // Standard number of words to allocate
-#define STD_BNT_WORDS_ALLOC 32 // 1024 bits big integers
+#define STD_BNT_WORDS_ALLOC 32 // Up to 1024 bits big integers
 
 // We use cuyasheint_t as uint64_t to simplify operations
-// typedef uint64_t cuyasheint_t;
-typedef uint32_t cuyasheint_t;
+typedef uint64_t cuyasheint_t;
+// typedef uint32_t cuyasheint_t;
 
 enum add_mode_t {ADD,SUB,MUL,DIV,MOD};
 enum ntt_mode_t {INVERSE,FORWARD};
