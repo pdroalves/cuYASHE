@@ -15,7 +15,7 @@
 
 #define BILLION  1000000000L
 #define MILLION  1000000L
-#define N 100
+#define N 10
 
 
 int main(int argc,char* argv[]){
@@ -176,8 +176,8 @@ int main(int argc,char* argv[]){
     Polynomial::random(&a,d-1);
     clock_gettime( CLOCK_REALTIME, &start);
     for(int i = 0; i < N;i++){
-      a.set_device_updated(false);
-      a.update_device_data();
+      a.set_crt_computed(false);
+      a.crt();
       result = cudaDeviceSynchronize();
       assert(result == cudaSuccess);
     }
@@ -194,7 +194,7 @@ int main(int argc,char* argv[]){
     clock_gettime( CLOCK_REALTIME, &start);
     a.update_host_data();
     for(int i = 0; i < N;i++){
-      a.set_host_updated(false);
+      a.set_icrt_computed(false);
       a.icrt();
       result = cudaDeviceSynchronize();
       assert(result == cudaSuccess);

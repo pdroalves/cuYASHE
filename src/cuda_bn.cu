@@ -28,6 +28,11 @@ __host__ __device__ int min_d(int a,int b){
 	return (a <= b)*a + (b < a)*b;
 }
 
+__device__ void swap_d(bn_t *a,bn_t *b){
+	bn_t tmp = *a;
+	*a = *b;
+	*b = tmp;
+}
 __host__ __device__ void dv_zero(cuyasheint_t *a, int digits) {
 	int i;
  
@@ -101,24 +106,18 @@ __host__ __device__ int bn_cmpn_low(const cuyasheint_t *a, const cuyasheint_t *b
 
 	r = CMP_EQ;
 	for (i = 0; i < size; i++, --a, --b) {
-		if (*a != *b && r == CMP_EQ) {
-			r = (*a > *b ? CMP_GT : CMP_LT);
-		}
+		r = 			r				*(!(*a != *b && r == CMP_EQ)) + 
+			(*a > *b ? CMP_GT : CMP_LT) *(*a != *b && r == CMP_EQ);
 	}
 	return r;
 }
 
 
 __host__ __device__ int bn_cmp_abs(const bn_t *a, const bn_t *b) {
-	if (a->used > b->used) {
-		return CMP_GT;
-	}
-
-	if (a->used < b->used) {
-		return CMP_LT;
-	}
-
-	return bn_cmpn_low(a->dp, b->dp, a->used);
+	if(a->used != b-> used)
+		return CMP_GT*(a->used > b->used) + CMP_LT*(a->used < b->used); 
+	else
+		return bn_cmpn_low(a->dp, b->dp, a->used);
 }
 
 /**
@@ -220,30 +219,30 @@ __device__ void bn_64bits_mulmod(cuyasheint_t *result,
 	 * http://stackoverflow.com/a/18680280/1541615
 	 */
     uint64_t res = 0;
-    uint64_t temp_b;
+    // uint64_t temp_b;
 
     /* Only needed if b may be >= m */
-    if (b >= m) {
-        if (m > UINT64_MAX / 2u)
-            b -= m;
-        else
-            b %= m;
-    }
+    b = b - 
+    	m*(
+    		(b >= m) && (m > UINT64_MAX / 2u)
+    	);
+    b = b*(
+    		(b < m) || 
+    		(
+				(b >= m) && (m > UINT64_MAX / 2u)
+			)
+		) + 
+    	(b%m)*(
+				(b >= m) && (m <= UINT64_MAX / 2u)
+			  ); 
 
     while (a != 0) {
-        if (a & 1) {
-            /* Add b to res, modulo m, without overflow */
-            if (b >= m - res) /* Equiv to if (res + b >= m), without overflow */
-                res -= m;
-            res += b;
-        }
+
+        res = res - m*((a & 1) && (b >= m - res)) + b*(a & 1);
         a >>= 1;
 
         /* Double b, modulo m */
-        temp_b = b;
-        if (b >= m - b)       /* Equiv to if (2 * b >= m), without overflow */
-            temp_b -= m;
-        b += temp_b;
+        b += b*(b < m - b) + (b-m)*(b >= m - b);
     }
 	*result = res;
 }
@@ -654,39 +653,38 @@ __global__ void cuICRT(	bn_t *poly,
 		 					     	Mpis[rid].used);
  				
  				inner_result.used = Mpis[rid].used;
-	 			if(carry){
- 					inner_result.dp[inner_result.used] = carry;	
-	 				inner_result.used++;	 				
- 				}
+				inner_result.dp[inner_result.used] = carry;	
+	 			inner_result.used+= (carry > 0);	 				
 
  				/**
  				 * Accumulate
  				 */
 
-				bn_t a = ( bn_cmp_abs(&poly[cid],&inner_result) == CMP_GT? poly[cid] : inner_result );
-				bn_t b = ( bn_cmp_abs(&poly[cid],&inner_result) == CMP_LT? poly[cid] : inner_result);
+				// bn_t a = ( bn_cmp_abs(&poly[cid],&inner_result) == CMP_GT? poly[cid] : inner_result );
+				// bn_t b = ( bn_cmp_abs(&poly[cid],&inner_result) == CMP_LT? poly[cid] : inner_result);
 
-				int max = a.used;
-				int min = b.used;
+				bn_t *a = &poly[cid];
+				bn_t *b = &inner_result;
+				if(bn_cmp_abs(a,b) == CMP_LT)
+					swap_d(a,b);
 
-				/* Grow the result. */
+				int max = a->used;
+				int min = b->used;
+
 				assert(poly[cid].alloc > max);
 
-				if (a.used == b.used) {
-					carry = bn_addn_low(poly[cid].dp, a.dp, b.dp, max);
-				} else {
-					carry = bn_addn_low(poly[cid].dp, a.dp, b.dp, min);
-					carry = bn_add1_low(poly[cid].dp + min, a.dp + min, carry, max - min);
-				}
+				carry = bn_addn_low(poly[cid].dp, a->dp, b->dp, max*(a->used == b->used) + min*(a->used != b->used));
+
+				if (a->used != b->used)
+					carry = bn_add1_low(poly[cid].dp + min, a->dp + min, carry, max - min);
 
 				poly[cid].used = max;
-				if (carry) {
-					assert(poly[cid].alloc > max + 1);
-					poly[cid].dp[max] = carry;
-					poly[cid].used++;
-				}
+				
+				/* Equivalent to "If has a carry, add as last word" */
+				assert(poly[cid].alloc > max + 1);
+				poly[cid].dp[max] = carry;
+				poly[cid].used += (carry > 0);
 
- 				__syncthreads();
 	 		}
  			bn_zero(&inner_result);
 
