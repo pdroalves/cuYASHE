@@ -81,12 +81,12 @@ int main(void){
       pA.update_device_data();
       cudaError_t result = cudaDeviceSynchronize();
       assert(result == cudaSuccess);
-      pA.set_device_updated(false);
+      pA.set_crt_residues_computed(false);
     }
     clock_gettime( CLOCK_REALTIME, &stop);
     std::cout << "Polynomial device update: " << compute_time_ms(start,stop)/100 << std::endl;
 
-    pA.set_device_updated(true);
+    pA.set_crt_residues_computed(true);
     pA.set_host_updated(false);
 
     clock_gettime( CLOCK_REALTIME, &start);

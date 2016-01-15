@@ -48,7 +48,7 @@ P common_addition(P *a,P *b){
 	      #ifdef VERBOSE
       	  std::cout << "a: " << std::endl;
       	  #endif
-	      if(!a->get_device_updated()){
+	      if(!a->get_crt_residues_computed()){
 	        a->update_device_data();
 	      }
 
@@ -58,7 +58,7 @@ P common_addition(P *a,P *b){
 	      #ifdef VERBOSE
        	  std::cout << "b: " << std::endl;
       	  #endif
-       	  if(!b->get_device_updated()){
+       	  if(!b->get_crt_residues_computed()){
 	        b->update_device_data();
 	      }
 	    }
@@ -73,7 +73,7 @@ P common_addition(P *a,P *b){
 										a->get_stream());
 
 	c.set_host_updated(false);
-	c.set_device_updated(true);
+	c.set_crt_residues_computed(true);
 	// cudaDeviceSynchronize();
 	return c;
 
@@ -107,14 +107,14 @@ void common_addition_inplace(P *a,P *b){
 		// #pragma omp section
 		{
 
-			if(!a->get_device_updated()){
+			if(!a->get_crt_residues_computed()){
 				a->update_device_data();
 			}
 
 		}
 		// #pragma omp section
 		{
-			if(!b->get_device_updated()){
+			if(!b->get_crt_residues_computed()){
 				b->update_device_data();
 			}
 		}
@@ -128,7 +128,7 @@ void common_addition_inplace(P *a,P *b){
 												ADD);
 
 	a->set_host_updated(false);
-	a->set_device_updated(true);
+	a->set_crt_residues_computed(true);
 }
 
 template <class P>
@@ -158,13 +158,13 @@ P common_multiplication(P *a_input, P *b_input){
 	  b.update_crt_spacing(needed_spacing);
   #elif defined(CUFFTMUL)
   if(a.get_crt_spacing() != needed_spacing){
-  	// if(!a.get_device_updated())
+  	// if(!a.get_crt_residues_computed())
   		// a.update_crt_spacing(needed_spacing);
   	// else
 	  	update_A_spacing = true;  	
   }
   if(b.get_crt_spacing() != needed_spacing){
-  	// if(!b.get_device_updated())
+  	// if(!b.get_crt_residues_computed())
   		// b.update_crt_spacing(needed_spacing);
   	// else
 	  	update_B_spacing = true;
@@ -185,7 +185,7 @@ P common_multiplication(P *a_input, P *b_input){
 		#ifdef VERBOSE
 		std::cout << "a" << std::endl;
 		#endif
-		if(!a.get_device_updated()){
+		if(!a.get_crt_residues_computed()){
 			a.update_device_data();
 		}
 
@@ -195,7 +195,7 @@ P common_multiplication(P *a_input, P *b_input){
 		#ifdef VERBOSE
 		std::cout << "b" << std::endl;
 		#endif
-		if(!b.get_device_updated()){
+		if(!b.get_crt_residues_computed()){
 			b.update_device_data();
 		}
       }
@@ -222,7 +222,7 @@ P common_multiplication(P *a_input, P *b_input){
   if(d_result != NULL){
 	  c.set_device_crt_residues(d_result);
 	  c.set_host_updated(false);
-	  c.set_device_updated(true);
+	  c.set_crt_residues_computed(true);
 
 	  // std::cout << " resultado da multiplicação: " << c.to_string() << std::endl;
 	  // c.reduce();

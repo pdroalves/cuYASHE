@@ -306,7 +306,7 @@ BOOST_AUTO_TEST_CASE(multiplyByZZOnCPU)
 
   for(int count = 0; count < NTESTS; count++){
 
-    a.set_device_updated(false);
+    a.set_crt_residues_computed(false);
     Polynomial::random(&a,degree-1);
     a.set_host_updated(true);
 
@@ -343,7 +343,7 @@ BOOST_AUTO_TEST_CASE(multiplyByZZOnGPU)
 
   for(int count = 0; count < NTESTS; count++){
 
-    a.set_device_updated(false);
+    a.set_crt_residues_computed(false);
     Polynomial::random(&a,degree-1);
     a.set_host_updated(true);
 
@@ -436,8 +436,8 @@ BOOST_AUTO_TEST_CASE(multiplyByPolynomial)
     Polynomial a;
     Polynomial b;
 
-    a.set_device_updated(false);
-    b.set_device_updated(false);
+    a.set_crt_residues_computed(false);
+    b.set_crt_residues_computed(false);
     Polynomial::random(&a,degree-1);
     Polynomial::random(&b,degree-1);
     a.set_host_updated(true);
@@ -495,8 +495,8 @@ BOOST_AUTO_TEST_CASE(multiplyAndAddByPolynomial)
     Polynomial a;
     Polynomial b;
 
-    a.set_device_updated(false);
-    b.set_device_updated(false);
+    a.set_crt_residues_computed(false);
+    b.set_crt_residues_computed(false);
     Polynomial::random(&a,degree-1);
     Polynomial::random(&b,degree-1);
     a.set_host_updated(true);
@@ -553,8 +553,8 @@ BOOST_AUTO_TEST_CASE(addAndMultiplyByPolynomial)
     Polynomial a;
     Polynomial b;
 
-    a.set_device_updated(false);
-    b.set_device_updated(false);
+    a.set_crt_residues_computed(false);
+    b.set_crt_residues_computed(false);
     Polynomial::random(&a,degree-1);
     Polynomial::random(&b,degree-1);
     a.set_host_updated(true);
@@ -605,8 +605,8 @@ BOOST_AUTO_TEST_CASE(addAndMultiplyByPolynomial)
 //   Polynomial a;
 //   Polynomial b;
 
-//   a.set_device_updated(false);
-//   b.set_device_updated(false);
+//   a.set_crt_residues_computed(false);
+//   b.set_crt_residues_computed(false);
 //   Polynomial::random(&a,degree-1);
 //   Polynomial::random(&b,degree-1);
 //   a.set_host_updated(true);

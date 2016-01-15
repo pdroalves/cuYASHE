@@ -229,11 +229,11 @@ int main(int argc,char* argv[]){
 
     clock_gettime( CLOCK_REALTIME, &start);
     a.update_host_data();
-    a.set_device_updated(false);
+    a.set_crt_residues_computed(false);
     for(int i = 0; i < N;i++){
       a.reduce();
       result = cudaDeviceSynchronize();
-      a.set_device_updated(false);
+      a.set_crt_residues_computed(false);
       assert(result == cudaSuccess);
     }
     clock_gettime( CLOCK_REALTIME, &stop);
@@ -248,7 +248,7 @@ int main(int argc,char* argv[]){
 
     clock_gettime( CLOCK_REALTIME, &start);
     a.update_host_data();
-    a.set_device_updated(false);
+    a.set_crt_residues_computed(false);
     for(int i = 0; i < N;i++){
       a %= q;
     }
@@ -274,8 +274,8 @@ int main(int argc,char* argv[]){
     for(int i = 0; i < N;i++){
 
       Polynomial c = (a+b);
-      a.set_device_updated(false);
-      b.set_device_updated(false);
+      a.set_crt_residues_computed(false);
+      b.set_crt_residues_computed(false);
       result = cudaDeviceSynchronize();
       assert(result == cudaSuccess);
     }
@@ -317,8 +317,8 @@ int main(int argc,char* argv[]){
     for(int i = 0; i < N;i++){
 
       Polynomial c = (a*b);
-      a.set_device_updated(false);
-      b.set_device_updated(false);
+      a.set_crt_residues_computed(false);
+      b.set_crt_residues_computed(false);
       result = cudaDeviceSynchronize();
       assert(result == cudaSuccess);
     }

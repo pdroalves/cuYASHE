@@ -157,7 +157,7 @@ Polynomial Yashe::decrypt(Ciphertext c){
     #ifdef VERBOSE
     std::cout << "not  aftermul" << std::endl;
     #endif
-    // f.set_device_updated(false);
+    // f.set_crt_residues_computed(false);
     g = f*c;
 
   }

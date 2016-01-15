@@ -75,7 +75,7 @@ Polynomial Polynomial::operator*(ZZ b){
         //#pragma omp parallel for
         for(int i = 0; i <= p.deg();i++)
           p.set_coeff(i,p.get_coeff(i)*b);
-        p.set_device_updated(false);
+        p.set_crt_residues_computed(false);
       }
       return p;
     }
@@ -106,7 +106,7 @@ void Polynomial::copy_device_crt_residues(Polynomial &b){
   // uint64_t start,end;
 
   // start = get_cycles();
-  if(!b.get_device_updated())
+  if(!b.get_crt_residues_computed())
     return;
 
   // std::cout << "Will copy residues on device memory" << std::endl;
@@ -265,7 +265,7 @@ void Polynomial::update_device_data(){
    * This function copy the polynomial to GPU's memory in bn_t format
    */
 
-  if(this->get_device_updated())
+  if(this->get_crt_residues_computed())
     return;
 
   #if defined(VERBOSE) || defined(VERBOSEMEMORYCOPY) 
@@ -273,7 +273,7 @@ void Polynomial::update_device_data(){
   #endif
 
   this->ON_COPY = true;
-  if(!get_device_updated()){
+  if(!get_crt_residues_computed()){
 	  // Verifica se o espaçamento é válido. Se não for, ajusta.
 	  if(this->get_crt_spacing() < (this->deg()+1)){
 	    int new_spacing;
@@ -312,6 +312,8 @@ void Polynomial::update_device_data(){
 								);
 	  assert(result == cudaSuccess);
 	  free(h_data);
+
+	  set_icrt_computed(true);
   }	
   /**
   *  CRT
@@ -323,7 +325,7 @@ void Polynomial::update_device_data(){
    */
   
   this->ON_COPY = false;
-  this->set_device_updated(true);
+  this->set_crt_residues_computed(true);
 
 }
 
@@ -419,7 +421,7 @@ void Polynomial::DivRem(Polynomial a,Polynomial b,Polynomial &quot,Polynomial &r
       // #pragma omp parallel for
       for(unsigned int i = 0;i <= half;i++)
         rem.set_coeff(i,a.get_coeff(i)-a.get_coeff(i+half+1));
-      rem.set_device_updated(false);
+      rem.set_crt_residues_computed(false);
     }else{
       throw "DivRem: I don't know how to div this!";
     }

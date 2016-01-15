@@ -45,7 +45,7 @@ class Polynomial{
       #endif
       cudaStreamCreate(&this->stream);
       this->set_host_updated(true);
-      this->set_device_updated(false);
+      this->set_crt_residues_computed(false);
       this->set_crt_computed(false);
       this->set_icrt_computed(true);
       if(Polynomial::global_mod > 0)
@@ -78,7 +78,7 @@ class Polynomial{
       #endif
       cudaStreamCreate(&this->stream);
       this->set_host_updated(true);
-      this->set_device_updated(false);
+      this->set_crt_residues_computed(false);
       this->set_crt_computed(false);
       this->set_icrt_computed(true);
       this->mod = ZZ(p);// Copy
@@ -106,7 +106,7 @@ class Polynomial{
       #endif
       cudaStreamCreate(&this->stream);
       this->set_host_updated(true);
-      this->set_device_updated(false);
+      this->set_crt_residues_computed(false);
       this->set_crt_computed(false);
       this->set_icrt_computed(true);
       this->mod = ZZ(p);// Copy
@@ -133,7 +133,7 @@ class Polynomial{
       #endif
       cudaStreamCreate(&this->stream);
       this->set_host_updated(true);
-      this->set_device_updated(false);
+      this->set_crt_residues_computed(false);
       this->set_crt_computed(false);
       this->set_icrt_computed(true);
       if(Polynomial::global_mod > 0){
@@ -164,7 +164,7 @@ class Polynomial{
       #endif
       cudaStreamCreate(&this->stream);
       this->set_host_updated(true);
-      this->set_device_updated(false);
+      this->set_crt_residues_computed(false);
       this->set_crt_computed(false);
       this->set_icrt_computed(true);
       this->mod = ZZ(p);// Copy
@@ -192,7 +192,7 @@ class Polynomial{
       #endif
       cudaStreamCreate(&this->stream);
       this->set_host_updated(true);
-      this->set_device_updated(false);
+      this->set_crt_residues_computed(false);
       this->set_crt_computed(false);
       this->set_icrt_computed(true);
       this->mod = ZZ(p);// Copy
@@ -234,15 +234,17 @@ class Polynomial{
       if(b.get_host_updated())
         this->set_coeffs(b.get_coeffs());      
       
-      if(b.get_device_updated())
+      if(b.get_crt_residues_computed())
         // this->copy_device_crt_residues(b);
         this->d_polyCRT = b.d_polyCRT;
-      
-      this->set_crt_computed(b.get_crt_computed());
+
+     this->set_crt_computed(b.get_crt_computed());
+      this->set_crt_residues_computed(b.get_crt_residues_computed());
       this->set_icrt_computed(b.get_icrt_computed());
       this->set_host_updated(b.get_host_updated());
-      this->set_device_updated(b.get_device_updated());
+      
 
+      
       #ifdef VERBOSE
       // stop = polynomial_get_cycles();
       // std::cout << (stop-start) << " cycles to copy" << std::endl;
@@ -299,12 +301,12 @@ class Polynomial{
           // #pragma omp section
           {
 
-              if(!this->get_device_updated())
+              if(!this->get_crt_residues_computed())
                 this->update_device_data();
           }
           // #pragma omp section
           {
-              if(!b.get_device_updated())
+              if(!b.get_crt_residues_computed())
                   b.update_device_data();
           }
       }
@@ -319,7 +321,7 @@ class Polynomial{
                                           this->stream);
 
       c->set_host_updated(false);
-      c->set_device_updated(true);
+      c->set_crt_residues_computed(true);
       // cudaDeviceSynchronize();
       return c;
     }
@@ -391,7 +393,7 @@ class Polynomial{
     //     return b+p;
     //   }else{
     //     p.set_coeff(0,p.get_coeff(0)+b.get_value());
-    //     p.set_device_updated(false);
+    //     p.set_crt_residues_computed(false);
     //     return p;
     //   }
     // }
@@ -406,7 +408,7 @@ class Polynomial{
     //     return b-p;
     //   }else{
     //     p.set_coeff(0,p.get_coeff(0)-b.get_value());
-    //     p.set_device_updated(false);
+    //     p.set_crt_residues_computed(false);
     //     return p;
     //   }
     // }
@@ -423,7 +425,7 @@ class Polynomial{
     //     //#pragma omp parallel for
     //     for(int i = 0; i <= p.deg();i++)
     //       p.set_coeff(i,p.get_coeff(i)*b.get_value());
-    //     p.set_device_updated(false);
+    //     p.set_crt_residues_computed(false);
     //   }
     //   return p;
     // }
@@ -440,7 +442,7 @@ class Polynomial{
         return p+B;
       }else{
         p.set_coeff(0,p.get_coeff(0)+b);
-        p.set_device_updated(false);
+        p.set_crt_residues_computed(false);
         return p;
       }
     }
@@ -457,7 +459,7 @@ class Polynomial{
         return p-B;
       }else{
         p.set_coeff(0,p.get_coeff(0)-b);
-        p.set_device_updated(false);
+        p.set_crt_residues_computed(false);
         return p;
       }
     }
@@ -480,10 +482,10 @@ class Polynomial{
         return p;
       }else{
         // Doing this, we reduce needless cycles to copy device data
-        bool device_updated_flag = get_device_updated();
-        this->set_device_updated(false);
+        bool crt_residues_computed_flag = get_crt_residues_computed();
+        this->set_crt_residues_computed(false);
         Polynomial p(*this);
-        this->set_device_updated(device_updated_flag);
+        this->set_crt_residues_computed(crt_residues_computed_flag);
           
         p %= b;
         return p;
@@ -504,7 +506,7 @@ class Polynomial{
       for(int i = 0; i <= this->deg();i++)
         this->set_coeff(i,this->get_coeff(i)%b);
       
-      this->set_device_updated(false);
+      this->set_crt_residues_computed(false);
 
       return *this;
     }
@@ -518,7 +520,7 @@ class Polynomial{
       // #pragma omp parallel for
       for(int i = 0; i <= p.deg();i++)
         p.set_coeff(i,p.get_coeff(i)/b);
-      p.set_device_updated(false);
+      p.set_crt_residues_computed(false);
 
       return p;
     }
@@ -594,7 +596,7 @@ class Polynomial{
       // #pragma omp parallel for
       for(int i = 0; i <= this->deg();i++)
         this->set_coeff(i,NTL::MulMod(this->get_coeff(i),b,mod));
-      this->set_device_updated(false);
+      this->set_crt_residues_computed(false);
     }
     void CPUAddition(Polynomial *b){
       // Forces the addition to be executed by CPU
@@ -686,7 +688,7 @@ class Polynomial{
         std::cout << "Polynomial coeff " << index << " set to " << this->coefs[index] << std::endl;
       #endif
 
-        this->set_device_updated(false);
+        this->set_crt_residues_computed(false);
         this->set_host_updated(true);
         if(this->get_crt_spacing() < (this->deg()+1))
           this->update_crt_spacing(this->deg()+1);
@@ -713,7 +715,7 @@ class Polynomial{
       for(std::vector<cuyasheint_t>::iterator iter = values.begin();iter != values.end();iter++)
         this->coefs[iter-values.begin()] = conv<ZZ>(*iter);
       
-      this->set_device_updated(false);
+      this->set_crt_residues_computed(false);
       this->set_host_updated(true);
       if(this->get_crt_spacing() < (this->deg()+1))
         this->update_crt_spacing(this->deg()+1);  
@@ -726,7 +728,7 @@ class Polynomial{
       for(std::vector<ZZ>::iterator iter = values.begin();iter != values.end();iter++)
         this->coefs[iter-values.begin()] = *iter;
 
-      this->set_device_updated(false);
+      this->set_crt_residues_computed(false);
       this->set_host_updated(true);
       if(this->get_crt_spacing() < (this->deg()+1))
         this->update_crt_spacing(this->deg()+1);  
@@ -743,7 +745,7 @@ class Polynomial{
         std::cout << "Polynomial coeff cleaned and resized to " << this->coefs.size() << std::endl;
       #endif
 
-      // this->set_device_updated(false);
+      // this->set_crt_residues_computed(false);
       // this->set_host_updated(true);
       // if(this->get_crt_spacing() < (this->deg()+1))
         // this->set_crt_spacing(Polynomial::global_phi->deg());
@@ -758,7 +760,7 @@ class Polynomial{
         std::cout << "Polynomial coeff cleaned and resized to " << this->coefs.size() << std::endl;
       #endif
 
-      // this->set_device_updated(false);
+      // this->set_crt_residues_computed(false);
       // this->set_host_updated(true);      
       // this->update_crt_spacing(size);
     }
@@ -840,7 +842,7 @@ class Polynomial{
     }
 
     void update_device_data();
-    void set_device_updated(bool b){
+    void set_crt_residues_computed(bool b){
       this->DEVICE_IS_UPDATE = b;
       if(b){
         // #ifdef VERBOSE
@@ -854,7 +856,7 @@ class Polynomial{
         this->set_crt_computed(false);
       }
     }
-    bool get_device_updated(){
+    bool get_crt_residues_computed(){
       bool b = this->DEVICE_IS_UPDATE;
       // if(b){        
       //   #ifdef VERBOSE
@@ -1023,13 +1025,13 @@ class Polynomial{
        *
        * Realloc *_bn_coefs and d_poly_CRT either
        */
-      if(this->get_crt_spacing() == new_spacing && get_device_updated()){
+      if(this->get_crt_spacing() == new_spacing && get_crt_residues_computed()){
         // Data lies in GPU's global memory and has the correct alignment
         #ifdef VERBOSE
         std::cout << "No need to update crt spacing." << std::endl;
         #endif
         return;
-      }else if(!get_device_updated()){
+      }else if(!get_crt_residues_computed()){
         #ifdef VERBOSE
         std::cout << "Will alloc memory  to update crt spacing." << std::endl;
         #endif
@@ -1147,7 +1149,7 @@ class Polynomial{
         return;
 
       // If updated data lies in gpu's global memory, realign it
-      if(this->get_device_updated()){
+      if(this->get_crt_residues_computed()){
         cuyasheint_t * d_pointer = CUDAFunctions::callRealignCRTResidues(this->stream, this->CRTSPACING,new_spacing,this->get_device_crt_residues(),this->deg()+1,Polynomial::CRTPrimes.size());
         if(d_pointer != NULL)
           this->set_device_crt_residues(d_pointer);
@@ -1217,7 +1219,7 @@ class Polynomial{
       else
         for(int i = 0;i <= degree;i++)
           a->set_coeff(i,ZZ(rand()) % a->global_mod);
-      a->set_device_updated(false);
+      a->set_crt_residues_computed(false);
       a->set_host_updated(true);
       a->normalize();
     }

@@ -10,7 +10,7 @@ class Integer{
 			this->set_value(a);
 
 			this->set_host_updated(true);
-			this->set_device_updated(false);
+			this->set_crt_residues_computed(false);
 			this->set_crt_computed(false);
 			this->set_icrt_computed(true);
 
@@ -20,7 +20,7 @@ class Integer{
 			this->set_value(a);
 
 			this->set_host_updated(true);
-			this->set_device_updated(false);
+			this->set_crt_residues_computed(false);
 			this->set_crt_computed(false);
 			this->set_icrt_computed(true);
 
@@ -30,7 +30,7 @@ class Integer{
 			this->set_value(a);
 
 			this->set_host_updated(true);
-			this->set_device_updated(false);
+			this->set_crt_residues_computed(false);
 			this->set_crt_computed(false);
 			this->set_icrt_computed(true);
 
@@ -41,7 +41,7 @@ class Integer{
 			this->set_value(a);
 
 			this->set_host_updated(true);
-			this->set_device_updated(false);
+			this->set_crt_residues_computed(false);
 			this->set_crt_computed(false);
 			this->set_icrt_computed(true);
 
@@ -53,7 +53,7 @@ class Integer{
 			if(!this->get_host_updated())
 				this->update_host_data();
 			
-			this->set_device_updated(false);
+			this->set_crt_residues_computed(false);
 			return value / a.get_value();;
 		}
 		ZZ operator+(ZZ a){
@@ -72,7 +72,7 @@ class Integer{
 			if(!this->get_host_updated())
 				this->update_host_data();
 			
-			this->set_device_updated(false);
+			this->set_crt_residues_computed(false);
 			value /= a;
 			return value;
 		}
@@ -80,7 +80,7 @@ class Integer{
 			if(!this->get_host_updated())
 				this->update_host_data();
 			
-			this->set_device_updated(false);
+			this->set_crt_residues_computed(false);
 			value %= a;
 			return value;
 		}
@@ -130,7 +130,7 @@ class Integer{
 
 	      return b;
 	    }
-	    void set_device_updated(bool b){
+	    void set_crt_residues_computed(bool b){
 	      this->DEVICE_IS_UPDATE = b;
 	      if(b){
 	        #ifdef VERBOSE
@@ -144,7 +144,7 @@ class Integer{
 	        this->set_crt_computed(false);
 	      }
 	    }
-	    bool get_device_updated(){
+	    bool get_crt_residues_computed(){
 	      bool b = this->DEVICE_IS_UPDATE;
 	      if(b){        
 	        #ifdef VERBOSE
@@ -209,12 +209,12 @@ class Integer{
 		    	crt_values[i] = conv<cuyasheint_t>(value % P[i]);
 			  	
 
-			this->set_device_updated(false);
+			this->set_crt_residues_computed(false);
 			this->set_crt_computed(true);
 		}
 		void icrt();
 		cuyasheint_t* get_device_crt_residues(){
-			if(!this->get_device_updated())
+			if(!this->get_crt_residues_computed())
 				this->update_device_data();
 			return this->d_crt_values;
 		}

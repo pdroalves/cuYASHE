@@ -80,7 +80,7 @@ Ciphertext Ciphertext::operator*(Ciphertext &b){
 
   p.aftermul = true;
   p.level = std::max(this->level,b.level)+1;
-  p.set_device_updated(false);
+  p.set_crt_residues_computed(false);
   p.set_host_updated(true);
 
   // end_total = get_cycles();

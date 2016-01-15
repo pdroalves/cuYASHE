@@ -921,7 +921,7 @@ __host__ void CUDAFunctions::init(int N){
 //   Polynomial *phi = Polynomial::global_phi;
 //   ZZ q = Polynomial::global_mod;
 
-//   if(!this->get_device_updated()){
+//   if(!this->get_crt_residues_computed()){
 //     #ifdef VERBOSE
 //     std::cout << "Reduce on host." << std::endl;
 //     #endif
@@ -955,7 +955,7 @@ __host__ void CUDAFunctions::init(int N){
 //       assert(result == cudaSuccess);
       
 //       this->set_host_updated(false);
-//       this->set_device_updated(true);
+//       this->set_crt_residues_computed(true);
 //       this->update_crt_spacing(phi->deg());
 //     }
 //   }
@@ -1033,9 +1033,9 @@ __host__ void Polynomial::reduce(){
   
   // Until we debug reduction on GPU, we need this
   update_host_data();
-  this->set_device_updated(false);
+  this->set_crt_residues_computed(false);
 
-  if(!this->get_device_updated()){
+  if(!this->get_crt_residues_computed()){
     #ifdef VERBOSE
     std::cout << "Reduce on host." << std::endl;
     #endif
