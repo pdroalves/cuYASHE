@@ -53,7 +53,7 @@ __host__ __device__ void dv_zero(cuyasheint_t *a, int digits) {
 __host__ __device__ void bn_zero(bn_t *a) {
 	a->sign = BN_POS;
 	a->used = 0;
-	// dv_zero(a->dp, a->alloc);
+	dv_zero(a->dp, a->alloc);
 }
 
 /**
@@ -163,19 +163,19 @@ __host__ __device__ cuyasheint_t bn_mod1_low(	const uint64_t *a,
 
 	w = 0;
 	for (i = size - 1; i >= 0; i--) {
-		// First 32 bits word
-		uint32_t lo = uint32_t(a[i] & 0xFFFFFFFF);
-		w = (w << ((uint64_t)32)) | ((uint64_t)lo);
-
-		r = (uint32_t)(w/b)*(w >= b);
-		w -= (((uint64_t)r) * ((uint64_t)b))*(w >= b);
-
 		// Second 32 bits word
 		uint32_t hi = uint32_t(a[i] >> 32);
 		w = ((w << ((uint64_t)32)) | ((uint64_t)hi))*(hi > 0) + w*(hi == 0);
 
 		r = (uint32_t)(w/b)*(w >= b);
 		w -= (((uint64_t)r) * ((uint64_t)b))*(w >= b || hi > 0);
+		
+		// First 32 bits word
+		uint32_t lo = uint32_t(a[i] & 0xFFFFFFFF);
+		w = (w << ((uint64_t)32)) | ((uint64_t)lo);
+
+		r = (uint32_t)(w/b)*(w >= b);
+		w -= (((uint64_t)r) * ((uint64_t)b))*(w >= b);
 		
 	}
 	return (cuyasheint_t)w;
@@ -499,12 +499,12 @@ __device__ void bn_mod_barrt(bn_t *C, const bn_t *A,const int NCoefs,
 	 * Each thread handles one coefficient
 	 */
 	
-	const int tid = threadIdx.x + blockDim.x*blockIdx.x;
+	const int cid = threadIdx.x + blockDim.x*blockIdx.x;
 
-	if(tid < NCoefs){
-		cuyasheint_t *a = A[tid].dp;
-		int sa = A[tid].used;
-		cuyasheint_t *c = C[tid].dp;
+	if(cid < NCoefs){
+		cuyasheint_t *a = A[cid].dp;
+		int sa = A[cid].used;
+		cuyasheint_t *c = C[cid].dp;
 
 		unsigned long mu;
 		cuyasheint_t q[2*STD_BNT_WORDS_ALLOC],t[2*STD_BNT_WORDS_ALLOC],carry;
@@ -637,10 +637,19 @@ __global__ void cuCRT(	cuyasheint_t *d_polyCRT,
 
 }	
 
-__global__ void testData(cuyasheint_t *d_polyCRT, int N){
-	for(int i = 0; i < N;i++)
-		printf("%d) %d\n",i,d_polyCRT[i]);
+__global__ void testData(bn_t *coefs, int N){
+	for(int i = 0; i < N;i++){
+		printf("%d)\n",i);
+		for(int j = 0; j < coefs[i].used;j++)
+			printf("%lu ",coefs[i].dp[j]);
+		printf("\n");
+	}
 }
+
+__host__ void callTestData(bn_t *coefs,int N){
+  testData<<<1,1>>>(coefs,N);
+};
+
 
 /**
  * cuICRT computes ICRT on GPU
@@ -673,9 +682,9 @@ __global__ void cuICRT(	bn_t *poly,
 	const int cid = tid;
 	
 	 if(tid < N){
-	 	bn_t coef = poly[cid];
+	 	// bn_t coef = poly[cid];
 	 	bn_t inner_result = inner_results[cid];
-	 	bn_zero(&coef); 
+	 	bn_zero(&poly[cid]); 
 
 	 	for(unsigned int rid = 0; rid < NPolis;rid++){
 				cuyasheint_t carry;
@@ -705,16 +714,16 @@ __global__ void cuICRT(	bn_t *poly,
  				
  				inner_result.used = Mpis[rid].used;
 				inner_result.dp[inner_result.used] = carry;	
-	 			inner_result.used+= (carry > 0);	 				
+	 			inner_result.used += (carry > 0);	 				
 
  				/**
  				 * Accumulate
  				 */
 
-				bn_t *a = ( bn_cmp_abs(&coef,&inner_result) == CMP_GT? &coef : &inner_result );
-				bn_t *b = ( bn_cmp_abs(&coef,&inner_result) == CMP_LT? &coef : &inner_result);
+				bn_t *a = ( bn_cmp_abs(&poly[cid],&inner_result) == CMP_GT? &poly[cid] : &inner_result );
+				bn_t *b = ( bn_cmp_abs(&poly[cid],&inner_result) == CMP_LT? &poly[cid] : &inner_result);
 
-				// bn_t *a = &coef;
+				// bn_t *a = &poly[cid];
 				// bn_t *b = &inner_result;
 				// if(bn_cmp_abs(a,b) == CMP_LT)
 					// swap_d(a,b);
@@ -722,27 +731,27 @@ __global__ void cuICRT(	bn_t *poly,
 				int max = a->used;
 				int min = b->used;
 
-				assert(coef.alloc > max);
+				assert(poly[cid].alloc > max);
 
-				carry = bn_addn_low(coef.dp, a->dp, b->dp, max*(a->used == b->used) + min*(a->used != b->used));
+				carry = bn_addn_low(poly[cid].dp, a->dp, b->dp, max*(a->used == b->used) + min*(a->used != b->used));
 
 				if (a->used != b->used)
-					carry = bn_add1_low(coef.dp + min, a->dp + min, carry, max - min);
+					carry = bn_add1_low(poly[cid].dp + min, a->dp + min, carry, max - min);
 
-				coef.used = max;
+				poly[cid].used = max;
 				
 				/* Equivalent to "If has a carry, add as last word" */
-				assert(coef.alloc > max + 1);
-				coef.dp[max] = carry;
-				coef.used += (carry > 0);
-
+				assert(poly[cid].alloc > max + 1);
+				poly[cid].dp[max] = carry;
+				poly[cid].used += (carry > 0);
+				// __syncthreads();
 	 		}
-	 		poly[cid] = coef;
+	 		// poly[cid] = coef;
  			bn_zero(&inner_result);
 
-	 ////////////////////////////////////////////////
-	 // Modular reduction of poly[cid] by M //
-	 ////////////////////////////////////////////////
+		////////////////////////////////////////////////
+		// Modular reduction of poly[cid] by M //
+		////////////////////////////////////////////////
  	 	/**
  	 	 * At this point a thread i finished the computation of coefficient i
  	 	 */
@@ -765,11 +774,9 @@ void callCRT(bn_t *coefs,const int used_coefs,cuyasheint_t *d_polyCRT,const int 
 	dim3 gridDim(ADDGRIDXDIM);
 	dim3 blockDim(ADDBLOCKXDIM);
 	
-	// std::cout << "CRT" << std::endl;
 	result = cudaGetLastError();
 	assert(result == cudaSuccess);
 	cuCRT<<<gridDim,blockDim,0,stream>>>(d_polyCRT,coefs,used_coefs,N,NPolis);
-	// testData<<<1,1,0,stream>>>(d_polyCRT,N*NPolis);
 	result = cudaGetLastError();
 	assert(result == cudaSuccess);
 	// cudaDeviceSynchronize();

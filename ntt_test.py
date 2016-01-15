@@ -1,10 +1,10 @@
 # P = 4294955009
-# P = pow(2,64)-pow(2,32)+1
-P = pow(2,32)-pow(2,20)+1
-N = 128
+P = pow(2,64)-pow(2,32)+1
+# P = pow(2,32)-pow(2,20)+1
+N = 32
 assert( (P-1) % N == 0)
 # wN = pow(7,(P-1)/N,P)
-wN = pow(19,(P-1)/N,P)
+wN = pow(7,(P-1)/N,P)
 
 W = []
 for i in range(N):

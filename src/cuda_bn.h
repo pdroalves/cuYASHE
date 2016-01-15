@@ -60,7 +60,7 @@ __host__ void callCuModN(bn_t * c, const bn_t * a,int NCoefs,
 __host__ ZZ get_ZZ(bn_t *a);
 __host__ __device__ int max_d(int a,int b);
 __host__ __device__ int min_d(int a,int b);
-
+__host__ void callTestData(bn_t *coefs,int N);
 void callCRT(bn_t *coefs,const int used_coefs,cuyasheint_t *d_polyCRT,const int N, const int NPolis,cudaStream_t stream);
 void callICRT(bn_t *coefs,cuyasheint_t *d_polyCRT,const int N, const int NPolis,cudaStream_t stream);
 

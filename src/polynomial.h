@@ -222,37 +222,36 @@ class Polynomial{
     }
     void copy(Polynomial b){
       #ifdef VERBOSE
-      cuyasheint_t start,stop;
+      // cuyasheint_t start,stop;
       // start = polynomial_get_cycles();
       #endif 
 
-      update_crt_spacing(b.get_crt_spacing());
+      CRTSPACING = b.get_crt_spacing();
+      if(b.d_bn_coefs)
+        this->d_bn_coefs = b.d_bn_coefs;
+      if(b.h_bn_coefs)
+        this->h_bn_coefs = b.h_bn_coefs;
       if(b.get_host_updated())
-        this->set_coeffs(b.get_coeffs());
-      
+        this->set_coeffs(b.get_coeffs());      
       
       if(b.get_device_updated())
         // this->copy_device_crt_residues(b);
         this->d_polyCRT = b.d_polyCRT;
       
-      
-      this->set_host_updated(b.get_host_updated());
-      this->set_device_updated(b.get_device_updated());
-
-      // this->set_mod(b.get_mod());
-      
-      // if(this != Polynomial::global_phi)
-        // this->set_phi(b.get_phi());
-
       this->set_crt_computed(b.get_crt_computed());
       this->set_icrt_computed(b.get_icrt_computed());
+      this->set_host_updated(b.get_host_updated());
+      this->set_device_updated(b.get_device_updated());
 
       #ifdef VERBOSE
       // stop = polynomial_get_cycles();
       // std::cout << (stop-start) << " cycles to copy" << std::endl;
       #endif
     }
-    // Functions and methods
+
+    ///////////////////////////
+    // Functions and methods //
+    ///////////////////////////
 
     void copy_device_crt_residues(Polynomial &b);
 
@@ -1071,7 +1070,6 @@ class Polynomial{
           h_bn_coefs[i].dp = tmp;
         }
 
-
         result = cudaMemcpyAsync(d_bn_coefs,h_bn_coefs,new_spacing*sizeof(bn_t),cudaMemcpyHostToDevice,get_stream());
         assert(result == cudaSuccess);
 
@@ -1231,14 +1229,29 @@ class Polynomial{
     }
     static void operator delete(void *ptr);
     void release(){
-      // cudaError_t result = cudaDeviceSynchronize();
-      // assert(result == cudaSuccess);
-      // for(unsigned int i = 0; i < bn_coefs.size(); i++){
-      //   bn_free(bn_coefs[i]);
-      //   result = cudaFree(bn_coefs[i]);
-      //   assert(result == cudaSuccess);
-      // }
+      cudaError_t result = cudaDeviceSynchronize();
+      assert(result == cudaSuccess);
+      
+      if(d_polyCRT){
+        result = cudaFree(d_polyCRT);
+        assert(result == cudaSuccess);
+      }
+      if(d_bn_coefs){
+        result = cudaFree(d_bn_coefs);
+        assert(result == cudaSuccess);
+      }
+      if(h_bn_coefs){
+        for(int i = 0; i < CRTSPACING;i++){
+          if(h_bn_coefs[i].dp){
+            // result = cudaFree(h_bn_coefs[i].dp);
+            assert(result == cudaSuccess);
+          }
+        }
+        free(h_bn_coefs);
+      }
     }
+    bn_t* h_bn_coefs = 0x0;
+    bn_t* d_bn_coefs = 0x0;
   private:
     // Attributes
     bool ON_COPY;
@@ -1257,8 +1270,6 @@ class Polynomial{
     std::vector<ZZ> coefs;
 
     // Must be initialized on CRTSPACING definition and updated by crt(), if needed
-    bn_t* h_bn_coefs = 0x0;
-    bn_t* d_bn_coefs = 0x0;
     cuyasheint_t *d_polyCRT = 0x0;
 
     ZZ mod;

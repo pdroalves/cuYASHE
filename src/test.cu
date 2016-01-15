@@ -24,6 +24,7 @@ struct CUDASuite
     ~CUDASuite()
     {
         BOOST_TEST_MESSAGE("teardown mass");
+        cudaDeviceReset();
     }
 };
 
@@ -62,6 +63,7 @@ struct PolySuite
     ~PolySuite()
     {
         BOOST_TEST_MESSAGE("teardown mass");
+        cudaDeviceReset();
     }
 };
 
@@ -210,10 +212,10 @@ BOOST_AUTO_TEST_CASE(multipleAddsWithDifferentDegrees)
     b_ntl += a_ntl;
   }
 
-  #ifdef VERBOSE
+  // #ifdef VERBOSE
   std::cout << "b: " << b.to_string() << std::endl;
   std::cout << "b_ntl: " << b_ntl << std::endl;
-  #endif
+  // #endif
   
   b.normalize();
  
@@ -268,9 +270,9 @@ BOOST_AUTO_TEST_CASE(wNTest)
   BOOST_REQUIRE(result == cudaSuccess);
 
   cuyasheint_t wN = CUDAFunctions::wN;
-  ZZ PZZ = conv<ZZ>("4293918721");
+  ZZ PZZ = conv<ZZ>("18446744069414584321L");
   cuyasheint_t k = conv<cuyasheint_t>(PZZ-1)/N;
-  ZZ wNZZ = NTL::PowerMod(ZZ(19),k,PZZ);
+  ZZ wNZZ = NTL::PowerMod(ZZ(7),k,PZZ);
   std::cout << wNZZ << std::endl;
 
   BOOST_REQUIRE(wNZZ == NTL::to_ZZ(wN));
@@ -278,19 +280,6 @@ BOOST_AUTO_TEST_CASE(wNTest)
     BOOST_REQUIRE(NTL::MulMod(NTL::to_ZZ(W[i]),NTL::to_ZZ(WInv[i]),PZZ) == 1);
 
 }
-#endif
-
-// BOOST_AUTO_TEST_CASE(sremTest)
-// {
-//   for(int i = 0; i < 100*NTESTS;i++){
-//     uint64_t a = rand()*pow(2,31);
-//     cuyasheint_t result = s_rem(a);
-//     // std::cout << "a: " << a << std::endl << "result: " << result << " == " << (a%4293918721)<<std::endl;
-//     BOOST_REQUIRE(result == (a%4293918721));
-//   }
-
-// }
-#ifdef NTTMUL
 BOOST_AUTO_TEST_CASE(smulTest)
 {
   const uint64_t P = 18446744069414584321L;
@@ -789,8 +778,8 @@ BOOST_AUTO_TEST_CASE(severalMultiplications)
 
     BOOST_REQUIRE(c.get_coeff(i) == ntl_value);
   }
-  for(unsigned int i = 1; i < 10; i++){
-    // std::cout << "Iteration "<< i << std::endl;
+  for(unsigned int i = 1; i < 1; i++){
+    std::cout << "Iteration "<< i << std::endl;
     c = c*a;
     c.reduce();
     c %= q;
@@ -798,12 +787,12 @@ BOOST_AUTO_TEST_CASE(severalMultiplications)
     c_ntl = c_ntl*a_ntl;
     c_ntl %= conv<ZZ_pEX>(NTL_Phi);
 
-    #ifdef DEBUG
+    // #ifdef DEBUG
     std::cout << "a: " << a.to_string() << " degree: " << a.deg() <<std::endl;
     std::cout << "b: " << b.to_string() << " degree: " << b.deg() <<std::endl;
     std::cout << "c: " << c.to_string() << " degree: " << c.deg() <<std::endl;
     std::cout << "c_ntl: " << c_ntl << " degree: " << NTL::deg(c_ntl) << std::endl << std::endl;
-    #endif
+    // #endif
 
     BOOST_REQUIRE(NTL::deg(c_ntl) == c.deg());
     for(int i = 0;i <= c.deg();i++){
@@ -818,6 +807,10 @@ BOOST_AUTO_TEST_CASE(severalMultiplications)
       BOOST_REQUIRE(c.get_coeff(i) == ntl_value);
     }
   }
+
+  a.release();
+  b.release();
+  c.release();
 }
 BOOST_AUTO_TEST_CASE(phiReduceCPU)
 {

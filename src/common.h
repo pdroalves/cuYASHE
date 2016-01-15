@@ -204,15 +204,15 @@ P common_multiplication(P *a_input, P *b_input){
 
   cuyasheint_t *d_result;
   if(a.get_crt_spacing() > 0 && b.get_crt_spacing() > 0)
-	  d_result = CUDAFunctions::callPolynomialMul(a.get_stream(),
-															a.get_device_crt_residues(),
-															update_A_spacing,
-															a.get_crt_spacing(),
-															b.get_device_crt_residues(),
-															update_B_spacing,
-															b.get_crt_spacing(),
-															needed_spacing,
-															a.CRTPrimes.size());
+	  d_result = CUDAFunctions::callPolynomialMul(	a.get_stream(),
+													a.get_device_crt_residues(),
+													update_A_spacing,
+													a.get_crt_spacing(),
+													b.get_device_crt_residues(),
+													update_B_spacing,
+													b.get_crt_spacing(),
+													needed_spacing,
+													a.CRTPrimes.size());
   else
   	d_result = NULL;
 
