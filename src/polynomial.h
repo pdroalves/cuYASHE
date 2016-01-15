@@ -226,24 +226,24 @@ class Polynomial{
       // start = polynomial_get_cycles();
       #endif 
 
-      CRTSPACING = b.get_crt_spacing();
-      if(b.d_bn_coefs)
-        this->d_bn_coefs = b.d_bn_coefs;
-      if(b.h_bn_coefs)
-        this->h_bn_coefs = b.h_bn_coefs;
-      if(b.get_host_updated())
-        this->set_coeffs(b.get_coeffs());      
-      
-      if(b.get_crt_residues_computed())
-        // this->copy_device_crt_residues(b);
-        this->d_polyCRT = b.d_polyCRT;
 
-     this->set_crt_computed(b.get_crt_computed());
+      CRTSPACING = b.get_crt_spacing();
+         
+
+      this->set_crt_computed(b.get_crt_computed());
       this->set_crt_residues_computed(b.get_crt_residues_computed());
       this->set_icrt_computed(b.get_icrt_computed());
       this->set_host_updated(b.get_host_updated());
-      
 
+      if(b.get_icrt_computed()){
+        this->d_bn_coefs = b.d_bn_coefs;
+        h_bn_coefs = (bn_t*)malloc(CRTSPACING*sizeof(bn_t));
+      }
+
+      if(b.get_crt_residues_computed())
+        d_polyCRT = b.d_polyCRT;
+      if(b.get_host_updated())
+        set_coeffs(b.get_coeffs());
       
       #ifdef VERBOSE
       // stop = polynomial_get_cycles();

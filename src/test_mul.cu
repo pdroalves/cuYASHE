@@ -37,7 +37,7 @@ int main(){
   Polynomial::random(&a,8);
   Polynomial::random(&b,8);
 
-  // c = a*b;
+  c = a*b;
   
   std::cout << "a: " << a.to_string() << std::endl;
   std::cout << "b: " << b.to_string() << std::endl;

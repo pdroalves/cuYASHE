@@ -778,7 +778,7 @@ BOOST_AUTO_TEST_CASE(severalMultiplications)
 
     BOOST_REQUIRE(c.get_coeff(i) == ntl_value);
   }
-  for(unsigned int i = 1; i < 1; i++){
+  for(unsigned int i = 1; i < NTESTS; i++){
     std::cout << "Iteration "<< i << std::endl;
     c = c*a;
     c.reduce();
@@ -787,12 +787,12 @@ BOOST_AUTO_TEST_CASE(severalMultiplications)
     c_ntl = c_ntl*a_ntl;
     c_ntl %= conv<ZZ_pEX>(NTL_Phi);
 
-    // #ifdef DEBUG
+    #ifdef DEBUG
     std::cout << "a: " << a.to_string() << " degree: " << a.deg() <<std::endl;
     std::cout << "b: " << b.to_string() << " degree: " << b.deg() <<std::endl;
     std::cout << "c: " << c.to_string() << " degree: " << c.deg() <<std::endl;
     std::cout << "c_ntl: " << c_ntl << " degree: " << NTL::deg(c_ntl) << std::endl << std::endl;
-    // #endif
+    #endif
 
     BOOST_REQUIRE(NTL::deg(c_ntl) == c.deg());
     for(int i = 0;i <= c.deg();i++){
