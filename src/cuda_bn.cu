@@ -9,12 +9,12 @@
 #include "cuda_functions.h"
 #include "polynomial.h"
 
-__constant__ cuyasheint_t CRTPrimesConstant[MAX_PRIMES_ON_C_MEMORY];
+__constant__ cuyasheint_t CRTPrimesConstant[PRIMES_BUCKET_SIZE];
 
 bn_t CUDAFunctions::M;
 bn_t CUDAFunctions::u;
 bn_t* CUDAFunctions::Mpis;
-cuyasheint_t* CUDAFunctions::invMpis;
+__constant__ cuyasheint_t invMpis[PRIMES_BUCKET_SIZE];
 
 ////////////////////////
 // Auxiliar functions //
@@ -106,8 +106,9 @@ __host__ __device__ int bn_cmpn_low(const cuyasheint_t *a, const cuyasheint_t *b
 
 	r = CMP_EQ;
 	for (i = 0; i < size; i++, --a, --b) {
-		r = 			r				*(!(*a != *b && r == CMP_EQ)) + 
-			(*a > *b ? CMP_GT : CMP_LT) *(*a != *b && r == CMP_EQ);
+		r = 			r				*(!((*a != *b) && r == CMP_EQ)) + 
+			// (*a > *b ? CMP_GT : CMP_LT)*(*a != *b && r == CMP_EQ);
+			((*a > *b)*CMP_GT + (*a <= *b)*CMP_LT)*(*a != *b && r == CMP_EQ);
 	}
 	return r;
 }
@@ -651,6 +652,51 @@ __host__ void callTestData(bn_t *coefs,int N){
 };
 
 
+__global__ void cuPreICRT(	bn_t *inner_results,
+							const cuyasheint_t *d_polyCRT,
+							const unsigned int N,
+							const unsigned int NPolis,
+							const bn_t *Mpis
+						){
+
+	const int tid = threadIdx.x + blockIdx.x*blockDim.x;
+	
+	if(tid < N*NPolis){
+	 	const int cid = tid % N;
+	 	const int rid = tid / N;
+
+
+		// Get a prime
+		cuyasheint_t pi = CRTPrimesConstant[rid];
+	 	bn_t inner_result = inner_results[tid];
+		bn_zero(&inner_result);
+
+		/**
+		 * Inner
+		 */
+		cuyasheint_t x;		
+		bn_64bits_mulmod(	&x,
+							invMpis[rid],
+							d_polyCRT[cid + rid*N],
+							pi);
+
+		// Adjust available words in inner_result
+		assert(inner_result.alloc >= Mpis[rid].used+1);
+			// bn_grow_d(&inner_result,1);
+
+		int carry = bn_mul1_low(inner_result.dp,
+					     	Mpis[rid].dp,
+					     	x,
+					     	Mpis[rid].used);
+		
+		inner_result.used = Mpis[rid].used;
+		inner_result.dp[inner_result.used] = carry;	
+		inner_result.used += (carry > 0);	
+
+		inner_results[tid] = inner_result; 
+	}
+}
+
 /**
  * cuICRT computes ICRT on GPU
  * @param poly      output: An array of coefficients 
@@ -659,13 +705,10 @@ __host__ void callTestData(bn_t *coefs,int N){
  * @param NPolis    input: Number of residues
  */
 __global__ void cuICRT(	bn_t *poly,
-						const cuyasheint_t *d_polyCRT,
 						const unsigned int N,
 						const unsigned int NPolis,
 						const bn_t M,
 						const bn_t u,
-						const bn_t *Mpis,
-						const cuyasheint_t *invMpis,
 						bn_t *inner_results
 						){
 	/**
@@ -682,72 +725,35 @@ __global__ void cuICRT(	bn_t *poly,
 	const int cid = tid;
 	
 	 if(tid < N){
-	 	// bn_t coef = poly[cid];
-	 	bn_t inner_result = inner_results[cid];
-	 	bn_zero(&poly[cid]); 
+	 	bn_t coef = poly[cid];
+	 	bn_zero(&coef); 
 
 	 	for(unsigned int rid = 0; rid < NPolis;rid++){
-				cuyasheint_t carry;
-	 			cuyasheint_t x;
+		 	bn_t inner_result = inner_results[cid + rid*N];
 
-	 			// Get a prime
-	 			cuyasheint_t pi = CRTPrimesConstant[rid];
-	 	
-	 			bn_zero(&inner_result);
+			/**
+			 * Accumulate
+			 */
+			bool fix_addition = (coef.used < inner_result.used);
+			cuyasheint_t carry = bn_addn_low(coef.dp, coef.dp, inner_result.dp,coef.used);
+			
+			/* Equivalent to "If has a carry, add as last word" */
+			coef.dp[coef.used] = carry;
+			coef.used += (carry > 0);
+			
+			if(fix_addition){
+				carry = bn_addn_low(coef.dp+coef.used,
+									inner_result.dp+coef.used,
+									coef.dp+coef.used,
+									inner_result.used);	
+				coef.used = inner_result.used;
+				coef.dp[coef.used] = carry;
+				coef.used += (carry > 0);		
+			}
 
-	 			/**
-	 			 * Inner
-	 			 */
-	 			bn_64bits_mulmod(	&x,
-	 								invMpis[rid],
-	 								d_polyCRT[cid + rid*N],
-	 								pi);
-
-	 			// Adjust available words in inner_result
- 				assert(inner_result.alloc >= Mpis[rid].used+1);
- 					// bn_grow_d(&inner_result,1);
-
-	 			carry = bn_mul1_low(inner_result.dp,
-		 					     	Mpis[rid].dp,
-		 					     	x,
-		 					     	Mpis[rid].used);
- 				
- 				inner_result.used = Mpis[rid].used;
-				inner_result.dp[inner_result.used] = carry;	
-	 			inner_result.used += (carry > 0);	 				
-
- 				/**
- 				 * Accumulate
- 				 */
-
-				bn_t *a = ( bn_cmp_abs(&poly[cid],&inner_result) == CMP_GT? &poly[cid] : &inner_result );
-				bn_t *b = ( bn_cmp_abs(&poly[cid],&inner_result) == CMP_LT? &poly[cid] : &inner_result);
-
-				// bn_t *a = &poly[cid];
-				// bn_t *b = &inner_result;
-				// if(bn_cmp_abs(a,b) == CMP_LT)
-					// swap_d(a,b);
-
-				int max = a->used;
-				int min = b->used;
-
-				assert(poly[cid].alloc > max);
-
-				carry = bn_addn_low(poly[cid].dp, a->dp, b->dp, max*(a->used == b->used) + min*(a->used != b->used));
-
-				if (a->used != b->used)
-					carry = bn_add1_low(poly[cid].dp + min, a->dp + min, carry, max - min);
-
-				poly[cid].used = max;
 				
-				/* Equivalent to "If has a carry, add as last word" */
-				assert(poly[cid].alloc > max + 1);
-				poly[cid].dp[max] = carry;
-				poly[cid].used += (carry > 0);
 				// __syncthreads();
-	 		}
-	 		// poly[cid] = coef;
- 			bn_zero(&inner_result);
+ 		}
 
 		////////////////////////////////////////////////
 		// Modular reduction of poly[cid] by M //
@@ -755,6 +761,7 @@ __global__ void cuICRT(	bn_t *poly,
  	 	/**
  	 	 * At this point a thread i finished the computation of coefficient i
  	 	 */
+ 		poly[cid] = coef;
 		bn_mod_barrt(poly,poly,N,M.dp,M.used,u.dp,u.used);	 	
 	 }
 
@@ -786,26 +793,34 @@ void callCRT(bn_t *coefs,const int used_coefs,cuyasheint_t *d_polyCRT,const int 
 
 void callICRT(bn_t *coefs,cuyasheint_t *d_polyCRT,const int N, const int NPolis,cudaStream_t stream){
 
-	const int size = N;
-	if(size <= 0)
+	if(N <= 0)
 		return;
+	int blockSize;   // The launch configurator returned block size 
+	int minGridSize; // The minimum grid size needed to achieve the 
+           			 // maximum occupancy for a full device launch 
+	int gridSize;    // The actual grid size needed, based on input size 
 
-	int ADDGRIDXDIM = (size%ADDBLOCKXDIM == 0? 
-			size/ADDBLOCKXDIM : 
-			size/ADDBLOCKXDIM + 1);
-	dim3 gridDim(ADDGRIDXDIM);
-	dim3 blockDim(ADDBLOCKXDIM);
+	// cudaOccupancyMaxPotentialBlockSize( &minGridSize, &blockSize, cuPreICRT, 0, 0); 
+	blockSize = ADDBLOCKXDIM;
 
-	// std::cout << "ICRT" << std::endl;
-	// testData<<<1,1,0,stream>>>(d_polyCRT,N*NPolis);
-	cuICRT<<<gridDim,blockDim,0,stream>>>(	coefs,
-											d_polyCRT,
+	gridSize = ( N*NPolis % blockSize == 0? 
+						N*NPolis/blockSize : 
+						N*NPolis/blockSize + 1);
+	cuPreICRT<<<gridSize,blockSize,0,stream>>> (CUDAFunctions::d_inner_results,
+												d_polyCRT,
+												N,
+												NPolis,
+												CUDAFunctions::Mpis);
+	blockSize = ADDBLOCKXDIM;
+
+	gridSize = ( N % blockSize == 0? 
+						N/blockSize : 
+						N/blockSize + 1);
+	cuICRT<<<gridSize,blockSize,0,stream>>>(coefs,
 											N,
 											NPolis,
 											CUDAFunctions::M,
 											CUDAFunctions::u,
-											CUDAFunctions::Mpis,
-											CUDAFunctions::invMpis,
 											CUDAFunctions::d_inner_results);
 	cudaError_t result = cudaGetLastError();
 	assert(result == cudaSuccess);
@@ -887,15 +902,9 @@ __host__ void  CUDAFunctions::write_crt_primes(){
     // Copy InvMpi //
     /////////////////
 
-    if(CUDAFunctions::invMpis)
-    	cudaFree(CUDAFunctions::invMpis);
-    result = cudaMalloc((void**)&CUDAFunctions::invMpis,Polynomial::CRTPrimes.size()*sizeof(cuyasheint_t));
-    assert(result == cudaSuccess);
-
-	result = cudaMemcpyAsync(CUDAFunctions::invMpis,
-							&Polynomial::CRTInvMpi[0],
-							Polynomial::CRTPrimes.size()*sizeof(cuyasheint_t),
-							cudaMemcpyHostToDevice
+	result = cudaMemcpyToSymbol(invMpis,
+								&Polynomial::CRTInvMpi[0],
+								Polynomial::CRTPrimes.size()*sizeof(cuyasheint_t)
 							);
     assert(result == cudaSuccess);
 

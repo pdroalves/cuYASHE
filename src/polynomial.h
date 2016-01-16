@@ -1044,16 +1044,32 @@ class Polynomial{
         /**
          * Update bn_coefs
          */
-        if(d_bn_coefs){
-          result = cudaFree(d_bn_coefs);
-          assert(result == cudaSuccess);
-        } 
-        if(d_polyCRT){
-          result = cudaFree(d_polyCRT);
-          assert(result == cudaSuccess);
-        } 
-       if(h_bn_coefs)
-          free(h_bn_coefs);
+        #warning memory leak here
+       // try{
+       //  if(d_bn_coefs){
+       //    // result = cudaFree(d_bn_coefs);
+       //    if(result != cudaSuccess)
+       //      throw  cudaGetErrorString(result);
+       //  }
+       // }catch(const char* s){
+       //  std::cerr << "Exception on release of d_bn_coefs: " << s << std::endl;
+       // }
+
+       // try{
+       //  if(d_polyCRT){
+       //    // result = cudaFree(d_polyCRT);
+       //    if(result != cudaSuccess)
+       //      throw  cudaGetErrorString(result);
+       //  }
+       // }catch(const char* s){
+       //  std::cerr << "Exception on release of d_bn_coefs: " << s << std::endl;
+       // } 
+       // try{
+       //  // if(h_bn_coefs)
+       //    // free(h_bn_coefs);
+       // }catch(const char* s){
+       //  std::cerr << "Exception on release of d_bn_coefs: " << s << std::endl;
+       // }
         
         // Alloc memory
         cuyasheint_t *tmp;

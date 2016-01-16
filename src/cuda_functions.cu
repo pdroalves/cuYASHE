@@ -574,20 +574,20 @@ __host__ cuyasheint_t* CUDAFunctions::callPolynomialMul(cudaStream_t stream,
   cuyasheint_t *d_result;
 
   #ifdef PLAINMUL
-    #ifdef VERBOSE
-        std::cout << "Plain multiplication" << std::endl;
-    #endif
-    cudaError_t result = cudaMalloc((void**)&d_result,(N)*NPolis*sizeof(cuyasheint_t));
-    assert(result == cudaSuccess);
-    result = cudaMemset((void*)d_result,0,(N)*NPolis*sizeof(cuyasheint_t));
-    assert(result == cudaSuccess);
+    // #ifdef VERBOSE
+    //     std::cout << "Plain multiplication" << std::endl;
+    // #endif
+    // cudaError_t result = cudaMalloc((void**)&d_result,(N)*NPolis*sizeof(cuyasheint_t));
+    // assert(result == cudaSuccess);
+    // result = cudaMemset((void*)d_result,0,(N)*NPolis*sizeof(cuyasheint_t));
+    // assert(result == cudaSuccess);
 
-    dim3 blockDim(ADDBLOCKXDIM,ADDBLOCKXDIM);
-    // int blocks = ((2*N*NPolis) % ADDBLOCKXDIM == 0? (2*N*NPolis)/ADDBLOCKXDIM : (2*N*NPolis)/ADDBLOCKXDIM+1);
-    // dim3 gridDim(blocks,blocks);
-    dim3 gridDim(N*NPolis,1);
-    polynomialPlainMul<<<gridDim,blockDim>>>(a,b,d_result,N,NPolis);
-    assert(cudaGetLastError() == cudaSuccess);
+    // dim3 blockDim(ADDBLOCKXDIM,ADDBLOCKXDIM);
+    // // int blocks = ((2*N*NPolis) % ADDBLOCKXDIM == 0? (2*N*NPolis)/ADDBLOCKXDIM : (2*N*NPolis)/ADDBLOCKXDIM+1);
+    // // dim3 gridDim(blocks,blocks);
+    // dim3 gridDim(N*NPolis,1);
+    // polynomialPlainMul<<<gridDim,blockDim>>>(a,b,d_result,N,NPolis);
+    // assert(cudaGetLastError() == cudaSuccess);
   #elif defined(NTTMUL)
 
       // std::cout << "NTT multiplication" << std::endl;
@@ -873,13 +873,14 @@ __host__ void CUDAFunctions::init(int N){
      * Alloc memory for d_inner_results
      */
     assert(CUDAFunctions::M.alloc > 0);
+    const int size = N*Polynomial::CRTPrimes.size();
 
     bn_t *h_inner_results;
-    h_inner_results = (bn_t *) malloc ( N * sizeof(bn_t));
-    result = cudaMalloc((void**)&CUDAFunctions::d_inner_results, N*sizeof(bn_t));
+    h_inner_results = (bn_t *) malloc ( size * sizeof(bn_t));
+    result = cudaMalloc((void**)&CUDAFunctions::d_inner_results, size*sizeof(bn_t));
     assert(result == cudaSuccess);
 
-    for(unsigned int i =0; i < N; i++){
+    for(unsigned int i =0; i < size; i++){
       h_inner_results[i].used = 0;
       h_inner_results[i].alloc = std::max(CUDAFunctions::M.alloc,STD_BNT_WORDS_ALLOC);
       h_inner_results[i].sign = BN_POS;
@@ -894,7 +895,7 @@ __host__ void CUDAFunctions::init(int N){
 
     result = cudaMemcpy( CUDAFunctions::d_inner_results,
                   h_inner_results,
-                  N*sizeof(bn_t),
+                  size*sizeof(bn_t),
                   cudaMemcpyHostToDevice
                 );
     assert(result == cudaSuccess);

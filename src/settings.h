@@ -13,8 +13,8 @@
 #define CRTPRIMESIZE 10
 #else
 #define CRTPRIMESIZE 29
+#define PRIMES_BUCKET_SIZE 200                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           //
 extern const uint32_t PRIMES_BUCKET[];
-extern const int PRIMES_BUCKET_SIZE;
 #endif
 // #define DEBUG
 // #define CYCLECOUNTING
