@@ -233,12 +233,12 @@ BOOST_AUTO_TEST_CASE(zeroAdd)
 
 
   Polynomial r = a + b;
-  #ifdef VERBOSE
+  // #ifdef VERBOSE
   std::cout << "M: "<<Polynomial::CRTProduct << std::endl;
   std::cout << "a: " << a.to_string() <<std::endl;
   std::cout << "b: " << b.to_string() <<std::endl;
   std::cout << "r: " << r.to_string() << std::endl;
-  #endif
+  // #endif
   
   BOOST_REQUIRE(r == a);
 
@@ -876,6 +876,45 @@ BOOST_AUTO_TEST_CASE(phiReduceGPU)
     }
   }
 }
+
+// BOOST_AUTO_TEST_CASE(remainder)
+// {
+//   /** 
+//    * verifies the % operation for cuyasheint_t, ZZ and bn_t
+//    */
+  
+//   ///////////////////
+//   // cuyasheint_t  //
+//   ///////////////////
+//   Polynomial a;
+//   Polynomial::random(&a,degree-1);
+//   ZZ_pEX a_ntl;
+//   for(int i = 0;i <= a.deg();i++)
+//     NTL::SetCoeff(a_ntl,i,conv<ZZ_p>(a.get_coeff(i)));
+//   std::cout << "a: " <<a.to_string() << std::endl; 
+//   std::cout << "a_ntl: " <<a_ntl << std::endl; 
+
+//   for(int i = 0; i < NTESTS;i++){
+//     cuyasheint_t d = rand();
+
+//     Polynomial b = a % d;
+//     ZZ_pEX b_ntl = a_ntl % conv<ZZ_pEX>(d);
+//     std::cout << "b: " <<b.to_string() << std::endl; 
+//     std::cout << "b_ntl: " <<b_ntl << std::endl; 
+//     BOOST_REQUIRE(NTL::deg(b_ntl) == b.deg());
+//     for(int i = 0;i <= b.deg();i++){
+
+//       ZZ ntl_value;
+//       if( NTL::IsZero(NTL::coeff(b_ntl,i)) )
+//       // Without this, NTL raises an exception when we call rep()
+//         ntl_value = 0L;
+//       else
+//         ntl_value = conv<ZZ>(NTL::rep(NTL::coeff(b_ntl,i))[0]);
+//       BOOST_REQUIRE(b.get_coeff(i) == ntl_value);
+//     }
+//   }
+// }
+
 
 BOOST_AUTO_TEST_SUITE_END()
 

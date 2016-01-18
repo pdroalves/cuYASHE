@@ -139,10 +139,6 @@ int main(void){
 
 	std::cout << "M: " << Polynomial::CRTProduct << std::endl;
 	std::cout << "Mpi[0] =  " << Polynomial::CRTMpi[0] << std::endl;
-	std::cout << "Mpi[0] words: " << std::endl;
-	for(int i = 0; i < CUDAFunctions::Mpis[0].used;i++)
-		std::cout << CUDAFunctions::Mpis[0].dp[i] << ", "<< std::endl;
-
 
 	unsigned int nprimes = Polynomial::CRTPrimes.size();
     std::cout << nprimes << " primes generated" << std::endl;

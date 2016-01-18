@@ -15,7 +15,7 @@
 
 #define BILLION  1000000000L
 #define MILLION  1000000L
-#define N 10
+#define N 1
 
 
 int main(int argc,char* argv[]){

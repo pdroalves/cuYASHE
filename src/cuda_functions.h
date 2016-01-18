@@ -23,9 +23,6 @@ class CUDAFunctions{
     //////////////////////////
     // CRT global variables //
     //////////////////////////
-    static bn_t M;
-    static bn_t u;
-    static bn_t* Mpis;
     static bn_t *d_inner_results;
 
     #ifdef NTTMUL

@@ -153,7 +153,7 @@ void get_words(bn_t *b,ZZ a){
    */
   cuyasheint_t *h_dp;
   int used = 0;
-  int alloc = std::max(STD_BNT_WORDS_ALLOC,CUDAFunctions::M.alloc);
+  int alloc = STD_BNT_WORDS_ALLOC;
   h_dp = (cuyasheint_t *) calloc (alloc,sizeof(cuyasheint_t));
 
   for(ZZ x = NTL::abs(a); x > 0; x=(x>>WORD),used++){
@@ -192,13 +192,47 @@ void get_words(bn_t *b,ZZ a){
 
   free(h_dp);
 }
+void get_words_host(bn_t *b,ZZ a){
+  /**
+   * Compute
+   */
+  cuyasheint_t *h_dp;
+  int used = 0;
+  int alloc = STD_BNT_WORDS_ALLOC;
+  h_dp = (cuyasheint_t *) calloc (alloc,sizeof(cuyasheint_t));
+
+  for(ZZ x = NTL::abs(a); x > 0; x=(x>>WORD),used++){
+    if(used >= alloc){
+      h_dp = (cuyasheint_t*)realloc(h_dp,alloc+STD_BNT_WORDS_ALLOC);
+      alloc += STD_BNT_WORDS_ALLOC;
+      std::cout << "get_words realloc!" << std::endl;
+    }
+    h_dp[used] = conv<uint64_t>(x);
+  }
+
+  // if(b->alloc != alloc && alloc > 0){
+    cudaError_t result;
+    if(b->alloc != alloc || b->dp == 0x0)
+      // If b->dp was allocated with less data than we need
+      if(b->alloc != 0)
+        free(b->dp);
+
+  /*
+   * Copy new data to device memory
+   */
+
+  b->used = used;
+  b->alloc = alloc;
+  b->sign = (a>=0?BN_POS:BN_NEG);
+  b->dp = h_dp;
+}
 void get_words_allocatted(bn_t *b,ZZ a,cuyasheint_t *h_data, cuyasheint_t *d_data, int index,cudaStream_t stream){
   /**
    * Compute
    */
   cuyasheint_t *h_dp;
   int used = 0;
-  int alloc = std::max(STD_BNT_WORDS_ALLOC,CUDAFunctions::M.alloc);
+  int alloc = STD_BNT_WORDS_ALLOC;
   h_dp = h_data + index*alloc;
 
   for(ZZ x = NTL::abs(a); x > 0; x=(x>>WORD),used++){
@@ -214,7 +248,7 @@ void get_words_allocatted(bn_t *b,ZZ a,cuyasheint_t *h_data, cuyasheint_t *d_dat
     cudaError_t result;
     if(b->alloc != alloc || b->dp == 0x0){
       // If b->dp was allocated with less data than we need
-      if(b->alloc != 0){
+      if(b->dp == 0x0){
         result = cudaFree(b->dp);
         assert(result == cudaSuccess); 
       }
@@ -486,6 +520,34 @@ bn_t get_reciprocal(ZZ q){
          */
         compute_reciprocal(q);
         pair = reciprocals[q];
+        reciprocal = std::get<0>(pair);
+        su = std::get<1>(pair);
+      }
+
+      bn_t result;
+      result.used = su;
+      result.alloc = su;
+      result.sign = BN_POS;
+      result.dp = reciprocal;
+
+      return result;
+    }
+bn_t get_reciprocal(bn_t q){
+	/**
+	 * The reciprocal is computed in the first time this function() is called
+	 * After that, the result is reused
+	 */
+	 ZZ q_ZZ = get_ZZ(&q);
+      std::pair<cuyasheint_t*,int> pair = reciprocals[q_ZZ];
+      cuyasheint_t *reciprocal = std::get<0>(pair);
+      int su = std::get<1>(pair);
+
+      if( reciprocal != NULL){
+        /** 
+         * Not computed yet
+         */
+        compute_reciprocal(q_ZZ);
+        pair = reciprocals[q_ZZ];
         reciprocal = std::get<0>(pair);
         su = std::get<1>(pair);
       }

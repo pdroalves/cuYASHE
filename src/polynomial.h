@@ -19,7 +19,9 @@ NTL_CLIENT
 
 cuyasheint_t polynomial_get_cycles();
 void get_words(bn_t* b,ZZ a);
+void get_words_host(bn_t *b,ZZ a);
 bn_t get_reciprocal(ZZ q);
+bn_t get_reciprocal(bn_t q);
 void compute_reciprocal(ZZ q);
 extern std::map<ZZ, std::pair<cuyasheint_t*,int>> reciprocals;
 
@@ -482,15 +484,14 @@ class Polynomial{
         return p;
       }else{
         // Doing this, we reduce needless cycles to copy device data
-        bool crt_residues_computed_flag = get_crt_residues_computed();
-        this->set_crt_residues_computed(false);
+        // bool crt_residues_computed_flag = get_crt_residues_computed();
+        // this->set_crt_residues_computed(false);
         Polynomial p(*this);
-        this->set_crt_residues_computed(crt_residues_computed_flag);
+        // this->set_crt_residues_computed(crt_residues_computed_flag);
           
         p %= b;
         return p;
       }
-
     }
     Polynomial operator%=(ZZ b){
       if(!this->get_host_updated()){
@@ -526,6 +527,16 @@ class Polynomial{
     }
     Polynomial operator/=(ZZ b){
       this->copy(((*this)/b));
+      return *this;
+    }
+    // Polynomial operator%(bn_t b){
+    //   Polynomial p(*this);
+
+    // }
+    Polynomial operator%=(bn_t b){
+      if(!this->get_crt_computed())
+        this->crt();      
+      modn(b);
       return *this;
     }
     Polynomial operator+(cuyasheint_t b){
@@ -981,6 +992,25 @@ class Polynomial{
 
       bn_free(h_m);
       free(h_m);
+    }
+  void modn(bn_t n){
+
+      /**
+       * n must be a hosts variable with a pointer to device memory
+       */
+
+      cudaError_t result;
+
+      bn_t u = get_reciprocal(n);
+
+      callCuModN( d_bn_coefs,
+                  d_bn_coefs,
+                  get_crt_spacing(),
+                  n.dp,
+                  n.used,
+                  u.dp,
+                  u.used,
+                  get_stream());
     }
     int deg(){
       if(!get_host_updated()){

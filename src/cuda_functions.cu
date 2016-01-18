@@ -818,7 +818,6 @@ __host__ void CUDAFunctions::init(int N){
   ZZ wNZZ = NTL::PowerMod(ZZ(PRIMITIVE_ROOT),k,PZZ);
 
   wN = conv<cuyasheint_t>(wNZZ);
-
   cudaError_t result;
   h_W = (cuyasheint_t*)malloc(N*sizeof(cuyasheint_t));
   result = cudaMalloc((void**)&d_W,N*sizeof(cuyasheint_t));
@@ -869,36 +868,44 @@ __host__ void CUDAFunctions::init(int N){
     #ifdef VERBOSE
     #endif
   #endif
-        /**
+    /**
      * Alloc memory for d_inner_results
      */
-    assert(CUDAFunctions::M.alloc > 0);
-    const int size = N*Polynomial::CRTPrimes.size();
+    
+    /**
+     * For some reason
+     */
+    const unsigned int size = 2*N*Polynomial::CRTPrimes.size();
 
     bn_t *h_inner_results;
     h_inner_results = (bn_t *) malloc ( size * sizeof(bn_t));
     result = cudaMalloc((void**)&CUDAFunctions::d_inner_results, size*sizeof(bn_t));
     assert(result == cudaSuccess);
 
-    for(unsigned int i =0; i < size; i++){
+    cuyasheint_t *aux;
+    result = cudaMalloc((void**)&aux,STD_BNT_WORDS_ALLOC*size*sizeof(cuyasheint_t));
+    assert(result == cudaSuccess);
+    #warning this may be useless
+    result = cudaMemsetAsync(aux,0,STD_BNT_WORDS_ALLOC*size*sizeof(cuyasheint_t));
+    assert(result == cudaSuccess);
+    for(unsigned int i =0; i < size; i++,aux += STD_BNT_WORDS_ALLOC){
       h_inner_results[i].used = 0;
-      h_inner_results[i].alloc = std::max(CUDAFunctions::M.alloc,STD_BNT_WORDS_ALLOC);
+      h_inner_results[i].alloc = STD_BNT_WORDS_ALLOC;
       h_inner_results[i].sign = BN_POS;
-      result = cudaMalloc((void**)&h_inner_results[i].dp,
-                h_inner_results[i].alloc*sizeof(cuyasheint_t)
-                );
-      assert(result == cudaSuccess);
-      result = cudaMemsetAsync(h_inner_results[i].dp,0,h_inner_results[i].alloc*sizeof(cuyasheint_t));
-      assert(result == cudaSuccess);
+      h_inner_results[i].dp = aux;
     }
 
 
-    result = cudaMemcpy( CUDAFunctions::d_inner_results,
-                  h_inner_results,
-                  size*sizeof(bn_t),
-                  cudaMemcpyHostToDevice
-                );
+    result = cudaMemcpyAsync( CUDAFunctions::d_inner_results,
+                              h_inner_results,
+                              size*sizeof(bn_t),
+                              cudaMemcpyHostToDevice
+                        );
     assert(result == cudaSuccess);
+
+    result = cudaDeviceSynchronize();
+    assert(result == cudaSuccess);
+
     free(h_inner_results);
 }
 
