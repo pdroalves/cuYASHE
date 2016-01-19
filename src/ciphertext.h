@@ -29,7 +29,6 @@ class Ciphertext: public Polynomial{
     Ciphertext(){
       this->set_stream();
       this->set_host_updated(true);
-      this->set_crt_residues_computed(false);
       this->set_crt_computed(false);
       this->set_icrt_computed(true);
       if(Polynomial::global_mod > 0)
@@ -57,7 +56,6 @@ class Ciphertext: public Polynomial{
     Ciphertext(ZZ p){
       this->set_stream();
       this->set_host_updated(true);
-      this->set_crt_residues_computed(false);
       this->set_crt_computed(false);
       this->set_icrt_computed(true);
       this->mod = ZZ(p);// Copy
@@ -79,7 +77,6 @@ class Ciphertext: public Polynomial{
     Ciphertext(ZZ p,Polynomial P){
       this->set_stream();
       this->set_host_updated(true);
-      this->set_crt_residues_computed(false);
       this->set_crt_computed(false);
       this->set_icrt_computed(true);
       this->mod = ZZ(p);// Copy
@@ -100,7 +97,6 @@ class Ciphertext: public Polynomial{
     Ciphertext(int spacing){
       this->set_stream();
       this->set_host_updated(true);
-      this->set_crt_residues_computed(false);
       this->set_crt_computed(false);
       this->set_icrt_computed(true);
       if(Polynomial::global_mod > 0){
@@ -125,7 +121,6 @@ class Ciphertext: public Polynomial{
     Ciphertext(ZZ p,Polynomial P,int spacing){
       this->set_stream();
       this->set_host_updated(true);
-      this->set_crt_residues_computed(false);
       this->set_crt_computed(false);
       this->set_icrt_computed(true);
       this->mod = ZZ(p);// Copy
@@ -146,7 +141,6 @@ class Ciphertext: public Polynomial{
     Ciphertext(ZZ p,int spacing){
       this->set_stream();
       this->set_host_updated(true);
-      this->set_crt_residues_computed(false);
       this->set_crt_computed(false);
       this->set_icrt_computed(true);
       this->mod = ZZ(p);// Copy

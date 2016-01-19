@@ -2,7 +2,7 @@
 #include "cuda_functions.h"
 
 void Integer::update_device_data(){
-    if(this->get_crt_residues_computed())
+    if(this->get_crt_computed())
       return;
     else if(!this->get_crt_computed())
       this->crt();
@@ -116,7 +116,7 @@ Polynomial Integer::operator*(Polynomial &a){
         #ifdef VERBOSE
           std::cout << "this: " << std::endl;
           #endif
-        if(!a.get_crt_residues_computed()){
+        if(!a.get_crt_computed()){
           a.update_device_data();
         }
 
@@ -126,7 +126,7 @@ Polynomial Integer::operator*(Polynomial &a){
         #ifdef VERBOSE
           std::cout << "b: " << std::endl;
           #endif
-          if(!this->get_crt_residues_computed()){
+          if(!this->get_crt_computed()){
           this->update_device_data();
         }
       }
@@ -145,7 +145,7 @@ Polynomial Integer::operator*(Polynomial &a){
 
   p->set_host_updated(false);
   p->set_icrt_computed(false);
-  p->set_crt_residues_computed(true);
+  p->set_crt_computed(true);
 
   *(p) %= a.get_mod();
   return p;

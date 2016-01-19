@@ -56,10 +56,12 @@ Polynomial Polynomial::operator*(ZZ b){
         Integer I = b;
         return I*p;
         }else{
-        //#pragma omp parallel for
+
         for(int i = 0; i <= p.deg();i++)
           p.set_coeff(i,p.get_coeff(i)*b);
-        p.set_crt_residues_computed(false);
+        p.set_crt_computed(false);
+        p.set_icrt_computed(false);
+        p.set_host_updated(true);
       }
       return p;
     }
@@ -90,7 +92,7 @@ void Polynomial::copy_device_crt_residues(Polynomial &b){
   // uint64_t start,end;
 
   // start = get_cycles();
-  if(!b.get_crt_residues_computed())
+  if(!b.get_crt_computed())
     return;
 
   // std::cout << "Will copy residues on device memory" << std::endl;
@@ -276,7 +278,7 @@ void Polynomial::update_device_data(){
    * This function copy the polynomial to GPU's memory in bn_t format
    */
 
-  if(this->get_crt_residues_computed())
+  if(this->get_crt_computed())
     return;
 
   #ifdef VERBOSE
@@ -331,7 +333,7 @@ void Polynomial::update_device_data(){
   free(h_data);
   
   this->ON_COPY = false;
-  this->set_crt_residues_computed(true);
+  this->set_crt_computed(true);
 
 }
 
@@ -445,7 +447,9 @@ void Polynomial::DivRem(Polynomial a,Polynomial b,Polynomial &quot,Polynomial &r
       // #pragma omp parallel for
       for(unsigned int i = 0;i <= half;i++)
         rem.set_coeff(i,a.get_coeff(i)-a.get_coeff(i+half+1));
-      rem.set_crt_residues_computed(false);
+      rem.set_crt_computed(false);
+      rem.set_icrt_computed(false);
+      rem.set_host_updated(true);
     }else{
       throw "DivRem: I don't know how to div this!";
     }

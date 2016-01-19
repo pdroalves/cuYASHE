@@ -10,7 +10,6 @@ class Integer{
 			this->set_value(a);
 
 			this->set_host_updated(true);
-			this->set_crt_residues_computed(false);
 			this->set_crt_computed(false);
 			this->set_icrt_computed(true);
 
@@ -20,7 +19,6 @@ class Integer{
 			this->set_value(a);
 
 			this->set_host_updated(true);
-			this->set_crt_residues_computed(false);
 			this->set_crt_computed(false);
 			this->set_icrt_computed(true);
 
@@ -30,7 +28,6 @@ class Integer{
 			this->set_value(a);
 
 			this->set_host_updated(true);
-			this->set_crt_residues_computed(false);
 			this->set_crt_computed(false);
 			this->set_icrt_computed(true);
 
@@ -41,7 +38,6 @@ class Integer{
 			this->set_value(a);
 
 			this->set_host_updated(true);
-			this->set_crt_residues_computed(false);
 			this->set_crt_computed(false);
 			this->set_icrt_computed(true);
 
@@ -53,7 +49,7 @@ class Integer{
 			if(!this->get_host_updated())
 				this->update_host_data();
 			
-			this->set_crt_residues_computed(false);
+			this->set_crt_computed(false);
 			return value / a.get_value();;
 		}
 		ZZ operator+(ZZ a){
@@ -72,7 +68,6 @@ class Integer{
 			if(!this->get_host_updated())
 				this->update_host_data();
 			
-			this->set_crt_residues_computed(false);
 			value /= a;
 			return value;
 		}
@@ -80,7 +75,6 @@ class Integer{
 			if(!this->get_host_updated())
 				this->update_host_data();
 			
-			this->set_crt_residues_computed(false);
 			value %= a;
 			return value;
 		}
@@ -89,11 +83,15 @@ class Integer{
 		void set_value(ZZ a){
 			value = a;
 
+			this->set_crt_computed(false);
+	        this->set_icrt_computed(false);
 			this->set_host_updated(true);
 		}
 		void set_value(cuyasheint_t a){
 			value = to_ZZ(a);
 
+	        this->set_icrt_computed(false);
+	        this->set_icrt_computed(false);
 			this->set_host_updated(true);
 		}
 		ZZ get_value(){
@@ -108,7 +106,6 @@ class Integer{
 	        std::cout << "Host data is updated" << std::endl;
 	        #endif
 	      }else{        
-	        this->set_icrt_computed(false);
 	        #ifdef VERBOSE
 	        std::cout << "Host data is NOT updated" << std::endl;
 	        #endif
@@ -131,7 +128,6 @@ class Integer{
 	      return b;
 	    }
 	    void set_crt_residues_computed(bool b){
-	      this->DEVICE_IS_UPDATE = b;
 	      if(b){
 	        #ifdef VERBOSE
 	        std::cout << "Device data is updated" << std::endl;
@@ -143,21 +139,6 @@ class Integer{
 	        #endif
 	        this->set_crt_computed(false);
 	      }
-	    }
-	    bool get_crt_residues_computed(){
-	      bool b = this->DEVICE_IS_UPDATE;
-	      if(b){        
-	        #ifdef VERBOSE
-	        std::cout << "Device data is updated" << std::endl;
-	        #endif
-	      }else{        
-	        this->set_icrt_computed(false);
-	        #ifdef VERBOSE
-	        std::cout << "Device data is NOT updated" << std::endl;
-	        #endif
-	      }
-
-	      return b;
 	    }
 	    void set_crt_computed(bool b){
 	      this->CRT_COMPUTED = b;
@@ -214,7 +195,7 @@ class Integer{
 		}
 		void icrt();
 		cuyasheint_t* get_device_crt_residues(){
-			if(!this->get_crt_residues_computed())
+			if(!this->get_crt_computed())
 				this->update_device_data();
 			return this->d_crt_values;
 		}
@@ -224,7 +205,6 @@ class Integer{
 	    // Attributes
 	    bool ON_COPY;
 	    bool HOST_IS_UPDATED;
-	    bool DEVICE_IS_UPDATE;
 	    bool CRT_COMPUTED;
 	    bool ICRT_COMPUTED;
 

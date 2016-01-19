@@ -171,7 +171,7 @@ int main(int argc, char* argv[]){
     encrypt << d << " " << diff << std::endl;;
         
     c = cipher.encrypt(a);
-    if(!c.get_crt_residues_computed())
+    if(!c.get_crt_computed())
       c.update_device_data();
     
 
@@ -193,9 +193,11 @@ int main(int argc, char* argv[]){
     Ciphertext ct_a = cipher.encrypt(a);
     Ciphertext ct_b = cipher.encrypt(b);
     ct_a.update_host_data();
-    ct_a.set_crt_residues_computed(false);
+    ct_a.set_crt_computed(false);
+    ct_a.set_icrt_computed(false);
     ct_b.update_host_data();
-    ct_b.set_crt_residues_computed(false);  
+    ct_b.set_crt_computed(false);  
+    ct_b.set_icrt_computed(false);  
 
     clock_gettime( CLOCK_REALTIME, &start);
     for(int i = 0; i < N;i++){
@@ -205,8 +207,10 @@ int main(int argc, char* argv[]){
 
       c = (ct_a+ct_b);
       // delete &a;
-      ct_a.set_crt_residues_computed(false);
-      ct_b.set_crt_residues_computed(false);
+      ct_a.set_crt_computed(false);
+      ct_a.set_icrt_computed(false);
+      ct_b.set_crt_computed(false);
+      ct_b.set_icrt_computed(false);
       cudaDeviceSynchronize();
     }
         

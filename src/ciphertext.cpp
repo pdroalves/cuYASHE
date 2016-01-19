@@ -36,25 +36,14 @@ uint64_t cycles() {
 
 
 Ciphertext Ciphertext::operator*(Ciphertext &b){
-  // uint64_t start,end;
-  // uint64_t start_total,end_total;
 
-  // start_total = get_cycles();
   Ciphertext c1(*this);
   Ciphertext c2(b);
 
-  // start = cycles();
   if(c1.aftermul)
     c1.convert();
   if(c2.aftermul)
     c2.convert();
-  // end = cycles();
-  // std::cout << "ciphertext convert " << (end-start) << std::endl;
-
-  #ifdef VERBOSE
-  std::cout << "ciphertext mult " << std::endl;
-  
-  #endif
 
   Polynomial g = common_multiplication<Polynomial>(&c1,&c2);
   g *= (Yashe::t.get_value());
@@ -62,29 +51,22 @@ Ciphertext Ciphertext::operator*(Ciphertext &b){
 
   Ciphertext p;
   p.set_coeffs(g.deg()+1);
-  // end = cycles();
 
-  // start = cycles();
   for(int i = 0; i <= g.deg();i++){
     ZZ quot = g.get_coeff(i)/Yashe::q;
     ZZ diff = g.get_coeff(i)%Yashe::q;
-    // NTL::DivRem(quot,diff,g.get_coeff(i),Yashe::q);
 
     if(2*diff > Yashe::q)
       p.set_coeff(i,(quot+1) % Yashe::q);
     else
       p.set_coeff(i,quot % Yashe::q);
   } 
-  // end = cycles();
-  // std::cout << "ciphertext mult loop " << (end-start) << std::endl;
 
   p.aftermul = true;
   p.level = std::max(this->level,b.level)+1;
-  p.set_crt_residues_computed(false);
+  p.set_crt_computed(false);
+  p.set_icrt_computed(false);
   p.set_host_updated(true);
-
-  // end_total = get_cycles();
-  // std::cout << "ciphertext mult " << (end_total-start_total) << std::endl;
 
   return p;
 

@@ -268,12 +268,13 @@ static __global__ void polynomialcuFFTMul(const Complex *a, const Complex *b,Com
 }
 #elif defined(NTTMUL)
 
-__device__ __host__ bool overflow(const uint64_t a, const uint64_t b){
+__host__ __device__ bool overflow(const uint64_t a, const uint64_t b){
   // True if a+b will result in a integer overflow.
   return (a+b) < a;
+  // return lessThan((a+b),a);
 }
 
-__device__ __host__ uint64_t s_rem (uint64_t a)
+__host__ __device__ uint64_t s_rem (uint64_t a)
 {
   // Special reduction for prime 2^64-2^32+1
   //
@@ -301,7 +302,7 @@ __device__ __host__ uint64_t s_rem (uint64_t a)
   return res;
 }
 
-__device__ __host__  uint64_t s_mul(volatile uint64_t a,volatile uint64_t b){
+__host__ __device__  uint64_t s_mul(uint64_t a,uint64_t b){
   // Multiply and reduce a and b by prime 2^64-2^32+1
   #ifdef __CUDA_ARCH__
   const uint64_t GAP = (UINT64_MAX-PRIMEP+1);
@@ -346,35 +347,29 @@ __device__ __host__  uint64_t s_mul(volatile uint64_t a,volatile uint64_t b){
   #endif
   return res;
 }
-__device__ __host__  uint64_t s_add(volatile uint64_t a,volatile uint64_t b){
+__host__ __device__  uint64_t s_add(uint64_t a,uint64_t b){
   // Add and reduce a and b by prime 2^64-2^32+1
   // 4294967295L == UINT64_MAX - P
   uint64_t res = a+b;
-  // res += (res < a)*4294967295L;
-  if(res < a)
-    res += 4294967295L;
-  res = s_rem(res);  
-  
-  #ifdef __CUDA_ARCH__
-  __syncthreads();
-  #endif
-  return res;
+  res += (res < a)*4294967295L;
+
+  return s_rem(res);
 }
 
 
-__device__ __host__ uint64_t s_sub(volatile uint64_t a,volatile uint64_t b){
+__host__ __device__ uint64_t s_sub(uint64_t a,uint64_t b){
   // Computes a-b % P
   // 4294967295L == UINT64_MAX - P
 
   uint64_t res;
-  if(b > a){
-    res = PRIMEP;
-    res -= b;
-    res += a;
-  }
-  else
-    res = a-b;
-  // res = (a-b) + (b > a)*P; 
+  // if(b > a){
+  //   res = PRIMEP;
+  //   res -= b;
+  //   res += a;
+  // }
+  // else
+  //   res = a-b;
+  res = (a-b) + (b > a)*PRIMEP; 
 
   #ifdef __CUDA_ARCH__
   __syncthreads();
@@ -401,7 +396,7 @@ __global__ void NTTScale(cuyasheint_t *data,const int size,const int N){
     data[tid] /= N;
 } 
 
-__device__ __host__ void NTTIteration(cuyasheint_t *W,
+__host__ __device__ void NTTIteration(cuyasheint_t *W,
                                       cuyasheint_t *WInv,
                                       const int residue_index,
                                       const int j,
@@ -905,7 +900,7 @@ __host__ void CUDAFunctions::init(int N){
 //   Polynomial *phi = Polynomial::global_phi;
 //   ZZ q = Polynomial::global_mod;
 
-//   if(!this->get_crt_residues_computed()){
+//   if(!this->get_crt_computed()){
 //     #ifdef VERBOSE
 //     std::cout << "Reduce on host." << std::endl;
 //     #endif
@@ -1014,9 +1009,9 @@ __host__ void Polynomial::reduce(){
   
   // Until we debug reduction on GPU, we need this
   update_host_data();
-  this->set_crt_residues_computed(false);
+  this->set_crt_computed(false);
 
-  if(!this->get_crt_residues_computed()){
+  if(!this->get_crt_computed()){
     #ifdef VERBOSE
     std::cout << "Reduce on host." << std::endl;
     #endif
@@ -1067,9 +1062,9 @@ __host__ void Polynomial::reduce(){
       assert(result == cudaSuccess);
       
       this->set_host_updated(false);
-      this->set_crt_residues_computed(true);
+      this->set_crt_computed(true);
       this->set_icrt_computed(false);
-      this->update_crt_spacing(phi->deg());
+      
       ///////////////////////
       // Modular reduction //
       ///////////////////////

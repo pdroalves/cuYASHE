@@ -78,7 +78,8 @@ int main(){
   a.set_coeff(7,1);
   a.set_coeff(8,1);
 
-  a.set_crt_residues_computed(false);
+  a.set_crt_computed(false);
+  a.set_icrt_computed(false);
   a.set_host_updated(true);
   a.reduce();
 
@@ -126,7 +127,8 @@ int main(){
   a.set_coeff(13, 96);  
   a.set_coeff(14,239);  
 
-  a.set_crt_residues_computed(false);
+  a.set_icrt_computed(false);
+  a.set_crt_computed(false);
   a.set_host_updated(true);
   a.reduce();
   // a %= Polynomial::global_mod;

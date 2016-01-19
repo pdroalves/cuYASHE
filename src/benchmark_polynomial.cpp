@@ -175,9 +175,11 @@ int main(int argc,char* argv[]){
     clock_gettime( CLOCK_REALTIME, &start);
     for(int i = 0; i < N;i++){
       a.update_device_data();
+      
       result = cudaDeviceSynchronize();
       assert(result == cudaSuccess);
-      a.set_crt_residues_computed(false);
+      a.set_crt_computed(false);
+      a.set_icrt_computed(false);
     }
     clock_gettime( CLOCK_REALTIME, &stop);
     diff = compute_time_ms(start,stop)/N;
@@ -206,7 +208,7 @@ int main(int argc,char* argv[]){
     clock_gettime( CLOCK_REALTIME, &start);
     a.update_host_data();
     a.set_crt_computed(false);
-    a.set_crt_residues_computed(false);
+    a.set_icrt_computed(false);
     for(int i = 0; i < N;i++){
       a.set_crt_computed(false);
       a.crt();
@@ -261,11 +263,13 @@ int main(int argc,char* argv[]){
 
     clock_gettime( CLOCK_REALTIME, &start);
     a.update_host_data();
-    a.set_crt_residues_computed(false);
+    a.set_crt_computed(false);
+    a.set_icrt_computed(false);
     for(int i = 0; i < N;i++){
       a.reduce();
       result = cudaDeviceSynchronize();
-      a.set_crt_residues_computed(false);
+      a.set_crt_computed(false);
+      a.set_icrt_computed(false);
       assert(result == cudaSuccess);
     }
     clock_gettime( CLOCK_REALTIME, &stop);
@@ -280,7 +284,8 @@ int main(int argc,char* argv[]){
 
     clock_gettime( CLOCK_REALTIME, &start);
     a.update_host_data();
-    a.set_crt_residues_computed(false);
+    a.set_crt_computed(false);
+    a.set_icrt_computed(false);
     for(int i = 0; i < N;i++){
       a %= q;
     }
@@ -309,8 +314,10 @@ int main(int argc,char* argv[]){
     for(int i = 0; i < N;i++){
 
       Polynomial c = (a+b);
-      a.set_crt_residues_computed(false);
-      b.set_crt_residues_computed(false);
+      a.set_crt_computed(false);
+      a.set_icrt_computed(false);
+      b.set_crt_computed(false);
+      b.set_icrt_computed(false);
       result = cudaDeviceSynchronize();
       assert(result == cudaSuccess);
     }
@@ -355,8 +362,11 @@ int main(int argc,char* argv[]){
     for(int i = 0; i < N;i++){
 
       Polynomial c = (a*b);
-      a.set_crt_residues_computed(false);
-      b.set_crt_residues_computed(false);
+
+      a.set_crt_computed(false);
+      a.set_icrt_computed(false);
+      b.set_crt_computed(false);
+      b.set_icrt_computed(false);
       result = cudaDeviceSynchronize();
       assert(result == cudaSuccess);
     }
@@ -374,9 +384,7 @@ int main(int argc,char* argv[]){
     // Time measured without memory copy
     Polynomial::random(&a,d-1);
     Polynomial::random(&b,d-1);
-    a.update_crt_spacing(2*d);
     a.update_device_data();
-    b.update_crt_spacing(2*d);
     b.update_device_data();
 
     clock_gettime( CLOCK_REALTIME, &start);

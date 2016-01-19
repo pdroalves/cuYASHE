@@ -157,6 +157,22 @@ BOOST_AUTO_TEST_CASE(justCRT)
 }
 
 
+BOOST_AUTO_TEST_CASE(auxLessThan)
+{
+  // 32 bits
+  for(int i = 0; i < NTESTS; i++){
+    uint64_t a = rand();
+    uint64_t b = rand();
+    BOOST_REQUIRE((a < b) == lessThan(a,b));
+  }
+  // 64 bits
+  for(int i = 0; i < NTESTS; i++){
+    uint64_t a = ((long long)rand() << 32) | rand();
+    uint64_t b = ((long long)rand() << 32) | rand();
+    BOOST_REQUIRE((a < b) == lessThan(a,b));
+  }
+}
+
 BOOST_AUTO_TEST_CASE(simpleAdd)
 {
 
@@ -335,9 +351,7 @@ BOOST_AUTO_TEST_CASE(multiplyByZZOnCPU)
 
   for(int count = 0; count < NTESTS; count++){
 
-    a.set_crt_residues_computed(false);
     Polynomial::random(&a,degree-1);
-    a.set_host_updated(true);
 
     ZZ_pEX a_ntl;
     for(int i = 0;i <= a.deg();i++)
@@ -372,9 +386,7 @@ BOOST_AUTO_TEST_CASE(multiplyByZZOnGPU)
 
   for(int count = 0; count < NTESTS; count++){
 
-    a.set_crt_residues_computed(false);
     Polynomial::random(&a,degree-1);
-    a.set_host_updated(true);
 
     ZZ_pEX a_ntl;
     for(int i = 0;i <= a.deg();i++)
@@ -465,12 +477,8 @@ BOOST_AUTO_TEST_CASE(multiplyByPolynomial)
     Polynomial a;
     Polynomial b;
 
-    a.set_crt_residues_computed(false);
-    b.set_crt_residues_computed(false);
     Polynomial::random(&a,degree-1);
     Polynomial::random(&b,degree-1);
-    a.set_host_updated(true);
-    b.set_host_updated(true);
 
     ZZ_pEX b_ntl;
     ZZ_pEX a_ntl;
@@ -524,12 +532,8 @@ BOOST_AUTO_TEST_CASE(multiplyAndAddByPolynomial)
     Polynomial a;
     Polynomial b;
 
-    a.set_crt_residues_computed(false);
-    b.set_crt_residues_computed(false);
     Polynomial::random(&a,degree-1);
     Polynomial::random(&b,degree-1);
-    a.set_host_updated(true);
-    b.set_host_updated(true);
 
     ZZ_pEX b_ntl;
     ZZ_pEX a_ntl;
@@ -582,12 +586,8 @@ BOOST_AUTO_TEST_CASE(addAndMultiplyByPolynomial)
     Polynomial a;
     Polynomial b;
 
-    a.set_crt_residues_computed(false);
-    b.set_crt_residues_computed(false);
     Polynomial::random(&a,degree-1);
     Polynomial::random(&b,degree-1);
-    a.set_host_updated(true);
-    b.set_host_updated(true);
 
     ZZ_pEX b_ntl;
     ZZ_pEX a_ntl;

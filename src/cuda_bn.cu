@@ -85,10 +85,10 @@ __device__ int isNotZero(int x){
  * @param  b [description]
  * @return   [description]
  */
-__device__ unsigned lessThan(int x, int y) {    
-    unsigned less;    
+__host__ __device__ uint64_t  lessThan(uint64_t x, uint64_t y) {    
+    uint64_t less;    
     less = x-y;
-    less >>= sizeof(int)*8-1;    
+    less >>= sizeof(uint64_t)*8-1;    
     return less;        
 }
 
@@ -908,12 +908,12 @@ void callCRT(bn_t *coefs,const int used_coefs,cuyasheint_t *d_polyCRT,const int 
 	int gridSize;    // The actual grid size needed, based on input size 
 
 	// cudaOccupancyMaxPotentialBlockSize( &minGridSize, &blockSize, cuCRT, 0, 0); 
-	// blockSize = 32; // 0.03 ms
-	// blockSize = 64; // 0.02 ms
-	// blockSize = 128; // 0.02 ms
-	// blockSize = 192; // 0.02 ms
-	// blockSize = 256; // 0.02 ms
-	blockSize = 512; // 0.02 ms
+	// blockSize = 32; // 0.11 ms
+	// blockSize = 64; // 0.07 ms
+	// blockSize = 128; // 0.06 ms
+	// blockSize = 192; // 0.06 ms
+	blockSize = 256; // 0.06 ms
+	// blockSize = 512; // 0.07 ms
 
 	gridSize = (size%blockSize == 0? 
 			size/blockSize : 
