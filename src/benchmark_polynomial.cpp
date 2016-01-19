@@ -15,7 +15,7 @@
 
 #define BILLION  1000000000L
 #define MILLION  1000000L
-#define N 1
+#define N 100
 
 
 int main(int argc,char* argv[]){
@@ -124,8 +124,8 @@ int main(int argc,char* argv[]){
 
 
 
-  // for(int d = 1024;d <= 4096;d *= 2){
-  for(int d = 4096;d <= 4096;d *= 2){
+  for(int d = 1024;d <= 4096;d *= 2){
+  // for(int d = 4096;d <= 4096;d *= 2){
 
     std::cout << "d: " << d << std::endl;
 
@@ -268,8 +268,8 @@ int main(int argc,char* argv[]){
     // Time measured with memory copy
     Polynomial::random(&a,d-1);
     Polynomial::random(&b,d-1);
-    // std::cout << a.to_string() << std::endl;        
-
+    // std::cout << a.to_string() << std::endl;       
+ 
     clock_gettime( CLOCK_REALTIME, &start);
     for(int i = 0; i < N;i++){
 

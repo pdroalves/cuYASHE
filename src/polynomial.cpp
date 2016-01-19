@@ -33,34 +33,19 @@ const uint32_t PRIMES_BUCKET[] = {536870909, 536870879, 536870869, 536870849, 53
 
 Polynomial Polynomial::operator+(Polynomial &b){
   Polynomial p = common_addition<Polynomial>(this,&b);
-
-  // uint64_t start,end;
-  // start = get_cycles();
   p.icrt();
-  // cudaDeviceSynchronize();
-  // end = get_cycles();
-  // std::cout << (end-start) << " cycles" << std::endl;
-  // p.modn(CRTProduct);
-  // p.crt();
   return p;
 }
 
 Polynomial Polynomial::operator+=(Polynomial &b){
   common_addition_inplace<Polynomial>(this,&b);
-
   this->icrt();
-  // this->modn(CRTProduct);
-  // this->crt();
   return *this;
 }
 
 Polynomial Polynomial::operator*(Polynomial &b){
   Polynomial p = common_multiplication<Polynomial>(this,&b);
- 
   p.icrt();
-  // p.modn(CRTProduct);
-  // p.crt();
-
   return p;
 }
 

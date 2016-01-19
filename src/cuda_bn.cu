@@ -16,6 +16,7 @@ __constant__ int M_used;
 __constant__ cuyasheint_t u[STD_BNT_WORDS_ALLOC];
 __constant__ int u_used;
 __constant__ cuyasheint_t Mpis[STD_BNT_WORDS_ALLOC*PRIMES_BUCKET_SIZE];
+__constant__ int Mpis_used[PRIMES_BUCKET_SIZE];
 __constant__ cuyasheint_t invMpis[PRIMES_BUCKET_SIZE];
 
 ////////////////////////
@@ -109,7 +110,6 @@ __host__ __device__ int bn_cmpn_low(const cuyasheint_t *a, const cuyasheint_t *b
 	r = CMP_EQ;
 	for (i = 0; i < size; i++, --a, --b) {
 		r = 			r				*(!((*a != *b) && r == CMP_EQ)) + 
-			// (*a > *b ? CMP_GT : CMP_LT)*(*a != *b && r == CMP_EQ);
 			((*a > *b)*CMP_GT + (*a <= *b)*CMP_LT)*(*a != *b && r == CMP_EQ);
 	}
 	return r;
@@ -140,15 +140,35 @@ __host__ void bn_grow(bn_t *a,const unsigned int new_size){
 
 }
 
-// __device__ void bn_grow_d(bn_t *a,const unsigned int new_size){
-//   // We expect that a->alloc <= new_size
-//   if((unsigned int)a->alloc >= new_size)
-//   	return;
+__device__ int isZero(int x) {
+    unsigned zero;
+    zero = x;
+    zero = 1 ^ ((zero | -zero) >> 31) & 1;
+    return zero;    
+}
 
-//   cudaMalloc(&a->dp+a->alloc,new_size*sizeof(cuyasheint_t));
-//   a->alloc = new_size;
+__device__ int isNotZero(int x){
+	unsigned result = isZero(x);
+	return isZero(result);
+}
 
-// }
+__device__ unsigned lessThan(int x, int y) {    
+    unsigned less;    
+    less = x-y;
+    less >>= sizeof(int)*8-1;    
+    return less;        
+}
+
+__device__ unsigned greaterOrEqualThan(int x, int y){
+	return lessThan(y,x);
+}
+
+__device__ unsigned isEqual(int x, int y) {    
+    unsigned equal;    
+    equal = x-y; // "equal" turns 0 if x = y    
+    equal = 1 ^ ((equal | -equal) >> 31) & 1; // "equal" turns 1 iff enable was 0
+    return equal;    
+}
 
 ////////////////
 // Operators //
@@ -200,7 +220,6 @@ __host__ __device__ cuyasheint_t bn_mul1_low(uint64_t *c,
 											int size) {
 	int i;
 	uint64_t carry;
-
 	carry = 0;
 	for (i = 0; i < size; i++, a++, c++) {	
   		#ifdef __CUDA_ARCH__
@@ -229,6 +248,10 @@ __host__ __device__ cuyasheint_t bn_mul1_low(uint64_t *c,
 		#endif
 	}
 
+	#ifdef __CUDA_ARCH__
+	__syncthreads();
+	#endif
+
 	return carry;
 }
 
@@ -254,9 +277,10 @@ __device__ void bn_64bits_mulmod(cuyasheint_t *result,
 	// Mod //
 	/////////
 	uint64_t r[] = {	(uint64_t)(rLo & 0xFFFFFFFF),
-					(uint64_t)(rLo >> 32),
-					(uint64_t)(rHi & 0xFFFFFFFF),
-					(uint64_t)(rHi >> 32) };
+						(uint64_t)(rLo >> 32),
+						(uint64_t)(rHi & 0xFFFFFFFF),
+						(uint64_t)(rHi >> 32) 
+					};
 	*result = bn_mod1_low(r,4,(uint64_t)m);
 	/**
 	 * http://stackoverflow.com/a/18680280/1541615
@@ -656,18 +680,31 @@ __host__ void callTestData(bn_t *coefs,int N){
 
 __device__ int get_used_index(cuyasheint_t *u,int alloc){
 	int i = 0;
-	for(i = alloc-1;i >= 0; i--)
+	// int max = 0;
+
+
+	for(i = alloc-1; i >= 0; i--)
+	/**
+	 * Profiling shows that the branch is cheaper
+	 */
 		if(u[i] != 0)
-			return i+1;
-	return i;
+			break;
+		// max = i*isNotZero(u[i])*isZero(max) + max*isNotZero(max);
+
+
+	return i+1;
 }
 
-__global__ void cuPreICRT(	bn_t *inner_results,
+__global__ void cuPreICRT(	cuyasheint_t *inner_results,
+							cuyasheint_t *inner_results_used,
 							const cuyasheint_t *d_polyCRT,
 							const unsigned int N,
 							const unsigned int NPolis
 						){
 
+	/**
+	 * This kernel has a very bad access pattern in inner_results
+	 */
 	const int tid = threadIdx.x + blockIdx.x*blockDim.x;
 	
 	if(tid < N*NPolis){
@@ -677,8 +714,6 @@ __global__ void cuPreICRT(	bn_t *inner_results,
 
 		// Get a prime
 		cuyasheint_t pi = CRTPrimesConstant[rid];
-	 	bn_t inner_result = inner_results[tid];
-		inner_result.used = 0;
 
 		/**
 		 * Inner
@@ -692,17 +727,22 @@ __global__ void cuPreICRT(	bn_t *inner_results,
 		// Adjust available words in inner_result
 		// assert(inner_result.alloc >= Mpis[rid].used+1);
 		// bn_grow_d(&inner_result,1);
-
-		int carry = bn_mul1_low(inner_result.dp,
+		int carry;
+		carry = bn_mul1_low(	&inner_results[tid*STD_BNT_WORDS_ALLOC],
 						     	&Mpis[rid*STD_BNT_WORDS_ALLOC],
 						     	x,
-						     	STD_BNT_WORDS_ALLOC);
-		
-		inner_result.used = get_used_index(inner_result.dp,inner_result.alloc);
-		inner_result.dp[inner_result.used] = carry;	
-		inner_result.used += (carry > 0);
+						     	Mpis_used[rid]);
 
-		inner_results[tid] = inner_result; 
+		inner_results_used[tid] = Mpis_used[rid];
+
+		/** 
+		 * The frequency of branching at this point is so low that 
+		 * doing this is faster than using some non-branch technic
+		 */
+		if(carry){
+			inner_results[tid*STD_BNT_WORDS_ALLOC + Mpis_used[rid]] = carry;	
+			inner_results_used[tid] += 1;			
+		}
 	}
 }
 
@@ -716,7 +756,8 @@ __global__ void cuPreICRT(	bn_t *inner_results,
 __global__ void cuICRT(	bn_t *poly,
 						const unsigned int N,
 						const unsigned int NPolis,
-						bn_t *inner_results
+						cuyasheint_t *inner_results,
+						cuyasheint_t *inner_results_used
 						){
 	/**
 	 * This function should be executed with N threads.
@@ -736,21 +777,18 @@ __global__ void cuICRT(	bn_t *poly,
 	 	bn_zero(&coef); 
 
 	 	for(unsigned int rid = 0; rid < NPolis;rid++){
-		 	bn_t inner_result = inner_results[cid + rid*N];
+		 	cuyasheint_t *inner_result = &inner_results[(cid + rid*N)*STD_BNT_WORDS_ALLOC];
 
 			/**
 			 * Accumulate
 			 */
-			assert(coef.alloc == inner_result.alloc);
-			int nwords = max_d(coef.used,inner_result.used);
-			cuyasheint_t carry = bn_addn_low(coef.dp, coef.dp, inner_result.dp,nwords);
+			int nwords = max_d(coef.used,inner_results_used[(cid + rid*N)]);
+			cuyasheint_t carry = bn_addn_low(coef.dp, coef.dp, inner_result,nwords);
 			coef.used = nwords;
 
 			/* Equivalent to "If has a carry, add as last word" */
 			coef.dp[coef.used] = carry;
 			coef.used += (carry > 0);
-				
-			// __syncthreads();
  		}
 
 		////////////////////////////////////////////////
@@ -800,17 +838,23 @@ void callICRT(bn_t *coefs,cuyasheint_t *d_polyCRT,const int N, const int NPolis,
 	if(N <= 0)
 		return;
 	int blockSize;   // The launch configurator returned block size 
-	// int minGridSize; // The minimum grid size needed to achieve the 
+	int minGridSize; // The minimum grid size needed to achieve the 
            			 // maximum occupancy for a full device launch 
 	int gridSize;    // The actual grid size needed, based on input size 
 
 	// cudaOccupancyMaxPotentialBlockSize( &minGridSize, &blockSize, cuPreICRT, 0, 0); 
-	blockSize = ADDBLOCKXDIM;
+	// blockSize = 32; // 0.71 ms
+	// blockSize = 64; // 0.58 ms
+	// blockSize = 128; // 0.54 ms
+	// blockSize = 192; // 0.54 ms
+	// blockSize = 256; // 0.54 ms
+	blockSize = 512; // 0.54 ms
 
 	gridSize = ( N*NPolis % blockSize == 0? 
 						N*NPolis/blockSize : 
 						N*NPolis/blockSize + 1);
 	cuPreICRT<<<gridSize,blockSize,0,stream>>> (CUDAFunctions::d_inner_results,
+												CUDAFunctions::d_inner_results_used,
 												d_polyCRT,
 												N,
 												NPolis
@@ -823,7 +867,8 @@ void callICRT(bn_t *coefs,cuyasheint_t *d_polyCRT,const int N, const int NPolis,
 	cuICRT<<<gridSize,blockSize,0,stream>>>(coefs,
 											N,
 											NPolis,
-											CUDAFunctions::d_inner_results);
+											CUDAFunctions::d_inner_results,
+											CUDAFunctions::d_inner_results_used);
 	cudaError_t result = cudaGetLastError();
 	assert(result == cudaSuccess);
 	// cudaDeviceSynchronize();
@@ -843,9 +888,9 @@ __host__ void  CUDAFunctions::write_crt_primes(){
   // Choose what memory will be used to story CRT Primes
   if(Polynomial::CRTPrimes.size() < MAX_PRIMES_ON_C_MEMORY){
     
-    // #ifdef VERBOSE
+    #ifdef VERBOSE
     std::cout << "Writting CRT Primes to GPU's constant memory" << std::endl;
-    // #endif
+    #endif
 
     cudaStream_t stream;
     cudaStreamCreate(&stream);
@@ -899,6 +944,8 @@ __host__ void  CUDAFunctions::write_crt_primes(){
     	h_Mpis[i].alloc = 0;
     	get_words_host(&h_Mpis[i],Polynomial::CRTMpi[i]);
 		result = cudaMemcpyToSymbolAsync(Mpis, h_Mpis[i].dp, STD_BNT_WORDS_ALLOC*sizeof(cuyasheint_t),i*STD_BNT_WORDS_ALLOC*sizeof(cuyasheint_t),cudaMemcpyHostToDevice,stream);
+		assert(result == cudaSuccess);
+		result = cudaMemcpyToSymbolAsync(Mpis_used,&h_Mpis[i].used, sizeof(int),i*sizeof(int),cudaMemcpyHostToDevice,stream);
 		assert(result == cudaSuccess);
     }
 

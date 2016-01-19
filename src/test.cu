@@ -218,7 +218,7 @@ BOOST_AUTO_TEST_CASE(multipleAddsWithDifferentDegrees)
   // #endif
   
   b.normalize();
- 
+   
   BOOST_REQUIRE(NTL::deg(b_ntl) == b.deg());
   for(int i = 0;i <= b.deg();i++)
     BOOST_REQUIRE(conv<ZZ>(NTL::rep(b_ntl[i])[0]) == b.get_coeff(i));
@@ -723,12 +723,12 @@ BOOST_AUTO_TEST_CASE(modularInversion)
   
   Polynomial result = a*aInv;
   
-  // std::cout << "a: " << a.to_string() << std::endl;
-  // std::cout << "aInv: " << aInv.to_string() << std::endl;
-  // std::cout << "result before reduce: " << result.to_string() << std::endl;
+  std::cout << "a: " << a.to_string() << std::endl;
+  std::cout << "aInv: " << aInv.to_string() << std::endl;
+  std::cout << "result before reduce: " << result.to_string() << std::endl;
   result.reduce();
   result %= a.get_mod();
-  // std::cout << "result after reduce: " << result.to_string() << std::endl;
+  std::cout << "result after reduce: " << result.to_string() << std::endl;
 
   Polynomial one = Polynomial();
   one.set_coeff(0,1);

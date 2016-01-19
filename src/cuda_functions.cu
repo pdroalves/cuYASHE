@@ -23,7 +23,8 @@
 cuyasheint_t CUDAFunctions::wN = 0;
 cuyasheint_t *CUDAFunctions::d_W = NULL;
 cuyasheint_t *CUDAFunctions::d_WInv = NULL;
-bn_t *CUDAFunctions::d_inner_results = NULL;
+cuyasheint_t *CUDAFunctions::d_inner_results = NULL;
+cuyasheint_t *CUDAFunctions::d_inner_results_used = NULL;
 
 #elif defined(CUFFTMUL)
 cufftHandle CUDAFunctions::plan;
@@ -875,38 +876,13 @@ __host__ void CUDAFunctions::init(int N){
     /**
      * For some reason
      */
-    const unsigned int size = 2*N*Polynomial::CRTPrimes.size();
+    const unsigned int size = N*Polynomial::CRTPrimes.size();
 
-    bn_t *h_inner_results;
-    h_inner_results = (bn_t *) malloc ( size * sizeof(bn_t));
-    result = cudaMalloc((void**)&CUDAFunctions::d_inner_results, size*sizeof(bn_t));
+    result = cudaMalloc((void**)&CUDAFunctions::d_inner_results, size*STD_BNT_WORDS_ALLOC*sizeof(cuyasheint_t));
+    assert(result == cudaSuccess);
+    result = cudaMalloc((void**)&CUDAFunctions::d_inner_results_used, size*sizeof(cuyasheint_t));
     assert(result == cudaSuccess);
 
-    cuyasheint_t *aux;
-    result = cudaMalloc((void**)&aux,STD_BNT_WORDS_ALLOC*size*sizeof(cuyasheint_t));
-    assert(result == cudaSuccess);
-    #warning this may be useless
-    result = cudaMemsetAsync(aux,0,STD_BNT_WORDS_ALLOC*size*sizeof(cuyasheint_t));
-    assert(result == cudaSuccess);
-    for(unsigned int i =0; i < size; i++,aux += STD_BNT_WORDS_ALLOC){
-      h_inner_results[i].used = 0;
-      h_inner_results[i].alloc = STD_BNT_WORDS_ALLOC;
-      h_inner_results[i].sign = BN_POS;
-      h_inner_results[i].dp = aux;
-    }
-
-
-    result = cudaMemcpyAsync( CUDAFunctions::d_inner_results,
-                              h_inner_results,
-                              size*sizeof(bn_t),
-                              cudaMemcpyHostToDevice
-                        );
-    assert(result == cudaSuccess);
-
-    result = cudaDeviceSynchronize();
-    assert(result == cudaSuccess);
-
-    free(h_inner_results);
 }
 
 
@@ -1015,27 +991,47 @@ __host__ int CUDAFunctions::callDeg(const bn_t *a,const int N){
   return h_deg;
 }
 
-__global__ void polynomialReduction(bn_t *a,const int half,const int N,const bn_t q){     
-  ////////////////////////////////////////////////////////
-  // This kernel must be executed with (N-half) threads //
-  ////////////////////////////////////////////////////////
+// __global__ void polynomialReduction(bn_t *a,const int half,const int N,const bn_t q){     
+//   ////////////////////////////////////////////////////////
+//   // This kernel must be executed with (N-half) threads //
+//   ////////////////////////////////////////////////////////
+
+//   const int tid = threadIdx.x + blockIdx.x*blockDim.x;
+//   const int cid = tid % (N-half);
+
+//   if(cid+half+1 < N){
+//     const int flag_neg = bn_cmp_abs(&a[cid], &a[cid+half+1]);
+
+//     assert(a[cid].alloc > a[cid+half+1].used);
+//     a[cid].sign = bn_subn_low(a[cid].dp, a[cid].dp, a[cid+half+1].dp, a[cid+half+1].used);
+
+//     __syncthreads();
+//     bn_zero(&a[cid + half + 1]);
+//   }
+// }
+
+__global__ void polynomialReduction(cuyasheint_t *a,const int half,const int N,const int NPolis){     
+  // This kernel must have (N-half)*Npolis threads
 
   const int tid = threadIdx.x + blockIdx.x*blockDim.x;
+  const int residueID = tid / (N-half); 
   const int cid = tid % (N-half);
 
-  if(cid+half+1 < N){
-    const int flag_neg = bn_cmp_abs(&a[cid], &a[cid+half+1]);
-
-    assert(a[cid].alloc > a[cid+half+1].used);
-    a[cid].sign = bn_subn_low(a[cid].dp, a[cid].dp, a[cid+half+1].dp, a[cid+half+1].used);
-
+  if( (cid+half+1 < N) && (residueID*N + cid + half + 1 < N*NPolis)){
+    a[residueID*N + cid] -= a[residueID*N + cid + half + 1];
     __syncthreads();
-    bn_zero(&a[cid + half + 1]);
+    a[residueID*N + cid + half + 1] = 0;
   }
+
 }
 
 __host__ void Polynomial::reduce(){
-  // Just like DivRem, but here we reduce a with a cyclotomic polynomial
+  // Just like DivRem, but here we reduce with a cyclotomic polynomial
+  
+  //////////////////////////
+  // Polynomial reduction //
+  //////////////////////////
+
   Polynomial *phi = (Polynomial::global_phi);
   ZZ q = (Polynomial::global_mod);
   
@@ -1077,43 +1073,32 @@ __host__ void Polynomial::reduce(){
      * Reduce on devicce
      */
     
-    //////////////////////////
-    // Polynomial reduction //
-    //////////////////////////
-    
-
     const int half = phi->deg()-1;
-    const int N = get_crt_spacing();
-    const int size = (N-half);
+    const int N = this->get_crt_spacing();
+    const int NPolis = this->CRTPrimes.size();
+    const int size = (N-half)*NPolis;
 
     if(size > 0){
-      if(!get_icrt_computed())
-        icrt();
-      
-      dim3 blockDim(32);
-      dim3 gridDim(size/32 + (size % 32 == 0? 0:1));
+      dim3 blockDim(ADDBLOCKXDIM);
+      dim3 gridDim(size/ADDBLOCKXDIM + (size % ADDBLOCKXDIM == 0? 0:1));
 
-      /**
-       * In case of a negative result in reduction, we use s to adjust the value
-       */
-      bn_t s;
-      get_words(&s,q-UINT32_MAX-1);
-
-      polynomialReduction<<< gridDim,blockDim, 1, get_stream()>>>( d_bn_coefs,
+      polynomialReduction<<< gridDim,blockDim, 1, this->get_stream()>>>( this->get_device_crt_residues(),
                                                                           half,
                                                                           N,
-                                                                          s);
+                                                                          NPolis);
       cudaError_t result = cudaGetLastError();
       assert(result == cudaSuccess);
-
-      set_icrt_computed(true);
-      set_host_updated(false);
+      
+      this->set_host_updated(false);
+      this->set_crt_residues_computed(true);
+      this->set_icrt_computed(false);
+      this->update_crt_spacing(phi->deg());
+      ///////////////////////
+      // Modular reduction //
+      ///////////////////////
+      // icrt();
+      // modn(q);
     }
 
-    ///////////////////////
-    // Modular reduction //
-    ///////////////////////
-
-     modn(q);
   }
 }

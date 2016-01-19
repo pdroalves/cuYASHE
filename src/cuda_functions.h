@@ -23,7 +23,8 @@ class CUDAFunctions{
     //////////////////////////
     // CRT global variables //
     //////////////////////////
-    static bn_t *d_inner_results;
+    static cuyasheint_t *d_inner_results;
+    static cuyasheint_t *d_inner_results_used;
 
     #ifdef NTTMUL
     /////////
