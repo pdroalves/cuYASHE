@@ -73,6 +73,7 @@ P common_addition(P *a,P *b){
 										a->get_stream());
 
 	c.set_host_updated(false);
+	c.set_icrt_computed(false);
 	c.set_crt_residues_computed(true);
 	// cudaDeviceSynchronize();
 	return c;
@@ -128,6 +129,7 @@ void common_addition_inplace(P *a,P *b){
 												ADD);
 
 	a->set_host_updated(false);
+	a->set_icrt_computed(false);
 	a->set_crt_residues_computed(true);
 }
 

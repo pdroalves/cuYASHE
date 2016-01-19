@@ -33,13 +33,13 @@ const uint32_t PRIMES_BUCKET[] = {536870909, 536870879, 536870869, 536870849, 53
 
 Polynomial Polynomial::operator+(Polynomial &b){
   Polynomial p = common_addition<Polynomial>(this,&b);
-  p.icrt();
+  // p.icrt();
   return p;
 }
 
 Polynomial Polynomial::operator+=(Polynomial &b){
   common_addition_inplace<Polynomial>(this,&b);
-  this->icrt();
+  // this->icrt();
   return *this;
 }
 
