@@ -73,7 +73,6 @@ class CUDAFunctions{
                                             int residuesSize,
                                             int residuesQty);
     static void callNTT(const int N, const int NPolis,cuyasheint_t* dataI, cuyasheint_t* dataO,const int type);
-    static int callDeg(const bn_t *a,const int N);
     static void init(int N);
     static void write_crt_primes();
   private:

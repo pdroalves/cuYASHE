@@ -26,6 +26,7 @@ typedef struct bn_st{
 
 __host__  void bn_new(bn_t *a);
 __host__ __device__ void bn_zero(bn_t *a);
+__host__ __device__ bool bn_is_zero(const bn_t* a);
 __host__ __device__ void bn_set_dig(bn_t *a, cuyasheint_t digit);
 __host__  void bn_free(bn_t *a);
 __host__ void bn_grow(bn_t *a,const unsigned int new_size);
@@ -57,6 +58,7 @@ __host__ __device__ int bn_cmp_abs(	const bn_t *a,
 __host__ void callCuModN(bn_t * c, const bn_t * a,int NCoefs,
 		const cuyasheint_t * m, int sm, const cuyasheint_t * u, int su,
 		cudaStream_t stream);
+__host__ int callBNGetDeg(bn_t *coefs, int N);
 __host__ ZZ get_ZZ(bn_t *a);
 __host__ __device__ int max_d(int a,int b);
 __host__ __device__ int min_d(int a,int b);

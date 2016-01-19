@@ -170,11 +170,43 @@ int main(int argc,char* argv[]){
     std::cout << "update_crt_spacing: " << diff << " ms" << std::endl;
     crt << d << " " << diff  << std::endl;
 
+    // update_device_data
+    Polynomial::random(&a,d-1);
+    clock_gettime( CLOCK_REALTIME, &start);
+    for(int i = 0; i < N;i++){
+      a.update_device_data();
+      result = cudaDeviceSynchronize();
+      assert(result == cudaSuccess);
+      a.set_crt_residues_computed(false);
+    }
+    clock_gettime( CLOCK_REALTIME, &stop);
+    diff = compute_time_ms(start,stop)/N;
+    std::cout << "update_device_data: " << diff << " ms" << std::endl;
+    crt << d << " " << diff  << std::endl;
+
+        // update_device_data
+    Polynomial::random(&a,d-1);
+    a.update_device_data();
+    a.set_host_updated(false);
+    clock_gettime( CLOCK_REALTIME, &start);
+    for(int i = 0; i < N;i++){
+      a.update_host_data();
+      result = cudaDeviceSynchronize();
+      assert(result == cudaSuccess);
+      a.set_host_updated(false);
+    }
+    clock_gettime( CLOCK_REALTIME, &stop);
+    diff = compute_time_ms(start,stop)/N;
+    std::cout << "update_host_data: " << diff << " ms" << std::endl;
+    crt << d << " " << diff  << std::endl;
+
     // /////////////////////////////////////////////
     // CRT/ICRT
     
-    Polynomial::random(&a,d-1);
     clock_gettime( CLOCK_REALTIME, &start);
+    a.update_host_data();
+    a.set_crt_computed(false);
+    a.set_crt_residues_computed(false);
     for(int i = 0; i < N;i++){
       a.set_crt_computed(false);
       a.crt();
@@ -265,7 +297,10 @@ int main(int argc,char* argv[]){
     
     ///////////////////////////////////////////////
     // ADD
-    // Time measured with memory copy
+    
+    ////////////////////////////////////
+    // Time measured with memory copy //
+    ////////////////////////////////////
     Polynomial::random(&a,d-1);
     Polynomial::random(&b,d-1);
     // std::cout << a.to_string() << std::endl;       
@@ -283,7 +318,10 @@ int main(int argc,char* argv[]){
     diff = compute_time_ms(start,stop)/N;
     std::cout << "ADD) Time measured with memory copy: " << diff << " ms" << std::endl;
     gpu_add_with_memcopy << d << " " << diff  << std::endl;
-    // Time measured without memory copy
+
+    ///////////////////////////////////////
+    // Time measured without memory copy //
+    ///////////////////////////////////////
     Polynomial::random(&a,d-1);
     Polynomial::random(&b,d-1);
     
@@ -336,7 +374,9 @@ int main(int argc,char* argv[]){
     // Time measured without memory copy
     Polynomial::random(&a,d-1);
     Polynomial::random(&b,d-1);
+    a.update_crt_spacing(2*d);
     a.update_device_data();
+    b.update_crt_spacing(2*d);
     b.update_device_data();
 
     clock_gettime( CLOCK_REALTIME, &start);

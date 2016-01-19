@@ -968,29 +968,6 @@ __host__ void CUDAFunctions::init(int N){
 //  
 // }
 
-__global__ void cuDeg(int *result,const bn_t *a,const int N){
-  /**
-   * This kernel may be executed by just one thread
-   */
-  int i;
-  for(i = N-1;i >= 0;i--)
-    if(a[i].used == 0)
-      break;
-  *result = i;
-}
-
-__host__ int CUDAFunctions::callDeg(const bn_t *a,const int N){
-  int h_deg;
-  int *d_deg;
-  cudaError_t result = cudaMalloc((void**)&d_deg,sizeof(int));
-  assert(result == cudaSuccess);
-  cuDeg<<<1,1,0>>>(d_deg,a,N);
-  assert(cudaGetLastError() == cudaSuccess);
-  result = cudaMemcpy(&h_deg,d_deg,sizeof(int),cudaMemcpyDeviceToHost);
-  assert(result == cudaSuccess);
-  return h_deg;
-}
-
 // __global__ void polynomialReduction(bn_t *a,const int half,const int N,const bn_t q){     
 //   ////////////////////////////////////////////////////////
 //   // This kernel must be executed with (N-half) threads //

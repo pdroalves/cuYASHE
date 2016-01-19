@@ -1014,11 +1014,10 @@ class Polynomial{
     }
     int deg(){
       if(!get_host_updated()){
-        update_host_data();
-        // icrt();
-        // return CUDAFunctions::callDeg(d_bn_coefs,CRTSPACING);
-      }
-      return coefs.size()-1;
+        icrt();
+        return callBNGetDeg(d_bn_coefs,get_crt_spacing());
+      }else
+        return coefs.size()-1;
     }
     ZZ lead_coeff(){
       if(this->deg() >= 0){
@@ -1103,12 +1102,17 @@ class Polynomial{
         
         // Alloc memory
         cuyasheint_t *tmp;
-        result = cudaMalloc((void**)&tmp,new_spacing*STD_BNT_WORDS_ALLOC*sizeof(cuyasheint_t));
-        assert(result == cudaSuccess);
+        // result = cudaMalloc((void**)&tmp,new_spacing*STD_BNT_WORDS_ALLOC*sizeof(cuyasheint_t));
+        // assert(result == cudaSuccess);
         result = cudaMalloc((void**)&d_bn_coefs,new_spacing*sizeof(bn_t));
         assert(result == cudaSuccess);
-        result = cudaMalloc((void**)&d_polyCRT,new_spacing*(CRTPrimes.size())*sizeof(cuyasheint_t));        
+        /**
+         * We use a single cudaMalloc call for tmp and d_polyCRT
+         */
+        result = cudaMalloc((void**)&d_polyCRT,(new_spacing*(CRTPrimes.size())+new_spacing*STD_BNT_WORDS_ALLOC)*sizeof(cuyasheint_t));        
         assert(result == cudaSuccess);
+        tmp = &d_polyCRT[new_spacing*(CRTPrimes.size())];
+
         h_bn_coefs = (bn_t*)malloc(new_spacing*sizeof(bn_t));
 
         for(int i = 0; i < new_spacing; i++,tmp += STD_BNT_WORDS_ALLOC){

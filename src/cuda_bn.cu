@@ -23,19 +23,104 @@ __constant__ cuyasheint_t invMpis[PRIMES_BUCKET_SIZE];
 // Auxiliar functions //
 ////////////////////////
 
+/**
+ * [max_d description]
+ * @param  a [description]
+ * @param  b [description]
+ * @return   [description]
+ */
 __host__ __device__ int max_d(int a,int b){
 	return (a >= b)*a + (b > a)*b;
 }
 
+/**
+ * [max_d description]
+ * @param  a [description]
+ * @param  b [description]
+ * @return   [description]
+ */
 __host__ __device__ int min_d(int a,int b){
 	return (a <= b)*a + (b < a)*b;
 }
 
+/**
+ * [max_d description]
+ * @param  a [description]
+ * @param  b [description]
+ * @return   [description]
+ */
 __device__ void swap_d(bn_t *a,bn_t *b){
 	bn_t tmp = *a;
 	*a = *b;
 	*b = tmp;
 }
+
+/**
+ * [max_d description]
+ * @param  a [description]
+ * @param  b [description]
+ * @return   [description]
+ */
+__device__ int isZero(int x) {
+    unsigned zero;
+    zero = x;
+    zero = 1 ^ ((zero | -zero) >> 31) & 1;
+    return zero;    
+}
+
+/**
+ * [max_d description]
+ * @param  a [description]
+ * @param  b [description]
+ * @return   [description]
+ */
+__device__ int isNotZero(int x){
+	unsigned result = isZero(x);
+	return isZero(result);
+}
+
+/**
+ * [max_d description]
+ * @param  a [description]
+ * @param  b [description]
+ * @return   [description]
+ */
+__device__ unsigned lessThan(int x, int y) {    
+    unsigned less;    
+    less = x-y;
+    less >>= sizeof(int)*8-1;    
+    return less;        
+}
+
+/**
+ * [max_d description]
+ * @param  a [description]
+ * @param  b [description]
+ * @return   [description]
+ */
+__device__ unsigned greaterOrEqualThan(int x, int y){
+	return lessThan(y,x);
+}
+
+/**
+ * [max_d description]
+ * @param  a [description]
+ * @param  b [description]
+ * @return   [description]
+ */
+__device__ unsigned isEqual(int x, int y) {    
+    unsigned equal;    
+    equal = x-y; // "equal" turns 0 if x = y    
+    equal = 1 ^ ((equal | -equal) >> 31) & 1; // "equal" turns 1 iff enable was 0
+    return equal;    
+}
+
+/**
+ * [max_d description]
+ * @param  a [description]
+ * @param  b [description]
+ * @return   [description]
+ */
 __host__ __device__ void dv_zero(cuyasheint_t *a, int digits) {
 	int i;
  
@@ -57,6 +142,52 @@ __host__ __device__ void bn_zero(bn_t *a) {
 	a->sign = BN_POS;
 	a->used = 0;
 	dv_zero(a->dp, a->alloc);
+}
+
+__host__ __device__ bool bn_is_zero(const bn_t* a) {
+	#ifdef __CUDA_ARCH__
+	/**
+	 * This version doesn't have branchings, what is good for GPUs
+	 */
+		return !isEqual( isEqual(a->used,0) + isEqual(a->used,1)*isEqual(a->dp[0],0)
+						,false);
+	#else
+		if (a->used == 0) {
+			return true;
+		}
+		if ((a->used == 1) && (a->dp[0] == 0)) {
+			return true;
+		}
+		return false;
+	#endif
+}
+
+__global__ void bn_get_deg(int *r, bn_t *coefs, int N){
+	/**
+	 * This kernel must be executed by a single thread. 
+	 */
+	
+	int index;
+	for(index = N-1; index >= 0; index++)
+		if(!bn_is_zero(&coefs[index]))
+			break;
+	*r = index;
+}
+
+__host__ int callBNGetDeg(bn_t *coefs, int N){
+	int *d_value;
+	cudaError_t result = cudaMalloc((void**)&d_value,sizeof(int));
+	assert(result == cudaSuccess);
+	
+	bn_get_deg<<<1,1,0>>>(d_value,coefs,N);
+	result = cudaGetLastError();
+	assert(result == cudaSuccess);
+
+	int h_value;
+	result = cudaMemcpy(&h_value,d_value,sizeof(int),cudaMemcpyDeviceToHost);
+	assert(result == cudaSuccess);
+
+	return h_value;
 }
 
 /**
@@ -140,35 +271,6 @@ __host__ void bn_grow(bn_t *a,const unsigned int new_size){
 
 }
 
-__device__ int isZero(int x) {
-    unsigned zero;
-    zero = x;
-    zero = 1 ^ ((zero | -zero) >> 31) & 1;
-    return zero;    
-}
-
-__device__ int isNotZero(int x){
-	unsigned result = isZero(x);
-	return isZero(result);
-}
-
-__device__ unsigned lessThan(int x, int y) {    
-    unsigned less;    
-    less = x-y;
-    less >>= sizeof(int)*8-1;    
-    return less;        
-}
-
-__device__ unsigned greaterOrEqualThan(int x, int y){
-	return lessThan(y,x);
-}
-
-__device__ unsigned isEqual(int x, int y) {    
-    unsigned equal;    
-    equal = x-y; // "equal" turns 0 if x = y    
-    equal = 1 ^ ((equal | -equal) >> 31) & 1; // "equal" turns 1 iff enable was 0
-    return equal;    
-}
 
 ////////////////
 // Operators //
@@ -282,37 +384,6 @@ __device__ void bn_64bits_mulmod(cuyasheint_t *result,
 						(uint64_t)(rHi >> 32) 
 					};
 	*result = bn_mod1_low(r,4,(uint64_t)m);
-	/**
-	 * http://stackoverflow.com/a/18680280/1541615
-	 */
- //    uint64_t res = 0;
- //    uint64_t temp_b;
-
- //    /* Only needed if b may be >= m */
- //    if (b >= m) {
- //        if (m > UINT64_MAX / 2u)
- //            b -= m;
- //        else
- //            b %= m;
- //    }
-
- //    while (a != 0) {
- //    	res = res + (a & 1)*(b - (b >= m - res)*m);
- //        // if (a & 1) {
- //        //     /* Add b to res, modulo m, without overflow */
- //        //     if (b >= m - res) /* Equiv to if (res + b >= m), without overflow */
- //        //         res -= m;
- //        //     res += b;
- //        // }
- //        a >>= 1;
-
- //        /* Double b, modulo m */
- //        temp_b = b - (b >= m - b)*m + (b < m - b)*b;
- //        // if (b >= m - b)        Equiv to if (2 * b >= m), without overflow 
- //        //     temp_b -= m;
- //        // b += temp_b;
- //    }
-	// *result = res;
 }
 
 // Add
@@ -397,6 +468,14 @@ __host__ __device__ cuyasheint_t bn_subn_low(cuyasheint_t * c, const cuyasheint_
 	return carry;
 }
 
+/**
+ * [bn_sub1_low description]
+ * @param  c     [description]
+ * @param  a     [description]
+ * @param  digit [description]
+ * @param  size  [description]
+ * @return       [description]
+ */
 __host__ __device__ cuyasheint_t bn_sub1_low(cuyasheint_t *c, const cuyasheint_t *a, cuyasheint_t digit, int size) {
 	int i;
 	cuyasheint_t carry, r0;
@@ -597,7 +676,16 @@ __device__ void bn_mod_barrt(	bn_t *C, const bn_t *A,const int NCoefs,
 	}
 }
 
-
+/**
+ * [cuModN description]
+ * @param c      [description]
+ * @param a      [description]
+ * @param NCoefs [description]
+ * @param m      [description]
+ * @param sm     [description]
+ * @param u      [description]
+ * @param su     [description]
+ */
 __global__ void cuModN(bn_t * c, const bn_t * a, const int NCoefs,
 		const cuyasheint_t * m, int sm, const cuyasheint_t * u, int su){
 	/**
@@ -608,6 +696,17 @@ __global__ void cuModN(bn_t * c, const bn_t * a, const int NCoefs,
 		bn_mod_barrt(c,a,NCoefs,m,sm,u,su);
 }
 
+/**
+ * [callCuModN description]
+ * @param c      [description]
+ * @param a      [description]
+ * @param NCoefs [description]
+ * @param m      [description]
+ * @param sm     [description]
+ * @param u      [description]
+ * @param su     [description]
+ * @param stream [description]
+ */
 __host__ void callCuModN(bn_t * c, const bn_t * a,int NCoefs,
 		const cuyasheint_t * m, int sm, const cuyasheint_t * u, int su,
 		cudaStream_t stream){
@@ -665,35 +764,22 @@ __global__ void cuCRT(	cuyasheint_t *d_polyCRT,
 
 }	
 
-__global__ void testData(bn_t *coefs, int N){
-	for(int i = 0; i < N;i++){
-		printf("%d)\n",i);
-		for(int j = 0; j < coefs[i].used;j++)
-			printf("%lu ",coefs[i].dp[j]);
-		printf("\n");
-	}
-}
-
-__host__ void callTestData(bn_t *coefs,int N){
-  testData<<<1,1>>>(coefs,N);
-};
-
-__device__ int get_used_index(cuyasheint_t *u,int alloc){
-	int i = 0;
-	// int max = 0;
+// __device__ int get_used_index(cuyasheint_t *u,int alloc){
+// 	int i = 0;
+// 	// int max = 0;
 
 
-	for(i = alloc-1; i >= 0; i--)
-	/**
-	 * Profiling shows that the branch is cheaper
-	 */
-		if(u[i] != 0)
-			break;
-		// max = i*isNotZero(u[i])*isZero(max) + max*isNotZero(max);
+// 	for(i = alloc-1; i >= 0; i--)
+// 	*
+// 	 * Profiling shows that the branch is cheaper
+	 
+// 		if(u[i] != 0)
+// 			break;
+// 		// max = i*isNotZero(u[i])*isZero(max) + max*isNotZero(max);
 
 
-	return i+1;
-}
+// 	return i+1;
+// }
 
 __global__ void cuPreICRT(	cuyasheint_t *inner_results,
 							cuyasheint_t *inner_results_used,
@@ -816,15 +902,25 @@ void callCRT(bn_t *coefs,const int used_coefs,cuyasheint_t *d_polyCRT,const int 
 		return;
 	
 	cudaError_t result;
+	int blockSize;   // The launch configurator returned block size 
+	int minGridSize; // The minimum grid size needed to achieve the 
+           			 // maximum occupancy for a full device launch 
+	int gridSize;    // The actual grid size needed, based on input size 
 
-	int ADDGRIDXDIM = (size%ADDBLOCKXDIM == 0? 
-			size/ADDBLOCKXDIM : 
-			size/ADDBLOCKXDIM + 1);
-	dim3 gridDim(ADDGRIDXDIM);
-	dim3 blockDim(ADDBLOCKXDIM);
+	// cudaOccupancyMaxPotentialBlockSize( &minGridSize, &blockSize, cuCRT, 0, 0); 
+	// blockSize = 32; // 0.03 ms
+	// blockSize = 64; // 0.02 ms
+	// blockSize = 128; // 0.02 ms
+	// blockSize = 192; // 0.02 ms
+	// blockSize = 256; // 0.02 ms
+	blockSize = 512; // 0.02 ms
+
+	gridSize = (size%blockSize == 0? 
+			size/blockSize : 
+			size/blockSize + 1);
+	dim3 gridDim(gridSize);
+	dim3 blockDim(blockSize);
 	
-	result = cudaGetLastError();
-	assert(result == cudaSuccess);
 	cuCRT<<<gridDim,blockDim,0,stream>>>(d_polyCRT,coefs,used_coefs,N,NPolis);
 	result = cudaGetLastError();
 	assert(result == cudaSuccess);

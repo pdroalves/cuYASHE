@@ -250,9 +250,38 @@ BOOST_AUTO_TEST_CASE(zeroJustCRT)
   a.update_device_data();
   a.set_host_updated(false);
   a.normalize();
-  assert(a.deg() < 0);
+  BOOST_REQUIRE(a.deg() < 0);
 }
 
+BOOST_AUTO_TEST_CASE(getDegreeDevice)
+{ 
+
+  ///////////////
+  // On device //
+  ///////////////
+  for(int i = 0; i < NTESTS; i++){
+    int degree = rand()%NTESTS;
+    Polynomial a;
+    Polynomial::random(&a,degree);
+    
+    a.update_device_data();
+    a.set_host_updated(false);
+    BOOST_REQUIRE(a.deg() == degree);
+  }
+}
+
+BOOST_AUTO_TEST_CASE(getDegreeHost)
+{
+  /////////////
+  // On host //
+  /////////////
+  for(int i = 0; i < NTESTS; i++){
+    int degree = rand()%NTESTS;
+    Polynomial a;
+    Polynomial::random(&a,degree);
+    BOOST_REQUIRE( a.deg() == degree);
+  }
+}
 
 #ifdef NTTMUL
 BOOST_AUTO_TEST_CASE(wNTest)
