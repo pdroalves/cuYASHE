@@ -912,8 +912,8 @@ void callCRT(bn_t *coefs,const int used_coefs,cuyasheint_t *d_polyCRT,const int 
 	// blockSize = 64; // 0.07 ms
 	// blockSize = 128; // 0.06 ms
 	// blockSize = 192; // 0.06 ms
-	blockSize = 256; // 0.06 ms
-	// blockSize = 512; // 0.07 ms
+	// blockSize = 256; // 0.06 ms
+	blockSize = 512; // 0.07 ms
 
 	gridSize = (size%blockSize == 0? 
 			size/blockSize : 

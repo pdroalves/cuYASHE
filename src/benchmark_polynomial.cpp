@@ -124,8 +124,8 @@ int main(int argc,char* argv[]){
 
 
 
-  // for(int d = 1024;d <= 4096;d *= 2){
-  for(int d = 4096;d <= 4096;d *= 2){
+  for(int d = 1024;d <= 4096;d *= 2){
+  // for(int d = 4096;d <= 4096;d *= 2){
 
     std::cout << "d: " << d << std::endl;
 
@@ -157,6 +157,46 @@ int main(int argc,char* argv[]){
     std::cout << "Starting!" <<std::endl;
 
     // /////////////////////////////////////////////
+    // CRT/ICRT
+    
+    Polynomial::random(&a,d-1);
+    a.update_device_data();
+    result = cudaDeviceSynchronize();
+    assert(result == cudaSuccess);
+
+    clock_gettime( CLOCK_REALTIME, &start);
+    for(int i = 0; i < N;i++){
+      a.set_crt_computed(false);
+      a.crt();
+      result = cudaDeviceSynchronize();
+      assert(result == cudaSuccess);
+    }
+    clock_gettime( CLOCK_REALTIME, &stop);
+    diff = compute_time_ms(start,stop)/N;
+    std::cout << "CRT) Foward: " << diff << " ms" << std::endl;
+    crt << d << " " << diff  << std::endl;
+
+    cudaMemGetInfo(&f, &t);
+
+    Polynomial::random(&a,d-1);
+    a.update_device_data();
+    a.icrt();
+    result = cudaDeviceSynchronize();
+    assert(result == cudaSuccess);
+
+    clock_gettime( CLOCK_REALTIME, &start);
+    for(int i = 0; i < N;i++){
+      a.set_icrt_computed(false);
+      a.icrt();
+      result = cudaDeviceSynchronize();
+      assert(result == cudaSuccess);
+    }
+    clock_gettime( CLOCK_REALTIME, &stop);
+    diff = compute_time_ms(start,stop)/N;
+    std::cout << "CRT) Inverse: " << diff << " ms" << std::endl;
+    icrt << d << " " << diff  << std::endl;
+
+    // /////////////////////////////////////////////
     // update_crt_spacing
     clock_gettime( CLOCK_REALTIME, &start);
     for(int i = 0; i < N;i++){
@@ -186,13 +226,15 @@ int main(int argc,char* argv[]){
     std::cout << "update_device_data: " << diff << " ms" << std::endl;
     crt << d << " " << diff  << std::endl;
 
-        // update_device_data
+    // update_host_data
     Polynomial::random(&a,d-1);
     a.update_device_data();
     a.set_host_updated(false);
+    a.icrt();
     clock_gettime( CLOCK_REALTIME, &start);
     for(int i = 0; i < N;i++){
       a.update_host_data();
+
       result = cudaDeviceSynchronize();
       assert(result == cudaSuccess);
       a.set_host_updated(false);
@@ -201,51 +243,12 @@ int main(int argc,char* argv[]){
     diff = compute_time_ms(start,stop)/N;
     std::cout << "update_host_data: " << diff << " ms" << std::endl;
     crt << d << " " << diff  << std::endl;
-
     // /////////////////////////////////////////////
-    // CRT/ICRT
-    
-    clock_gettime( CLOCK_REALTIME, &start);
-    a.update_host_data();
-    a.set_crt_computed(false);
-    a.set_icrt_computed(false);
-    for(int i = 0; i < N;i++){
-      a.set_crt_computed(false);
-      a.crt();
-      result = cudaDeviceSynchronize();
-      assert(result == cudaSuccess);
-    }
-    clock_gettime( CLOCK_REALTIME, &stop);
-    diff = compute_time_ms(start,stop)/N;
-    std::cout << "CRT) Foward: " << diff << " ms" << std::endl;
-    crt << d << " " << diff  << std::endl;
 
-    cudaMemGetInfo(&f, &t);
-    // cout << "Free memory: " << f/(1024*1024) << std::endl;
-    // std::cout << "Press Enter to Continue" << std::endl;
-    //cin.ignore();
 
-    clock_gettime( CLOCK_REALTIME, &start);
-    a.update_host_data();
-    for(int i = 0; i < N;i++){
-      a.set_icrt_computed(false);
-      a.icrt();
-      result = cudaDeviceSynchronize();
-      assert(result == cudaSuccess);
-    }
-    clock_gettime( CLOCK_REALTIME, &stop);
-    diff = compute_time_ms(start,stop)/N;
-    std::cout << "CRT) Inverse: " << diff << " ms" << std::endl;
-    icrt << d << " " << diff  << std::endl;
-
-    // cudaMemGetInfo(&f, &t);
-    // cout << "Free memory: " << f/(1024*1024) << std::endl;
-    // std::cout << "Press Enter to Continue" << std::endl;
-    // cin.ignore();
-
-    clock_gettime( CLOCK_REALTIME, &start);
     Polynomial::random(&a,d-1);
     a.update_device_data();
+    clock_gettime( CLOCK_REALTIME, &start);
     for(int i = 0; i < N;i++){
       a.reduce();
       result = cudaDeviceSynchronize();
@@ -261,10 +264,10 @@ int main(int argc,char* argv[]){
     // std::cout << "Press Enter to Continue" << std::endl;
     //cin.ignore();
 
-    clock_gettime( CLOCK_REALTIME, &start);
     a.update_host_data();
     a.set_crt_computed(false);
     a.set_icrt_computed(false);
+    clock_gettime( CLOCK_REALTIME, &start);
     for(int i = 0; i < N;i++){
       a.reduce();
       result = cudaDeviceSynchronize();
@@ -282,10 +285,10 @@ int main(int argc,char* argv[]){
     // std::cout << "Press Enter to Continue" << std::endl;
     // cin.ignore();
 
-    clock_gettime( CLOCK_REALTIME, &start);
     a.update_host_data();
     a.set_crt_computed(false);
     a.set_icrt_computed(false);
+    clock_gettime( CLOCK_REALTIME, &start);
     for(int i = 0; i < N;i++){
       a %= q;
     }
@@ -407,6 +410,7 @@ int main(int argc,char* argv[]){
     
   }
 
-  cudaDeviceReset();
+  result = cudaDeviceReset();
+  assert(result == cudaSuccess);
 
 }
