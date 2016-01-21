@@ -10,11 +10,9 @@ NTL_CLIENT
 // Big number's stuff //
 //////////////////////
 
-#define BN_POS      (0)
-#define BN_NEG      (1)
-#define CMP_LT 		-1
-#define CMP_GT 		 1
-#define CMP_EQ		 0
+enum BN_SIGN {BN_POS,BN_NEG};
+enum BN_CMP {CMP_LT,CMP_GT,CMP_EQ};
+
 
 #define BN_DIGIT WORD
 typedef struct bn_st{
@@ -26,13 +24,17 @@ typedef struct bn_st{
 
 __host__  void bn_new(bn_t *a);
 __host__ __device__ void bn_zero(bn_t *a);
+__host__ __device__ void bn_zero_non_used(bn_t *a);
 __host__ __device__ bool bn_is_zero(const bn_t* a);
 __host__ __device__ void bn_set_dig(bn_t *a, cuyasheint_t digit);
 __host__  void bn_free(bn_t *a);
 __host__ void bn_grow(bn_t *a,const unsigned int new_size);
+__host__ __device__ void bn_2_compl(bn_t *a);
 __host__ __device__ cuyasheint_t bn_mod1_low(const cuyasheint_t *a,
 									const int size,
 									const uint32_t b);
+__device__ void bn_mod_barrt(	bn_t *C, const bn_t *A,const int NCoefs,
+								const cuyasheint_t * m,  int sm, const cuyasheint_t * u, int su);
 __host__ __device__ cuyasheint_t bn_addn_low(cuyasheint_t *c,
 									cuyasheint_t *a,
 									cuyasheint_t *b,
@@ -64,8 +66,8 @@ __host__ __device__ int max_d(int a,int b);
 __host__ __device__ int min_d(int a,int b);
 __host__ __device__ uint64_t lessThan(uint64_t x, uint64_t y);
 __host__ void callTestData(bn_t *coefs,int N);
+__device__ int get_used_index(cuyasheint_t *u,int alloc);
 void callCRT(bn_t *coefs,const int used_coefs,cuyasheint_t *d_polyCRT,const int N, const int NPolis,cudaStream_t stream);
 void callICRT(bn_t *coefs,cuyasheint_t *d_polyCRT,const int N, const int NPolis,cudaStream_t stream);
-
 
 #endif

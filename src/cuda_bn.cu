@@ -92,15 +92,15 @@ __host__ __device__ uint64_t  lessThan(uint64_t x, uint64_t y) {
     return less;        
 }
 
-/**
- * [max_d description]
- * @param  a [description]
- * @param  b [description]
- * @return   [description]
- */
-__device__ unsigned greaterOrEqualThan(int x, int y){
-	return lessThan(y,x);
-}
+// /**
+//  * [max_d description]
+//  * @param  a [description]
+//  * @param  b [description]
+//  * @return   [description]
+//  */
+// __device__ unsigned greaterOrEqualThan(int x, int y){
+// 	return lessThan(y,x);
+// }
 
 /**
  * [max_d description]
@@ -144,6 +144,10 @@ __host__ __device__ void bn_zero(bn_t *a) {
 	dv_zero(a->dp, a->alloc);
 }
 
+__host__ __device__ void bn_zero_non_used(bn_t *a) {
+	dv_zero(a->dp+a->used, a->alloc-a->used);
+}
+
 __host__ __device__ bool bn_is_zero(const bn_t* a) {
 	#ifdef __CUDA_ARCH__
 	/**
@@ -168,9 +172,11 @@ __global__ void bn_get_deg(int *r, bn_t *coefs, int N){
 	 */
 	
 	int index;
-	for(index = N-1; index >= 0; index++)
+	for(index = N-1; index >= 0; index--){
+		coefs[index].used = get_used_index(coefs[index].dp,coefs[index].alloc)+1;
 		if(!bn_is_zero(&coefs[index]))
 			break;
+	}
 	*r = index;
 }
 
@@ -271,6 +277,10 @@ __host__ void bn_grow(bn_t *a,const unsigned int new_size){
 
 }
 
+__host__ __device__ void bn_2_compl(bn_t *a){
+	for(int i = 0; i < a->used; i++)
+		a->dp[i] = (a->dp[i]^UINT64_MAX)+1; 
+}
 
 ////////////////
 // Operators //
@@ -764,22 +774,22 @@ __global__ void cuCRT(	cuyasheint_t *d_polyCRT,
 
 }	
 
-// __device__ int get_used_index(cuyasheint_t *u,int alloc){
-// 	int i = 0;
-// 	// int max = 0;
+__device__ int get_used_index(cuyasheint_t *u,int alloc){
+	int i = 0;
+	// int max = 0;
 
 
-// 	for(i = alloc-1; i >= 0; i--)
-// 	*
-// 	 * Profiling shows that the branch is cheaper
-	 
-// 		if(u[i] != 0)
-// 			break;
-// 		// max = i*isNotZero(u[i])*isZero(max) + max*isNotZero(max);
+	for(i = alloc-1; i >= 0; i--)
+	/*
+	 * Profiling shows that the branch is cheaper
+	 */ 
+		if(u[i] != 0)
+			break;
+		// max = i*isNotZero(u[i])*isZero(max) + max*isNotZero(max);
 
 
-// 	return i+1;
-// }
+	return i;
+}
 
 __global__ void cuPreICRT(	cuyasheint_t *inner_results,
 							cuyasheint_t *inner_results_used,
@@ -890,7 +900,9 @@ __global__ void cuICRT(	bn_t *poly,
 						M,
 						M_used,
 						u,
-						u_used);	 	
+						u_used);
+    	poly[cid].used = get_used_index(poly[cid].dp,STD_BNT_WORDS_ALLOC)+1;
+    	bn_zero_non_used(&poly[cid]);
 	 }
 
 }
@@ -903,7 +915,7 @@ void callCRT(bn_t *coefs,const int used_coefs,cuyasheint_t *d_polyCRT,const int 
 	
 	cudaError_t result;
 	int blockSize;   // The launch configurator returned block size 
-	int minGridSize; // The minimum grid size needed to achieve the 
+	// int minGridSize; // The minimum grid size needed to achieve the 
            			 // maximum occupancy for a full device launch 
 	int gridSize;    // The actual grid size needed, based on input size 
 
@@ -934,7 +946,7 @@ void callICRT(bn_t *coefs,cuyasheint_t *d_polyCRT,const int N, const int NPolis,
 	if(N <= 0)
 		return;
 	int blockSize;   // The launch configurator returned block size 
-	int minGridSize; // The minimum grid size needed to achieve the 
+	// int minGridSize; // The minimum grid size needed to achieve the 
            			 // maximum occupancy for a full device launch 
 	int gridSize;    // The actual grid size needed, based on input size 
 

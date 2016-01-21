@@ -1,4 +1,4 @@
-OPT = -O3
+OPT = -O0
 
 CUDA_CC = nvcc $(OPT) -G -g -std=c++11
 CC = g++ -std=c++11 -g -Wall -Wfatal-errors -m64 $(OPT)
@@ -96,4 +96,4 @@ test.o:test.cu
 	$(CUDA_CC) -c test.cu -o test.o  -lboost_unit_test_framework $(NTL)
 
 clean:
-	rm -f $(BIN) $(TESTBIN) $(BENCHMARKPOLYBIN) $(BENCHMARKYASHEBIN) integer.o test_ntt.o test_crt.o  test_ct_mul.o  test_ctpt.o  test_mul.o common.o benchmark_polynomial.o benchmark_yashe.o polynomial.o tests.o test_reduce.o ciphertext.o cuda_functions.o cuda_bn.o distribution.o yashe.o test.o test_bnt.o
+	rm -f $(BIN) $(TESTBIN) $(BENCHMARKPOLYBIN) $(BENCHMARKYASHEBIN) test_bnt test_mul test_ntt test_reduce integer.o test_ntt.o test_crt.o  test_ct_mul.o  test_ctpt.o  test_mul.o common.o benchmark_polynomial.o benchmark_yashe.o polynomial.o tests.o test_reduce.o ciphertext.o cuda_functions.o cuda_bn.o distribution.o yashe.o test.o test_bnt.o

@@ -1124,20 +1124,8 @@ class Polynomial{
       int new_spacing = this->deg()+1;
       if(this->get_crt_spacing() == new_spacing)
         return;
-
-      // If updated data lies in gpu's global memory, realign it
-      if(this->get_crt_computed()){
-        cuyasheint_t * d_pointer = CUDAFunctions::callRealignCRTResidues(this->stream, this->CRTSPACING,new_spacing,this->get_device_crt_residues(),this->deg()+1,Polynomial::CRTPrimes.size());
-        if(d_pointer != NULL)
-          this->set_device_crt_residues(d_pointer);
-        else{
-          #ifdef VERBOSE
-          std::cout << "Old spacing is equal new spacing." << std::endl;
-          #endif
-        }
-      }else
-        this->CRTSPACING = new_spacing;
-
+      else
+        update_crt_spacing(new_spacing);
     }
     bool is_zero(){
       this->normalize();

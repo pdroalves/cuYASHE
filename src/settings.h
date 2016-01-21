@@ -22,6 +22,7 @@ extern const uint32_t PRIMES_BUCKET[];
 // #define VERBOSEMEMORYCOPY
 // #define MAYADDONCPU
 
+
 // CRT cannot use primes bigger than WORD/2 bits
 #define WORD 64
 
@@ -34,6 +35,11 @@ typedef uint64_t cuyasheint_t;
 
 enum add_mode_t {ADD,SUB,MUL,DIV,MOD};
 enum ntt_mode_t {INVERSE,FORWARD};
+// enum reduction_type {RESIDUES,COEFS};
+#define RESIDUES 0
+#define COEFS 1
+
+#define PREDUCTION COEFS
 
 #define asm	__asm__ volatile
 

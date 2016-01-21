@@ -165,7 +165,7 @@ void get_words(bn_t *b,ZZ a){
       assert(result == cudaSuccess);  
     }
 
-    result = cudaMemcpy(b->dp,h_dp,used*sizeof(cuyasheint_t),cudaMemcpyHostToDevice);
+    result = cudaMemcpy(b->dp,h_dp,alloc*sizeof(cuyasheint_t),cudaMemcpyHostToDevice);
     assert(result == cudaSuccess);
 
   // }
@@ -248,6 +248,8 @@ ZZ get_ZZ(bn_t *a){
 }
 
 void Polynomial::crt(){
+  if(get_crt_computed())
+    return;
   callCRT(d_bn_coefs,
           (deg()+1),
           get_device_crt_residues(),
@@ -290,7 +292,8 @@ void Polynomial::update_device_data(){
     /**
     * Converts ZZs to bn_t
     */
-    h_data = (cuyasheint_t*)malloc(get_crt_spacing()*STD_BNT_WORDS_ALLOC*sizeof(cuyasheint_t));
+    h_data = (cuyasheint_t*)calloc(get_crt_spacing()*STD_BNT_WORDS_ALLOC,sizeof(cuyasheint_t));
+    // h_data = (cuyasheint_t*)malloc(get_crt_spacing()*STD_BNT_WORDS_ALLOC*sizeof(cuyasheint_t));
     cuyasheint_t *d_data;
     cudaError_t result = cudaMalloc((void**)&d_data,get_crt_spacing()*STD_BNT_WORDS_ALLOC*sizeof(cuyasheint_t));
     assert(result == cudaSuccess);
@@ -302,7 +305,7 @@ void Polynomial::update_device_data(){
     assert(result == cudaSuccess);
     for(int i = 0; i < get_crt_spacing(); i++)
       h_bn_coefs[i].dp = &d_data[i*STD_BNT_WORDS_ALLOC];
-    
+
     ////////////////////
     // Copy to device //
     ////////////////////
@@ -334,8 +337,8 @@ void Polynomial::update_device_data(){
 }
 
 void Polynomial::icrt(){  
-  // if(get_icrt_computed())
-    // return;
+  if(get_icrt_computed())
+    return;
 
   if(get_crt_spacing() > CUDAFunctions::N)
     CUDAFunctions::init(get_crt_spacing());
@@ -366,6 +369,8 @@ void Polynomial::update_host_data(){
       this->icrt();
 	
     assert(Polynomial::CRTPrimes.size() > 0);
+    cudaError_t result = cudaDeviceSynchronize();
+    assert(result == cudaSuccess);
 
     //////////
     // Copy //
@@ -376,8 +381,7 @@ void Polynomial::update_host_data(){
     #endif
 
     assert(get_crt_spacing() > 0);
-
-    cudaError_t result = cudaMemcpy(h_bn_coefs,
+    result = cudaMemcpy(h_bn_coefs,
                         d_bn_coefs,
                         get_crt_spacing()*sizeof(bn_t),
                         cudaMemcpyDeviceToHost
@@ -397,7 +401,7 @@ void Polynomial::update_host_data(){
     result = cudaMemcpy(aux,h_bn_coefs[0].dp,STD_BNT_WORDS_ALLOC*used_coefs*sizeof(cuyasheint_t),cudaMemcpyDeviceToHost);
 
     this->set_coeffs(used_coefs);
-    #pragma omp parallel for
+    // #pragma omp parallel for
     for(int i = 0; i < used_coefs; i++){
       bn_t bn_coef;
       bn_coef.used = h_bn_coefs[i].used;

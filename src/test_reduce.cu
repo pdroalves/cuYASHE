@@ -23,8 +23,8 @@ int main(){
   // Polynomial::gen_crt_primes(Polynomial::global_mod,degree);
 
   Polynomial::CRTPrimes.clear();
-  Polynomial::CRTMpi.clear()
-;  Polynomial::CRTInvMpi.clear();
+  Polynomial::CRTMpi.clear();  
+  Polynomial::CRTInvMpi.clear();
 
   Polynomial::CRTPrimes.push_back(751);
   Polynomial::CRTPrimes.push_back(839);
@@ -85,7 +85,6 @@ int main(){
 
   std::cout << "CPU: " <<a.to_string() << std::endl;
 
-
  // GPU
   a.set_coeff(0,722); 
   a.set_coeff(1,173); 
@@ -135,5 +134,31 @@ int main(){
 
   std::cout << "CPU: " <<a.to_string() << std::endl;
 
+   // GPU
+  a.set_coeffs();
+  a.set_coeff(0,to_ZZ("100841831415836174481434746063997936280"));
+  ZZ m = to_ZZ("77287149995192912462927307869L");
 
+  a.set_icrt_computed(false);
+  a.set_crt_computed(false);
+  a.set_host_updated(true);
+
+  a.update_device_data();
+  a.set_host_updated(false);
+  a.modn(m);
+
+  std::cout << "GPU: " <<a.to_string() << std::endl;
+
+  // CPU
+  a.set_coeffs(1);
+  a.set_coeff(0,to_ZZ("100841831415836174481434746063997936280"));
+
+  a.set_icrt_computed(false);
+  a.set_crt_computed(false);
+  a.set_host_updated(true);
+
+  a.set_host_updated(false);
+  a %= m;
+
+  std::cout << "CPU: " <<a.to_string() << std::endl;
 }
