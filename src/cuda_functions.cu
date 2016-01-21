@@ -591,12 +591,6 @@ __host__ cuyasheint_t* CUDAFunctions::callPolynomialMul(cudaStream_t stream,
     // assert(cudaGetLastError() == cudaSuccess);
   #elif defined(NTTMUL)
 
-      // std::cout << "NTT multiplication" << std::endl;
-
-  // Allocates memory for temporary arrays on device
-  // Each polynomial's degree gets doubled
-  //
-  // d_result is used as auxiliar array
   const int size = N*NPolis;
   cuyasheint_t *d_a;
   cuyasheint_t *d_b;
@@ -649,7 +643,7 @@ __host__ cuyasheint_t* CUDAFunctions::callPolynomialMul(cudaStream_t stream,
   polynomialNTTMul<<<gridDimMul,blockDimMul,1,stream>>>(d_a,d_b,size);
   assert(cudaGetLastError() == cudaSuccess);
 
-  // // Inverse
+  // Inverse
   for(int Ns=1; Ns<N; Ns*=RADIX){
     NTT<<<gridDim,blockDim,1,stream >>>(CUDAFunctions::d_W,CUDAFunctions::d_WInv,N,RADIX,Ns,d_a,d_result,INVERSE);
     assert(cudaGetLastError() == cudaSuccess);
@@ -979,8 +973,8 @@ __host__ void Polynomial::reduce(){
   ZZ q = (Polynomial::global_mod);
   
   // Until we debug reduction on GPU, we need this
-  // update_host_data();
-  // this->set_crt_computed(false);
+  update_host_data();
+  this->set_crt_computed(false);
 
   if(!this->get_crt_computed()){
     #ifdef VERBOSE

@@ -1067,12 +1067,12 @@ class Polynomial{
         /**
          * Update bn_coefs
          */
-        if(d_bn_coefs){
-          result = cudaFree(d_bn_coefs);
-          assert(result == cudaSuccess);
-        } 
-       if(h_bn_coefs)
-          free(h_bn_coefs);
+       //  if(d_bn_coefs){
+       //    result = cudaFree(d_bn_coefs);
+       //    assert(result == cudaSuccess);
+       //  } 
+       // if(h_bn_coefs)
+       //    free(h_bn_coefs);
 
         cuyasheint_t *tmp;
         result = cudaMalloc((void**)&tmp,new_spacing*STD_BNT_WORDS_ALLOC*sizeof(cuyasheint_t));

@@ -134,15 +134,10 @@ void common_addition_inplace(P *a,P *b){
 }
 
 template <class P>
-P common_multiplication(P *a_input, P *b_input){
+P common_multiplication(P a, P b){
   
-  // uint64_t start,end;
-
-  P a,b;
-  a.copy(a_input);
-  b.copy(b_input);
   // Check align
-  int needed_spacing = pow(2,ceil(log2(a.get_crt_spacing()+b.get_crt_spacing())));
+  int needed_spacing = pow(2,ceil(log2(a.deg() + b.deg())));
   
   if(needed_spacing < CUDAFunctions::N)
 	needed_spacing = CUDAFunctions::N;

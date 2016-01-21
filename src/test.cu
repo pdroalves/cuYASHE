@@ -817,13 +817,13 @@ BOOST_AUTO_TEST_CASE(severalMultiplications)
     BOOST_REQUIRE(c.get_coeff(i) == ntl_value);
   }
   for(unsigned int i = 1; i < NTESTS; i++){
-    // #ifdef DEBUG
+    #ifdef DEBUG
     std::cout << "Iteration "<< i << std::endl;
     std::cout << "a: " << a.to_string() << " degree: " << a.deg() <<std::endl;
     std::cout << "b: " << b.to_string() << " degree: " << b.deg() <<std::endl;
     std::cout << "c: " << c.to_string() << " degree: " << c.deg() <<std::endl;
     std::cout << "c_ntl: " << c_ntl << " degree: " << NTL::deg(c_ntl) << std::endl << std::endl;
-    // #endif
+    #endif
     c = c*a;
     c.reduce(); // %phi %q
 

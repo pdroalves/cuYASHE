@@ -43,7 +43,7 @@ int main(){
   }
   
   CUDAFunctions::write_crt_primes();
-
+  CUDAFunctions::init(16);
 
   ZZ_p::init(Polynomial::global_mod);
 

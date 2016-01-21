@@ -39,7 +39,7 @@ enum ntt_mode_t {INVERSE,FORWARD};
 #define RESIDUES 0
 #define COEFS 1
 
-#define PREDUCTION COEFS
+#define PREDUCTION RESIDUES
 
 #define asm	__asm__ volatile
 

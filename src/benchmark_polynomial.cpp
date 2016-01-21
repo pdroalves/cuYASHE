@@ -124,8 +124,8 @@ int main(int argc,char* argv[]){
 
 
 
-  for(int d = 1024;d <= 4096;d *= 2){
-  // for(int d = 4096;d <= 4096;d *= 2){
+  // for(int d = 1024;d <= 4096;d *= 2){
+  for(int d = 4096;d <= 4096;d *= 2){
 
     std::cout << "d: " << d << std::endl;
 
@@ -361,6 +361,8 @@ int main(int argc,char* argv[]){
     // // Time measured with memory copy
     Polynomial::random(&a,d-1);
     Polynomial::random(&b,d-1);
+    a.update_crt_spacing(2*d);
+    b.update_crt_spacing(2*d);
     clock_gettime( CLOCK_REALTIME, &start);
     for(int i = 0; i < N;i++){
 
@@ -387,7 +389,9 @@ int main(int argc,char* argv[]){
     // Time measured without memory copy
     Polynomial::random(&a,d-1);
     Polynomial::random(&b,d-1);
+    a.update_crt_spacing(2*d);
     a.update_device_data();
+    b.update_crt_spacing(2*d);
     b.update_device_data();
 
     clock_gettime( CLOCK_REALTIME, &start);
