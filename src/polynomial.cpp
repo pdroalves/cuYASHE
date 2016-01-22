@@ -44,8 +44,8 @@ Polynomial Polynomial::operator+=(Polynomial &b){
 }
 
 Polynomial Polynomial::operator*(Polynomial &b){
-  Polynomial p = common_multiplication<Polynomial>(this,b);
-  p.icrt();
+  Polynomial *p = common_multiplication<Polynomial>(this,&b);
+  p->icrt();
   return p;
 }
 

@@ -970,9 +970,9 @@ class Polynomial{
     }
     void update_crt_spacing(const int new_spacing){
       
-      // #ifdef VERBOSE
+      #ifdef VERBOSE
       std::cout << "update_crt_spacing - " << new_spacing << std::endl;
-      // #endif
+      #endif
       if(new_spacing & (new_spacing-1))
         std::cout << "Achei!" << std::endl;
 
@@ -1005,37 +1005,37 @@ class Polynomial{
          * Update bn_coefs
          */
         // #warning memory leak here
-       try{
-        if(d_bn_coefs){
-          result = cudaFree(d_bn_coefs);
-          d_bn_coefs = 0x0;
-          if(result != cudaSuccess)
-            throw  cudaGetErrorString(result);
-        }
-       }catch(const char* s){
-        std::cerr << "Exception on release of d_bn_coefs: " << s << std::endl;
-        cudaGetLastError();// Reset
-       }
+       // try{
+       //  if(d_bn_coefs){
+       //    result = cudaFree(d_bn_coefs);
+       //    d_bn_coefs = 0x0;
+       //    if(result != cudaSuccess)
+       //      throw  cudaGetErrorString(result);
+       //  }
+       // }catch(const char* s){
+       //  std::cerr << "Exception on release of d_bn_coefs: " << s << std::endl;
+       //  cudaGetLastError();// Reset
+       // }
 
-       try{
-        if(d_polyCRT){
-          // result = cudaFree(d_polyCRT);
-          d_polyCRT = 0x0;
-          if(result != cudaSuccess)
-            throw  cudaGetErrorString(result);
-        }
-       }catch(const char* s){
-        std::cerr << "Exception on release of d_polyCRT: " << s << std::endl;
-        cudaGetLastError();// Reset
-       } 
-       try{
-        if(h_bn_coefs){
-          free(h_bn_coefs);
-          h_bn_coefs = 0x0;
-        }
-       }catch(const char* s){
-        std::cerr << "Exception on release of h_bn_coefs: " << s << std::endl;
-       }
+       // try{
+       //  if(d_polyCRT){
+       //    // result = cudaFree(d_polyCRT);
+       //    d_polyCRT = 0x0;
+       //    if(result != cudaSuccess)
+       //      throw  cudaGetErrorString(result);
+       //  }
+       // }catch(const char* s){
+       //  std::cerr << "Exception on release of d_polyCRT: " << s << std::endl;
+       //  cudaGetLastError();// Reset
+       // } 
+       // try{
+       //  if(h_bn_coefs){
+       //    free(h_bn_coefs);
+       //    h_bn_coefs = 0x0;
+       //  }
+       // }catch(const char* s){
+       //  std::cerr << "Exception on release of h_bn_coefs: " << s << std::endl;
+       // }
         
         // Alloc memory
         cuyasheint_t *tmp;
@@ -1221,29 +1221,29 @@ class Polynomial{
     }
     static void operator delete(void *ptr);
     void release(){
-      cudaError_t result = cudaDeviceSynchronize();
-      assert(result == cudaSuccess);
+      // cudaError_t result = cudaDeviceSynchronize();
+      // assert(result == cudaSuccess);
       
-      if(d_polyCRT){
-        result = cudaFree(d_polyCRT);
-        assert(result == cudaSuccess);
-        d_polyCRT = 0x0;
-      }
-      if(d_bn_coefs){
-        result = cudaFree(d_bn_coefs);
-        assert(result == cudaSuccess);
-        d_bn_coefs = 0x0;
-      }
-      if(h_bn_coefs){
-        for(int i = 0; i < CRTSPACING;i++){
-          if(h_bn_coefs[i].dp){
-            // result = cudaFree(h_bn_coefs[i].dp);
-            assert(result == cudaSuccess);
-          }
-        }
-        free(h_bn_coefs);
-        h_bn_coefs = 0x0;
-      }
+      // if(d_polyCRT){
+      //   result = cudaFree(d_polyCRT);
+      //   assert(result == cudaSuccess);
+      //   d_polyCRT = 0x0;
+      // }
+      // if(d_bn_coefs){
+      //   result = cudaFree(d_bn_coefs);
+      //   assert(result == cudaSuccess);
+      //   d_bn_coefs = 0x0;
+      // }
+      // if(h_bn_coefs){
+      //   for(int i = 0; i < CRTSPACING;i++){
+      //     if(h_bn_coefs[i].dp){
+      //       // result = cudaFree(h_bn_coefs[i].dp);
+      //       assert(result == cudaSuccess);
+      //     }
+      //   }
+      //   free(h_bn_coefs);
+      //   h_bn_coefs = 0x0;
+      // }
     }
     bn_t* h_bn_coefs = 0x0;
     bn_t* d_bn_coefs = 0x0;

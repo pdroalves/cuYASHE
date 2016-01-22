@@ -134,10 +134,10 @@ void common_addition_inplace(P *a,P *b){
 }
 
 template <class P>
-P common_multiplication(P a, P b){
+P* common_multiplication(P *a, P *b){
   
   // Check align
-  int needed_spacing = pow(2,ceil(log2(a.deg() + b.deg())));
+  int needed_spacing = pow(2,ceil(log2(a->deg() + b->deg())));
   
   if(needed_spacing < CUDAFunctions::N)
 	needed_spacing = CUDAFunctions::N;
@@ -149,20 +149,20 @@ P common_multiplication(P a, P b){
   bool update_A_spacing = false; 
   bool update_B_spacing = false;
   #ifdef NTTMUL
-	if(a.CRTSPACING != needed_spacing)
-	  a.update_crt_spacing(needed_spacing);
-	if(b.CRTSPACING != needed_spacing)
-	  b.update_crt_spacing(needed_spacing);
+	if(a->CRTSPACING != needed_spacing)
+	  a->update_crt_spacing(needed_spacing);
+	if(b->CRTSPACING != needed_spacing)
+	  b->update_crt_spacing(needed_spacing);
   #elif defined(CUFFTMUL)
-  if(a.get_crt_spacing() != needed_spacing){
-  	// if(!a.get_crt_computed())
-  		// a.update_crt_spacing(needed_spacing);
+  if(a->get_crt_spacing() != needed_spacing){
+  	// if(!a->get_crt_computed())
+  		// a->update_crt_spacing(needed_spacing);
   	// else
 	  	update_A_spacing = true;  	
   }
-  if(b.get_crt_spacing() != needed_spacing){
-  	// if(!b.get_crt_computed())
-  		// b.update_crt_spacing(needed_spacing);
+  if(b->get_crt_spacing() != needed_spacing){
+  	// if(!b->get_crt_computed())
+  		// b->update_crt_spacing(needed_spacing);
   	// else
 	  	update_B_spacing = true;
   }
@@ -170,8 +170,8 @@ P common_multiplication(P a, P b){
 
   #ifdef VERBOSE
   std::cout << "Mul with CRTSPACING " << needed_spacing << std::endl;
-  // std::cout << "this: " << a.to_string() << std::endl;
-  // std::cout << "other " << b.to_string() << std::endl;
+  // std::cout << "this: " << a->to_string() << std::endl;
+  // std::cout << "other " << b->to_string() << std::endl;
   #endif
 
   // Apply CRT and copy data to global memory, if needed
@@ -182,8 +182,8 @@ P common_multiplication(P a, P b){
 		#ifdef VERBOSE
 		std::cout << "a" << std::endl;
 		#endif
-		if(!a.get_crt_computed()){
-			a.update_device_data();
+		if(!a->get_crt_computed()){
+			a->update_device_data();
 		}
 
       }
@@ -192,33 +192,33 @@ P common_multiplication(P a, P b){
 		#ifdef VERBOSE
 		std::cout << "b" << std::endl;
 		#endif
-		if(!b.get_crt_computed()){
-			b.update_device_data();
+		if(!b->get_crt_computed()){
+			b->update_device_data();
 		}
       }
   }
   // start = get_cycles();
 
   cuyasheint_t *d_result;
-  if(a.get_crt_spacing() > 0 && b.get_crt_spacing() > 0)
-	  d_result = CUDAFunctions::callPolynomialMul(	a.get_stream(),
-													a.get_device_crt_residues(),
+  if(a->get_crt_spacing() > 0 && b->get_crt_spacing() > 0)
+	  d_result = CUDAFunctions::callPolynomialMul(	a->get_stream(),
+													a->get_device_crt_residues(),
 													update_A_spacing,
-													a.get_crt_spacing(),
-													b.get_device_crt_residues(),
+													a->get_crt_spacing(),
+													b->get_device_crt_residues(),
 													update_B_spacing,
-													b.get_crt_spacing(),
+													b->get_crt_spacing(),
 													needed_spacing,
-													a.CRTPrimes.size());
+													a->CRTPrimes.size());
   else
   	d_result = NULL;
 
-  P c = P(a.get_mod(),a.get_phi(),needed_spacing);
+  P *c = new P(a->get_mod(),a->get_phi(),needed_spacing);
   if(d_result != NULL){
-	  c.set_device_crt_residues(d_result);
-	  c.set_host_updated(false);
-	  c.set_icrt_computed(false);
-	  c.set_crt_computed(true);
+	  c->set_device_crt_residues(d_result);
+	  c->set_host_updated(false);
+	  c->set_icrt_computed(false);
+	  c->set_crt_computed(true);
   }
   // cudaDeviceSynchronize();
   return c;
