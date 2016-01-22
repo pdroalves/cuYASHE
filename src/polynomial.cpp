@@ -328,7 +328,7 @@ void Polynomial::update_device_data(){
   /**
    * Releases memory
    */
-  if(h_data != 0x0)
+  if(h_data)
     free(h_data);
   
   this->ON_COPY = false;

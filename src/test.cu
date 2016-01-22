@@ -817,8 +817,8 @@ BOOST_AUTO_TEST_CASE(severalMultiplications)
     BOOST_REQUIRE(c.get_coeff(i) == ntl_value);
   }
   for(unsigned int i = 1; i < NTESTS; i++){
-    #ifdef DEBUG
     std::cout << "Iteration "<< i << std::endl;
+    #ifdef DEBUG
     std::cout << "a: " << a.to_string() << " degree: " << a.deg() <<std::endl;
     std::cout << "b: " << b.to_string() << " degree: " << b.deg() <<std::endl;
     std::cout << "c: " << c.to_string() << " degree: " << c.deg() <<std::endl;
@@ -842,11 +842,11 @@ BOOST_AUTO_TEST_CASE(severalMultiplications)
 
       BOOST_REQUIRE(c.get_coeff(i) == ntl_value);
     }
+    c.release();
   }
 
   a.release();
   b.release();
-  c.release();
 }
 BOOST_AUTO_TEST_CASE(phiReduceCPU)
 {

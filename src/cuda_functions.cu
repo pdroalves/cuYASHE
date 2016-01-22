@@ -597,18 +597,30 @@ __host__ cuyasheint_t* CUDAFunctions::callPolynomialMul(cudaStream_t stream,
   cuyasheint_t *aux;
 
   cudaError_t result;
-  result = cudaMalloc((void**)&d_result,size*sizeof(cuyasheint_t));
-  assert(result == cudaSuccess);
-  result = cudaMalloc((void**)&d_a,size*sizeof(cuyasheint_t));
-  assert(result == cudaSuccess);
-  result = cudaMalloc((void**)&d_b,size*sizeof(cuyasheint_t));
-  assert(result == cudaSuccess);
-  result = cudaMalloc((void**)&aux,size*sizeof(cuyasheint_t));
+  // result = cudaMalloc((void**)&d_result,size*sizeof(cuyasheint_t));
+  // assert(result == cudaSuccess);
+  // result = cudaMalloc((void**)&d_a,size*sizeof(cuyasheint_t));
+  // assert(result == cudaSuccess);
+  // result = cudaMalloc((void**)&d_b,size*sizeof(cuyasheint_t));
+  // assert(result == cudaSuccess);
+  // result = cudaMalloc((void**)&aux,size*sizeof(cuyasheint_t));
+  // assert(result == cudaSuccess);
+   
+  cuyasheint_t *mem;
+  result = cudaMalloc((void**)&mem,(4*size)*sizeof(cuyasheint_t));
   assert(result == cudaSuccess);
 
-  result = cudaMemsetAsync(aux,0,size*sizeof(cuyasheint_t),stream);
-  assert(result == cudaSuccess);
-  result = cudaMemsetAsync(d_result,0,size*sizeof(cuyasheint_t),stream);
+  d_result = mem + 0*size;
+  d_a =      mem + 1*size;
+  d_b =      mem + 2*size;
+  aux =      mem + 3*size;
+
+  // result = cudaMemsetAsync(aux,0,size*sizeof(cuyasheint_t),stream);
+  // assert(result == cudaSuccess);
+  // result = cudaMemsetAsync(d_result,0,size*sizeof(cuyasheint_t),stream);
+  // assert(result == cudaSuccess);
+
+  result = cudaMemsetAsync(mem,0,(4*size)*sizeof(cuyasheint_t),stream);
   assert(result == cudaSuccess);
 
   result = cudaMemcpyAsync(d_a,a,size*sizeof(cuyasheint_t),cudaMemcpyDeviceToDevice,stream);
@@ -654,9 +666,10 @@ __host__ cuyasheint_t* CUDAFunctions::callPolynomialMul(cudaStream_t stream,
 
   NTTScale<<< gridDimMul,blockDimMul,1,stream >>>(d_result,size,N);
   
-  cudaFree(d_a);
-  cudaFree(d_b);
-  cudaFree(aux);
+  // cudaFree(d_a);
+  // cudaFree(d_b);
+  // cudaFree(aux);
+  result = cudaDeviceSynchronize();
 
   #elif defined(FFTMUL)
 
