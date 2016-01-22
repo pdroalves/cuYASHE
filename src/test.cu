@@ -408,10 +408,10 @@ BOOST_AUTO_TEST_CASE(multiplyByZZOnGPU)
     #ifdef VERBOSE
     std::cout << "a: " << a.to_string() << " degree: " << a.deg() <<std::endl;
     std::cout << "b: " << b <<std::endl;
+    std::cout << "c: " << c.to_string() << " degree: " << c.deg() <<std::endl;
     std::cout << "c_ntl: " << c_ntl << " degree: " << NTL::deg(c_ntl) << std::endl << std::endl;
     std::cout << "count: " << count << std::endl;
     #endif
-    std::cout << "c: " << c.to_string() << " degree: " << c.deg() <<std::endl;
     BOOST_REQUIRE(NTL::deg(c_ntl) == c.deg());
     for(int i = 0;i <= c.deg();i++)
       BOOST_REQUIRE(conv<ZZ>(NTL::rep(c_ntl[i])[0]) == c.get_coeff(i));
@@ -754,18 +754,18 @@ BOOST_AUTO_TEST_CASE(modularInversion)
   
   Polynomial result = a*aInv;
   
-  std::cout << "a: " << a.to_string() << std::endl;
-  std::cout << "aInv: " << aInv.to_string() << std::endl;
-  std::cout << "result before reduce: " << result.to_string() << std::endl;
+  // std::cout << "a: " << a.to_string() << std::endl;
+  // std::cout << "aInv: " << aInv.to_string() << std::endl;
+  // std::cout << "result before reduce: " << result.to_string() << std::endl;
   result.reduce();
   result %= a.get_mod();
-  std::cout << "result after reduce: " << result.to_string() << std::endl;
+  // std::cout << "result after reduce: " << result.to_string() << std::endl;
 
   Polynomial one = Polynomial();
   one.set_coeff(0,1);
 
   result.normalize();
-  
+
   BOOST_REQUIRE(result == one);
 
 }

@@ -1059,7 +1059,7 @@ class Polynomial{
 
         result = cudaMemsetAsync(tmp,0,new_spacing*STD_BNT_WORDS_ALLOC*sizeof(cuyasheint_t),get_stream());
         assert(result == cudaSuccess);
-        
+
         for(int i = 0; i < new_spacing; i++,tmp += STD_BNT_WORDS_ALLOC){
           h_bn_coefs[i].alloc = STD_BNT_WORDS_ALLOC;
           h_bn_coefs[i].used = 0;
@@ -1222,7 +1222,8 @@ class Polynomial{
       a->normalize();
     }
     cudaStream_t get_stream(){
-      return this->stream;
+      // return this->stream;
+      return (cudaStream_t)0;
     }
     void set_stream(){
       cudaStreamCreate(&this->stream);

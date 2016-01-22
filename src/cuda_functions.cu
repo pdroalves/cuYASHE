@@ -880,10 +880,6 @@ __host__ void CUDAFunctions::init(int N){
     /**
      * Alloc memory for d_inner_results
      */
-    
-    /**
-     * For some reason
-     */
     const unsigned int size = N*Polynomial::CRTPrimes.size();
 
     result = cudaMalloc((void**)&CUDAFunctions::d_inner_results, size*STD_BNT_WORDS_ALLOC*sizeof(cuyasheint_t));
