@@ -48,7 +48,7 @@ class Polynomial{
       cudaStreamCreate(&this->stream);
       this->set_host_updated(true);
       this->set_crt_computed(false);
-      this->set_icrt_computed(true);
+      this->set_icrt_computed(false);
       if(Polynomial::global_mod > 0)
         // If a global mod is defined, use it
         this->mod = Polynomial::global_mod; // Doesn't copy. Uses the reference.
@@ -80,7 +80,7 @@ class Polynomial{
       cudaStreamCreate(&this->stream);
       this->set_host_updated(true);
       this->set_crt_computed(false);
-      this->set_icrt_computed(true);
+      this->set_icrt_computed(false);
       this->mod = ZZ(p);// Copy
 
       if(Polynomial::global_phi){
@@ -107,7 +107,7 @@ class Polynomial{
       cudaStreamCreate(&this->stream);
       this->set_host_updated(true);
       this->set_crt_computed(false);
-      this->set_icrt_computed(true);
+      this->set_icrt_computed(false);
       this->mod = ZZ(p);// Copy
       this->phi = &P;// Copy
 
@@ -133,7 +133,7 @@ class Polynomial{
       cudaStreamCreate(&this->stream);
       this->set_host_updated(true);
       this->set_crt_computed(false);
-      this->set_icrt_computed(true);
+      this->set_icrt_computed(false);
       if(Polynomial::global_mod > 0){
         // If a global mod is defined, use it
         this->mod = Polynomial::global_mod; // Doesn't copy. Uses the reference.
@@ -163,7 +163,7 @@ class Polynomial{
       cudaStreamCreate(&this->stream);
       this->set_host_updated(true);
       this->set_crt_computed(false);
-      this->set_icrt_computed(true);
+      this->set_icrt_computed(false);
       this->mod = ZZ(p);// Copy
       this->phi = &P;// Copy
 
@@ -190,7 +190,7 @@ class Polynomial{
       cudaStreamCreate(&this->stream);
       this->set_host_updated(true);
       this->set_crt_computed(false);
-      this->set_icrt_computed(true);
+      this->set_icrt_computed(false);
       this->mod = ZZ(p);// Copy
 
       // CRT Spacing set to spacing
@@ -221,12 +221,12 @@ class Polynomial{
       // cuyasheint_t start,stop;
       // start = polynomial_get_cycles();
       #endif 
-
+      cudaDeviceSynchronize();
 
       this->update_crt_spacing(b.get_crt_spacing());
       if(b.get_icrt_computed()){
         #warning this is wrong!
-        cudaError_t result = cudaMemcpyAsync(this->d_bn_coefs,b.d_bn_coefs,b.get_crt_spacing()*sizeof(bn_t),cudaMemcpyDeviceToDevice);
+        cudaError_t result = cudaMemcpyAsync(this->d_bn_coefs,b.d_bn_coefs,b.get_crt_spacing()*sizeof(bn_t),cudaMemcpyDeviceToDevice,b.get_stream());
         assert(result == cudaSuccess);
         assert(CRTSPACING > 0);
         h_bn_coefs = (bn_t*)malloc(CRTSPACING*sizeof(bn_t));
@@ -237,7 +237,7 @@ class Polynomial{
       this->set_host_updated(b.get_host_updated());
 
       if(b.get_crt_computed()){
-        cudaError_t result = cudaMemcpyAsync(this->d_polyCRT,b.d_polyCRT,b.get_crt_spacing()*Polynomial::CRTPrimes.size()*sizeof(cuyasheint_t),cudaMemcpyDeviceToDevice);
+        cudaError_t result = cudaMemcpyAsync(this->d_polyCRT,b.d_polyCRT,b.get_crt_spacing()*Polynomial::CRTPrimes.size()*sizeof(cuyasheint_t),cudaMemcpyDeviceToDevice,b.get_stream());
         assert(result == cudaSuccess);
       }
 
@@ -260,6 +260,9 @@ class Polynomial{
       #ifdef VERBOSE
       std::cout << "Will generate a string" << std::endl;
       #endif
+      cudaError_t result = cudaDeviceSynchronize();
+      assert(result == cudaSuccess);
+
       if(!get_host_updated())
         update_host_data();
       
@@ -973,8 +976,6 @@ class Polynomial{
       #ifdef VERBOSE
       std::cout << "update_crt_spacing - " << new_spacing << std::endl;
       #endif
-      if(new_spacing & (new_spacing-1))
-        std::cout << "Achei!" << std::endl;
 
       if(new_spacing <= 0)
         // Do nothing
@@ -1046,12 +1047,19 @@ class Polynomial{
         /**
          * We use a single cudaMalloc call for tmp and d_polyCRT
          */
-        result = cudaMalloc((void**)&d_polyCRT,(new_spacing*(CRTPrimes.size())+new_spacing*STD_BNT_WORDS_ALLOC)*sizeof(cuyasheint_t));        
+        // result = cudaMalloc((void**)&d_polyCRT,(new_spacing*(CRTPrimes.size())+new_spacing*STD_BNT_WORDS_ALLOC)*sizeof(cuyasheint_t));        
+        // assert(result == cudaSuccess);
+        result = cudaMalloc((void**)&d_polyCRT,new_spacing*(CRTPrimes.size())*sizeof(cuyasheint_t));        
         assert(result == cudaSuccess);
-        tmp = &d_polyCRT[new_spacing*(CRTPrimes.size())];
+        result = cudaMalloc((void**)&tmp,new_spacing*STD_BNT_WORDS_ALLOC*sizeof(cuyasheint_t));        
+        assert(result == cudaSuccess);
+        // tmp = &d_polyCRT[new_spacing*(CRTPrimes.size())];
 
         h_bn_coefs = (bn_t*)malloc(new_spacing*sizeof(bn_t));
 
+        result = cudaMemsetAsync(tmp,0,new_spacing*STD_BNT_WORDS_ALLOC*sizeof(cuyasheint_t),get_stream());
+        assert(result == cudaSuccess);
+        
         for(int i = 0; i < new_spacing; i++,tmp += STD_BNT_WORDS_ALLOC){
           h_bn_coefs[i].alloc = STD_BNT_WORDS_ALLOC;
           h_bn_coefs[i].used = 0;
@@ -1221,29 +1229,28 @@ class Polynomial{
     }
     static void operator delete(void *ptr);
     void release(){
-      // cudaError_t result = cudaDeviceSynchronize();
-      // assert(result == cudaSuccess);
+      cudaError_t result = cudaDeviceSynchronize();
+      assert(result == cudaSuccess);
       
-      // if(d_polyCRT){
-      //   result = cudaFree(d_polyCRT);
-      //   assert(result == cudaSuccess);
-      //   d_polyCRT = 0x0;
-      // }
-      // if(d_bn_coefs){
-      //   result = cudaFree(d_bn_coefs);
-      //   assert(result == cudaSuccess);
-      //   d_bn_coefs = 0x0;
-      // }
-      // if(h_bn_coefs){
-      //   for(int i = 0; i < CRTSPACING;i++){
-      //     if(h_bn_coefs[i].dp){
-      //       // result = cudaFree(h_bn_coefs[i].dp);
-      //       assert(result == cudaSuccess);
-      //     }
-      //   }
-      //   free(h_bn_coefs);
-      //   h_bn_coefs = 0x0;
-      // }
+      if(d_polyCRT){
+        result = cudaFree(d_polyCRT);
+        assert(result == cudaSuccess);
+        d_polyCRT = 0x0;
+      }
+      if(d_bn_coefs){
+        result = cudaFree(d_bn_coefs);
+        assert(result == cudaSuccess);
+        d_bn_coefs = 0x0;
+      }
+      if(h_bn_coefs){
+        if(h_bn_coefs[0].dp){
+          // All h_bn_coefs[*].dp are alloc in a single array
+          // result = cudaFree(h_bn_coefs[0].dp);
+          assert(result == cudaSuccess);
+        }
+        free(h_bn_coefs);
+        h_bn_coefs = 0x0;
+      }
     }
     bn_t* h_bn_coefs = 0x0;
     bn_t* d_bn_coefs = 0x0;

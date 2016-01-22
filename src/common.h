@@ -75,7 +75,6 @@ P common_addition(P *a,P *b){
 	c.set_host_updated(false);
 	c.set_icrt_computed(false);
 	c.set_crt_computed(true);
-	// cudaDeviceSynchronize();
 	return c;
 
 }
@@ -220,7 +219,9 @@ P* common_multiplication(P *a, P *b){
 	  c->set_icrt_computed(false);
 	  c->set_crt_computed(true);
   }
-  // cudaDeviceSynchronize();
+
+  cudaError_t result = cudaDeviceSynchronize();
+  assert(result == cudaSuccess);
   return c;
 }
 #endif

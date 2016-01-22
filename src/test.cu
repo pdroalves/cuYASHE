@@ -58,8 +58,8 @@ struct PolySuite
 
         Polynomial::gen_crt_primes(Polynomial::global_mod,degree);
         CUDAFunctions::init(degree);
-        std::cout << "M = " << Polynomial::CRTProduct << std::endl;
-        std::cout << std::endl;
+        // std::cout << "M = " << Polynomial::CRTProduct << std::endl;
+        // std::cout << std::endl;
     }
 
     ~PolySuite()
@@ -230,10 +230,10 @@ BOOST_AUTO_TEST_CASE(multipleAddsWithDifferentDegrees)
     b_ntl += a_ntl;
   }
 
-  // #ifdef VERBOSE
+  #ifdef VERBOSE
   std::cout << "b: " << b.to_string() << std::endl;
   std::cout << "b_ntl: " << b_ntl << std::endl;
-  // #endif
+  #endif
   
   b.normalize();
    
@@ -251,12 +251,12 @@ BOOST_AUTO_TEST_CASE(zeroAdd)
 
 
   Polynomial r = a + b;
-  // #ifdef VERBOSE
+  #ifdef VERBOSE
   std::cout << "M: "<<Polynomial::CRTProduct << std::endl;
   std::cout << "a: " << a.to_string() <<std::endl;
   std::cout << "b: " << b.to_string() <<std::endl;
   std::cout << "r: " << r.to_string() << std::endl;
-  // #endif
+  #endif
   
   BOOST_REQUIRE(r == a);
 
@@ -408,10 +408,10 @@ BOOST_AUTO_TEST_CASE(multiplyByZZOnGPU)
     #ifdef VERBOSE
     std::cout << "a: " << a.to_string() << " degree: " << a.deg() <<std::endl;
     std::cout << "b: " << b <<std::endl;
-    std::cout << "c: " << c.to_string() << " degree: " << c.deg() <<std::endl;
     std::cout << "c_ntl: " << c_ntl << " degree: " << NTL::deg(c_ntl) << std::endl << std::endl;
     std::cout << "count: " << count << std::endl;
     #endif
+    std::cout << "c: " << c.to_string() << " degree: " << c.deg() <<std::endl;
     BOOST_REQUIRE(NTL::deg(c_ntl) == c.deg());
     for(int i = 0;i <= c.deg();i++)
       BOOST_REQUIRE(conv<ZZ>(NTL::rep(c_ntl[i])[0]) == c.get_coeff(i));
@@ -600,15 +600,15 @@ BOOST_AUTO_TEST_CASE(addAndMultiplyByPolynomial)
 
     Polynomial c = a*b+a;
     c.reduce();
-    c %= q;
 
     ZZ_pEX c_ntl = a_ntl*b_ntl+a_ntl;
     c_ntl %= conv<ZZ_pEX>(NTL_Phi);
 
     #ifdef DEBUG 
-     std::cout << "a: " << a.to_string() << " ==  " << a_ntl <<std::endl;
-      std::cout << "b: " << b.to_string() << " ==  " << b_ntl <<std::endl;
-      std::cout << "c: " << c.to_string() << " ==  " << c_ntl <<std::endl;
+     std::cout << "a: " << a.to_string() <<std::endl;
+      std::cout << "b: " << b.to_string() <<std::endl;
+      std::cout << "c: " << c.to_string() <<std::endl;
+      std::cout << "c_ntl: " << c_ntl <<std::endl<<std::endl;
     #endif
 
     // std::cout << NTL::deg(c_ntl) << " == " << c.deg() << std::endl;;
@@ -765,7 +765,7 @@ BOOST_AUTO_TEST_CASE(modularInversion)
   one.set_coeff(0,1);
 
   result.normalize();
-
+  
   BOOST_REQUIRE(result == one);
 
 }
@@ -817,8 +817,8 @@ BOOST_AUTO_TEST_CASE(severalMultiplications)
     BOOST_REQUIRE(c.get_coeff(i) == ntl_value);
   }
   for(unsigned int i = 1; i < NTESTS; i++){
-    std::cout << "Iteration "<< i << std::endl;
     #ifdef DEBUG
+    std::cout << "Iteration "<< i << std::endl;
     std::cout << "a: " << a.to_string() << " degree: " << a.deg() <<std::endl;
     std::cout << "b: " << b.to_string() << " degree: " << b.deg() <<std::endl;
     std::cout << "c: " << c.to_string() << " degree: " << c.deg() <<std::endl;

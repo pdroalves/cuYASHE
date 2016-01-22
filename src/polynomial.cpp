@@ -33,19 +33,29 @@ const uint32_t PRIMES_BUCKET[] = {536870909, 536870879, 536870869, 536870849, 53
 
 Polynomial Polynomial::operator+(Polynomial &b){
   Polynomial p = common_addition<Polynomial>(this,&b);
-  // p.icrt();
+  
+  cudaError_t result = cudaDeviceSynchronize();
+  assert(result == cudaSuccess);
+  
   return p;
 }
 
 Polynomial Polynomial::operator+=(Polynomial &b){
   common_addition_inplace<Polynomial>(this,&b);
-  // this->icrt();
+  
+  cudaError_t result = cudaDeviceSynchronize();
+  assert(result == cudaSuccess);
+
   return *this;
 }
 
 Polynomial Polynomial::operator*(Polynomial &b){
   Polynomial *p = common_multiplication<Polynomial>(this,&b);
   p->icrt();
+  
+  cudaError_t result = cudaDeviceSynchronize();
+  assert(result == cudaSuccess);
+
   return p;
 }
 
@@ -235,6 +245,15 @@ void get_words_allocatted(bn_t *b,ZZ a,cuyasheint_t *h_data, cuyasheint_t *d_dat
   b->alloc = alloc;
   b->sign = (a>=0?BN_POS:BN_NEG);
 }
+
+int get_used_index(bn_t *coefs,int alloc){
+  int i;
+  for(i = alloc-1; i >= 0; i--)
+    if(coefs[i].used != 0)
+      return i;
+  return i;
+}
+
 /**
  * Convert an array of words into a NTL ZZ
  * @param  a input:array of words
@@ -311,7 +330,7 @@ void Polynomial::update_device_data(){
     ////////////////////
     result = cudaMemcpyAsync(	d_bn_coefs,
                               h_bn_coefs,
-                              (deg()+1)*sizeof(bn_t),
+                             get_crt_spacing()*sizeof(bn_t),
                               cudaMemcpyHostToDevice,
                               get_stream() 
                         		);
@@ -351,14 +370,6 @@ void Polynomial::icrt(){
       );
 
   this->set_icrt_computed(true);
-}
-
-int get_used_index(bn_t *coefs,int alloc){
-  int i;
-  for(i = alloc-1; i >= 0; i--)
-    if(coefs[i].used != 0)
-      return i;
-  return i;
 }
 
 void Polynomial::update_host_data(){

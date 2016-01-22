@@ -813,10 +813,10 @@ __host__ void CUDAFunctions::init(int N){
   CUDAFunctions::N = N;
 
   #ifdef NTTMUL
-  // #ifdef VERBOSE
+  #ifdef VERBOSE
   std::cout << "Will compute W -- N = " << N << std::endl;
   std::cout << "P " << PZZ << std::endl;
-  // #endif
+  #endif
 
   cuyasheint_t *h_W;
   cuyasheint_t *h_WInv;
