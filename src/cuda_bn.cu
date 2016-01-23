@@ -511,7 +511,7 @@ __host__ __device__ cuyasheint_t bn_sub1_low(cuyasheint_t *c, const cuyasheint_t
  * @param[in] A				- the first digit to multiply.
  * @param[in] B				- the second digit to multiply.
  */
-#ifdef __CUDA_ARCH__	
+// #ifdef __CUDA_ARCH__	
 
 #define COMBA_STEP_BN_MUL_LOW(R2, R1, R0, A, B)														\
 	uint64_t rHi = __umul64hi((uint64_t)(A) , (uint64_t)(B));										\
@@ -523,19 +523,19 @@ __host__ __device__ cuyasheint_t bn_sub1_low(cuyasheint_t *c, const cuyasheint_t
 	(R1) += rHi;																					\
 	(R2) += (R1) < rHi;
 
-#else
+// #else
 
-#define COMBA_STEP_BN_MUL_LOW(R2, R1, R0, A, B)														\
-	__uint128_t r = (__uint128_t)((uint64_t)(A))*(__uint128_t)((uint64_t)(B));						\
-	uint64_t rHi = (r>>64);																			\
-	uint64_t rLo = (r&0xffffffffffffffffL);															\
-	uint64_t _r = (R1);																				\
-	(R0) += rLo;																					\
-	(R1) += (R0) < rLo;																				\
-	(R2) += (R1) < _r;																				\
-	(R1) += rHi;																					\
-	(R2) += (R1) < rHi;
-#endif							
+// #define COMBA_STEP_BN_MUL_LOW(R2, R1, R0, A, B)														\
+// 	__uint128_t r = (__uint128_t)((uint64_t)(A))*(__uint128_t)((uint64_t)(B));						\
+// 	uint64_t rHi = (r>>64);																			\
+// 	uint64_t rLo = (r&0xffffffffffffffffL);															\
+// 	uint64_t _r = (R1);																				\
+// 	(R0) += rLo;																					\
+// 	(R1) += (R0) < rLo;																				\
+// 	(R2) += (R1) < _r;																				\
+// 	(R1) += rHi;																					\
+// 	(R2) += (R1) < rHi;
+// #endif							
 
 /**
  * Accumulates a single precision digit in a triple register variable.
@@ -551,8 +551,27 @@ __host__ __device__ cuyasheint_t bn_sub1_low(cuyasheint_t *c, const cuyasheint_t
 	(R1) += (R0) < (A);														\
 	(R2) += (R1) < __r;														\
 
-__host__ __device__ void bn_muld_low(cuyasheint_t * c, const cuyasheint_t * a, int sa,
-		const cuyasheint_t * b, int sb, int l, int h) {
+/**
+ * Multiplies two digit vectors of different sizes, with sizea > sizeb. 
+ * Computes c = a * b. 
+ * 
+ * This function outputs as result only the digits between low and high,
+ * 	inclusive, with high > sizea and low < sizeb.
+ * @param c  [description]
+ * @param a  [description]
+ * @param sa [description]
+ * @param b  [description]
+ * @param sb [description]
+ * @param l  [description]
+ * @param h  [description]
+ */
+__device__ void bn_muld_low(cuyasheint_t * c, 
+							const cuyasheint_t * a, 
+							int sa,
+							const cuyasheint_t * b, 
+							int sb, 
+							int l, 
+							int h) {
 	int i, j, ta;
 	const cuyasheint_t *tmpa, *tmpb;
 	cuyasheint_t r0, r1, r2;
@@ -596,6 +615,47 @@ __host__ __device__ void bn_muld_low(cuyasheint_t * c, const cuyasheint_t * a, i
 	}
 }
 
+/**
+ * Multiplies two digit vectors of the same size. Computes c = a * b.
+ * @param c    [description]
+ * @param a    [description]
+ * @param b    [description]
+ * @param size [description]
+ */
+__device__ void bn_muln_low(cuyasheint_t *c,
+							const cuyasheint_t *a,
+							const cuyasheint_t *b,
+							int size 
+						){
+	int i, j;
+	const cuyasheint_t *tmpa, *tmpb;
+	cuyasheint_t r0, r1, r2;
+
+	r0 = r1 = r2 = 0;
+	for (i = 0; i < size; i++, c++) {
+		tmpa = a;
+		tmpb = b + i;
+		for (j = 0; j <= i; j++, tmpa++, tmpb--) {
+			COMBA_STEP_BN_MUL_LOW(r2, r1, r0, *tmpa, *tmpb);
+		}
+		*c = r0;
+		r0 = r1;
+		r1 = r2;
+		r2 = 0;
+	}
+	for (i = 0; i < size; i++, c++) {
+		tmpa = a + i + 1;
+		tmpb = b + (size - 1);
+		for (j = 0; j < size - (i + 1); j++, tmpa++, tmpb--) {
+			COMBA_STEP_BN_MUL_LOW(r2, r1, r0, *tmpa, *tmpb);
+		}
+		*c = r0;
+		r0 = r1;
+		r1 = r2;
+		r2 = 0;
+	}
+
+}
 
 /**
  * [bn_mod_barrt description]

@@ -66,6 +66,11 @@ class CUDAFunctions{
                                             cuyasheint_t *integer_array,
                                             const int N,
                                             const int NPolis);
+    static void callPolynomialOPDigit( const int opcode,
+                                            cudaStream_t stream,
+                                            bn_t *a,
+                                            bn_t digit,
+                                            const int N);
     static cuyasheint_t* callRealignCRTResidues(cudaStream_t stream,
                                             int oldSpacing,
                                             int newSpacing,

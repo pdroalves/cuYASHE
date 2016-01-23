@@ -2,7 +2,10 @@
 #define INTEGER_H
 
 #include <NTL/ZZ.h>
-#include "polynomial.h"
+#include "cuda_bn.h"
+// #include "polynomial.h"
+class Polynomial;
+void get_words(bn_t *a, ZZ b);
 
 class Integer{
 	public:
@@ -82,17 +85,14 @@ class Integer{
 		Polynomial operator*(Polynomial &a);
 		void set_value(ZZ a){
 			value = a;
+			get_words(&digits,a);
 
 			this->set_crt_computed(false);
-	        this->set_icrt_computed(false);
+	        this->set_icrt_computed(true);
 			this->set_host_updated(true);
 		}
 		void set_value(cuyasheint_t a){
-			value = to_ZZ(a);
-
-	        this->set_icrt_computed(false);
-	        this->set_icrt_computed(false);
-			this->set_host_updated(true);
+			this->set_value(to_ZZ(a));
 		}
 		ZZ get_value(){
 			if(!this->get_host_updated())
@@ -172,27 +172,7 @@ class Integer{
 	      return this->ICRT_COMPUTED;
 	    }
 
-		void crt(){
-			// Escapes, if possible
-
-			if(this->get_crt_computed())
-			  return;
-			else if(!this->get_host_updated())
-			  throw "host is not updated";
-
-			// Set the quantity of expected residues
-			std::vector<cuyasheint_t> P = Polynomial::CRTPrimes;
-			this->crt_values.resize(P.size());
-
-			// We pick each prime
-			// #pragma omp parallel for  
-			for(unsigned int i = 0; i < P.size();i++)
-		    	crt_values[i] = conv<cuyasheint_t>(value % P[i]);
-			  	
-
-			this->set_crt_residues_computed(false);
-			this->set_crt_computed(true);
-		}
+		void crt();
 		void icrt();
 		cuyasheint_t* get_device_crt_residues(){
 			if(!this->get_crt_computed())
@@ -211,6 +191,8 @@ class Integer{
 		ZZ value;
 		std::vector<cuyasheint_t> crt_values;
 		cuyasheint_t *d_crt_values;
+
+		bn_t digits;
 };
 
 #endif

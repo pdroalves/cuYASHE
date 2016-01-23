@@ -13,7 +13,7 @@
 #include "cuda_bn.h"
 #include "settings.h"
 #include "common.h"
-// #include "integer.h"
+#include "integer.h"
 
 NTL_CLIENT
 
@@ -391,11 +391,9 @@ class Polynomial{
     }
     Polynomial operator+(ZZ b){
       Polynomial p(*this);
-      if(!this->get_host_updated()){
-        // Convert to polynomial and send to device
-        Polynomial B(this->get_mod(),this->get_phi(),this->get_crt_spacing());
-        B.set_coeff(0,b);
-        return p+B;
+      if(this->get_icrt_computed()){
+        Integer I = Integer(b);
+        return I+p;
       }else{
         p.set_coeff(0,p.get_coeff(0)+b);
         p.set_crt_computed(false);
@@ -528,7 +526,6 @@ class Polynomial{
       *this /= ZZ(b);
       return *this;
     }
-
     bool operator==(Polynomial b){
       if(!this->get_host_updated())
           this->update_host_data();

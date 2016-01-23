@@ -1,3 +1,4 @@
+#include "polynomial.h"
 #include "integer.h"
 #include "cuda_functions.h"
 
@@ -58,6 +59,28 @@ void Integer::update_host_data(){
     this->icrt();
 }
 
+void Integer::crt(){
+      // Escapes, if possible
+
+      if(this->get_crt_computed())
+        return;
+      else if(!this->get_host_updated())
+        throw "host is not updated";
+
+      // Set the quantity of expected residues
+      std::vector<cuyasheint_t> P = Polynomial::CRTPrimes;
+      this->crt_values.resize(P.size());
+
+      // We pick each prime
+      // #pragma omp parallel for  
+      for(unsigned int i = 0; i < P.size();i++)
+          crt_values[i] = conv<cuyasheint_t>(value % P[i]);
+          
+
+      this->set_crt_residues_computed(false);
+      this->set_crt_computed(true);
+    }
+
 void Integer::icrt(){
 
   // Escapes, if possible
@@ -94,58 +117,82 @@ void Integer::icrt(){
 }
 
 Polynomial Integer::operator+(Polynomial &a){
-    Polynomial *p;
-    p = new Polynomial();
-    p->copy(a);
+  Polynomial p = Polynomial(a);
+  if(a.get_icrt_computed()){
+    assert(p.get_crt_computed());
+    assert(p.d_bn_coefs);
+    CUDAFunctions::callPolynomialOPDigit( ADD,
+                                        p.get_stream(),
+                                        p.d_bn_coefs,
+                                        this->digits,
+                                        p.deg()+1);
+    p.set_crt_computed(false);
+    p.set_host_updated(false);
+  }
+  else{
     CUDAFunctions::callPolynomialOPInteger( ADD,
-                                            p->get_stream(),
-                                            p->get_device_crt_residues(),
+                                            p.get_stream(),
+                                            p.get_device_crt_residues(),
                                             this->get_device_crt_residues(),
-                                            p->get_crt_spacing(),
-                                            Polynomial::CRTPrimes.size());
-    return p;
+                                            p.get_crt_spacing(),
+                                            Polynomial::CRTPrimes.size());   
+  }
+  return p;
 }
 
 Polynomial Integer::operator*(Polynomial &a){
+  Polynomial *p = new Polynomial(a);
 
   // Apply CRT and copy data to global memory, if needed
-  // #pragma omp parallel sections num_threads(2)
-  {
-      // #pragma omp section
-      {
-        #ifdef VERBOSE
-          std::cout << "this: " << std::endl;
-          #endif
-        if(!a.get_crt_computed()){
-          a.update_device_data();
-        }
+  if(get_crt_computed()){
+    // #pragma omp parallel sections num_threads(2)
+    {
+        // #pragma omp section
+        {
+          #ifdef VERBOSE
+            std::cout << "this: " << std::endl;
+            #endif
+          if(!a.get_crt_computed()){
+            a.update_device_data();
+          }
 
-      }
-      // #pragma omp section
-      {
-        #ifdef VERBOSE
-          std::cout << "b: " << std::endl;
-          #endif
-          if(!this->get_crt_computed()){
-          this->update_device_data();
         }
-      }
+        // #pragma omp section
+        {
+          #ifdef VERBOSE
+            std::cout << "b: " << std::endl;
+            #endif
+            if(!this->get_crt_computed()){
+            this->update_device_data();
+          }
+        }
+    }
+
+    cuyasheint_t *result = CUDAFunctions::callPolynomialOPInteger( MUL,
+                                            a.get_stream(),
+                                            a.get_device_crt_residues(),
+                                            this->get_device_crt_residues(),
+                                            a.get_crt_spacing(),
+                                            Polynomial::CRTPrimes.size());
+
+    p->set_device_crt_residues(result);
+    p->set_host_updated(false);
+    p->set_icrt_computed(false);
+    p->set_crt_computed(true);
+      
+  }else if (get_icrt_computed()){
+    assert(p->get_icrt_computed());
+    assert(p->d_bn_coefs);
+    CUDAFunctions::callPolynomialOPDigit( MUL,
+                                        p->get_stream(),
+                                        p->d_bn_coefs,
+                                        this->digits,
+                                        p->deg()+1);
+    p->set_crt_computed(false);
+    p->set_host_updated(false);
+  }else{
+    throw "Don't know how to multiply";
   }
-
-  cuyasheint_t *result = CUDAFunctions::callPolynomialOPInteger( MUL,
-                                          a.get_stream(),
-                                          a.get_device_crt_residues(),
-                                          this->get_device_crt_residues(),
-                                          a.get_crt_spacing(),
-                                          Polynomial::CRTPrimes.size());
-
-  Polynomial *p = new Polynomial();
-  p->update_crt_spacing(a.get_crt_spacing());
-  p->set_device_crt_residues(result);
-
-  p->set_host_updated(false);
-  p->set_icrt_computed(false);
-  p->set_crt_computed(true);
 
   *(p) %= a.get_mod();
   return p;

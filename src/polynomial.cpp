@@ -61,11 +61,11 @@ Polynomial Polynomial::operator*(Polynomial &b){
 
 Polynomial Polynomial::operator*(ZZ b){
       Polynomial p(*this);
-      if(!p.get_host_updated()){
+      if(p.get_crt_computed() || get_icrt_computed()){
         // Operate on device
         Integer I = b;
         return I*p;
-        }else{
+      }else{
 
         for(int i = 0; i <= p.deg();i++)
           p.set_coeff(i,p.get_coeff(i)*b);

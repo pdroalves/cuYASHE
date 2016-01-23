@@ -500,18 +500,12 @@ __global__ void polynomialOPInteger(const int opcode,
       if(cid == 0)
         output[tid] = a[tid] - integer_array[rid];
       break;
-    case DIV:
-        output[tid] = a[tid] / integer_array[rid];
-      break;
     case MUL:
         output[tid] = a[tid] * integer_array[rid];
       break;
-    case MOD:
-        output[tid] = a[tid] % integer_array[rid];
-      break;
     default:
-      //This case shouldn't be used. I will use 42 to recognize if we got in this case.
-      output[tid] = 42;
+      //This case shouldn't be used. 
+      assert(1 == 0);
       break;
     }
   }
@@ -534,7 +528,7 @@ __host__ cuyasheint_t* CUDAFunctions::callPolynomialOPInteger(const int opcode,
 
   cuyasheint_t *d_pointer;
   cudaError_t result = cudaMalloc((void**)&d_pointer,
-                                  N*NPolis*sizeof(cuyasheint_t));        
+                                  size*sizeof(cuyasheint_t));        
   assert(result == cudaSuccess);
 
   polynomialOPInteger<<< gridDim,blockDim, 1, stream>>> ( opcode,
@@ -547,6 +541,73 @@ __host__ cuyasheint_t* CUDAFunctions::callPolynomialOPInteger(const int opcode,
 
   return d_pointer;
 }
+
+__global__ void polynomialOPDigit(const int opcode,
+                                      bn_t *a,
+                                      const bn_t digit,
+                                      const int N
+                                  ){
+
+  // We have one thread per polynomial coefficient on 32 threads-block.
+  const int size = N;
+  const int tid = threadIdx.x + blockDim.x*blockIdx.x;
+  int nwords = 0;
+  cuyasheint_t carry = 0;
+
+  if(tid < size ){
+      // Coalesced access to global memory. Doing this way we reduce required bandwich.
+    switch(opcode)
+    {
+    case ADD:
+      if(tid == 0){
+
+        nwords = max_d(a[tid].used,digit.used);
+        carry = bn_addn_low(a[tid].dp, a[tid].dp, digit.dp,nwords);
+        a[tid].used = nwords;
+
+        /* Equivalent to "If has a carry, add as last word" */
+        a[tid].dp[a[tid].used] = carry;
+        a[tid].used += (carry > 0);
+      }
+      break;
+    case MUL:
+      assert(a[tid].alloc >= STD_BNT_WORDS_ALLOC);
+      assert(digit.alloc >= STD_BNT_WORDS_ALLOC);
+
+      bn_muln_low(a[tid].dp,
+                  a[tid].dp,
+                  digit.dp,
+                  STD_BNT_WORDS_ALLOC);
+      break;
+    default:
+      //This case shouldn't be used. 
+      assert(1 == 0);
+      break;
+    }
+  }
+
+}
+
+__host__ void CUDAFunctions::callPolynomialOPDigit( const int opcode,
+                                                            cudaStream_t stream,
+                                                            bn_t *a,
+                                                            bn_t digit,
+                                                            const int N){
+    // This method applies a 0-degree operation over all coeficients
+  const int size = N;
+
+  const int ADDGRIDXDIM = (size%ADDBLOCKXDIM == 0? size/ADDBLOCKXDIM : size/ADDBLOCKXDIM + 1);
+  const dim3 gridDim(ADDGRIDXDIM);
+  const dim3 blockDim(ADDBLOCKXDIM);
+
+  polynomialOPDigit<<< gridDim,blockDim, 1, stream>>> ( opcode,
+                                                        a,
+                                                        digit,
+                                                        N);
+  assert(cudaGetLastError() == cudaSuccess);
+  return;
+}
+
 
 __host__ cuyasheint_t* CUDAFunctions::callPolynomialMul(cudaStream_t stream,
                                                         cuyasheint_t *a,
