@@ -323,6 +323,7 @@ int main(int argc,char* argv[]){
       b.set_icrt_computed(false);
       result = cudaDeviceSynchronize();
       assert(result == cudaSuccess);
+      // c.release();
     }
     clock_gettime( CLOCK_REALTIME, &stop);
     diff = compute_time_ms(start,stop)/N;
@@ -349,6 +350,7 @@ int main(int argc,char* argv[]){
       Polynomial c = (a+b);
       result = cudaDeviceSynchronize();
       assert(result == cudaSuccess);
+      // c.release();
     }
     clock_gettime( CLOCK_REALTIME, &stop);
     diff = compute_time_ms(start,stop)/N;
@@ -374,6 +376,7 @@ int main(int argc,char* argv[]){
       b.set_icrt_computed(false);
       result = cudaDeviceSynchronize();
       assert(result == cudaSuccess);
+      // c.release();
     }
     clock_gettime( CLOCK_REALTIME, &stop);
     diff = compute_time_ms(start,stop)/N;
@@ -399,6 +402,7 @@ int main(int argc,char* argv[]){
       Polynomial c = (a*b);
       result = cudaDeviceSynchronize();
       assert(result == cudaSuccess);
+      // c.release();
     }
     clock_gettime( CLOCK_REALTIME, &stop);
     diff = compute_time_ms(start,stop)/N;
@@ -415,6 +419,4 @@ int main(int argc,char* argv[]){
   }
 
   result = cudaDeviceReset();
-  assert(result == cudaSuccess);
-
-}
+  assert(result == cudaS

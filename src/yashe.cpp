@@ -107,9 +107,13 @@ Ciphertext Yashe::encrypt(Polynomial m){
   #ifdef DEBUG
   std::cout << "delta: "<< delta.get_value() <<std::endl;
   #endif
-
-  Polynomial ps = xerr.get_sample(phi.deg()-1);
-  Polynomial e = xerr.get_sample(phi.deg()-1);
+  struct timespec start,stop;
+  clock_gettime( CLOCK_REALTIME, &start);
+  Polynomial ps = xerr.get_sample(2*(phi.deg()-1));
+  Polynomial e = xerr.get_sample(2*(phi.deg()-1));
+  clock_gettime( CLOCK_REALTIME, &stop);
+  float diff = compute_time_ms(start,stop);
+  // std::cout << "sampling: " << diff << std::endl;
 
   #ifdef DEBUG
   std::cout << "ps: "<< ps.to_string() <<std::endl;
@@ -121,7 +125,6 @@ Ciphertext Yashe::encrypt(Polynomial m){
   Polynomial mdelta = delta*m;
   p += mdelta;
   p.reduce();
-  p %= q;
 
 
   // std::cout << "phi.deg() " << phi.deg() << std::endl;

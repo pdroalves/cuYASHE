@@ -1003,37 +1003,37 @@ class Polynomial{
          * Update bn_coefs
          */
         // #warning memory leak here
-       // try{
-       //  if(d_bn_coefs){
-       //    result = cudaFree(d_bn_coefs);
-       //    d_bn_coefs = 0x0;
-       //    if(result != cudaSuccess)
-       //      throw  cudaGetErrorString(result);
-       //  }
-       // }catch(const char* s){
-       //  std::cerr << "Exception on release of d_bn_coefs: " << s << std::endl;
-       //  cudaGetLastError();// Reset
-       // }
+       try{
+        if(d_bn_coefs){
+          result = cudaFree(d_bn_coefs);
+          d_bn_coefs = 0x0;
+          if(result != cudaSuccess)
+            throw  cudaGetErrorString(result);
+        }
+       }catch(const char* s){
+        std::cerr << "Exception on release of d_bn_coefs: " << s << std::endl;
+        cudaGetLastError();// Reset
+       }
 
-       // try{
-       //  if(d_polyCRT){
-       //    // result = cudaFree(d_polyCRT);
-       //    d_polyCRT = 0x0;
-       //    if(result != cudaSuccess)
-       //      throw  cudaGetErrorString(result);
-       //  }
-       // }catch(const char* s){
-       //  std::cerr << "Exception on release of d_polyCRT: " << s << std::endl;
-       //  cudaGetLastError();// Reset
-       // } 
-       // try{
-       //  if(h_bn_coefs){
-       //    free(h_bn_coefs);
-       //    h_bn_coefs = 0x0;
-       //  }
-       // }catch(const char* s){
-       //  std::cerr << "Exception on release of h_bn_coefs: " << s << std::endl;
-       // }
+       try{
+        if(d_polyCRT){
+          result = cudaFree(d_polyCRT);
+          d_polyCRT = 0x0;
+          if(result != cudaSuccess)
+            throw  cudaGetErrorString(result);
+        }
+       }catch(const char* s){
+        std::cerr << "Exception on release of d_polyCRT: " << s << std::endl;
+        cudaGetLastError();// Reset
+       } 
+       try{
+        if(h_bn_coefs){
+          free(h_bn_coefs);
+          h_bn_coefs = 0x0;
+        }
+       }catch(const char* s){
+        std::cerr << "Exception on release of h_bn_coefs: " << s << std::endl;
+       }
         
         // Alloc memory
         cuyasheint_t *tmp;
@@ -1049,7 +1049,10 @@ class Polynomial{
         result = cudaMalloc((void**)&d_polyCRT,new_spacing*(CRTPrimes.size())*sizeof(cuyasheint_t));        
         assert(result == cudaSuccess);
         result = cudaMalloc((void**)&tmp,new_spacing*STD_BNT_WORDS_ALLOC*sizeof(cuyasheint_t));        
-        assert(result == cudaSuccess);
+        if(result != cudaSuccess){
+          std::cout << "Erro! " << cudaGetErrorString(result) << std::endl;
+          exit(1);
+        }
         // tmp = &d_polyCRT[new_spacing*(CRTPrimes.size())];
 
         h_bn_coefs = (bn_t*)malloc(new_spacing*sizeof(bn_t));
