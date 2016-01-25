@@ -419,4 +419,6 @@ int main(int argc,char* argv[]){
   }
 
   result = cudaDeviceReset();
-  assert(result == cudaS
+  assert(result == cudaSuccess);
+
+}

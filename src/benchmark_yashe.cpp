@@ -156,7 +156,7 @@ int main(int argc, char* argv[]){
       std::cout << "Keys generated in " << compute_time_ms(start,stop) << " ms." << std::endl;
 
     Ciphertext c;
-    Polynomial a;
+    Polynomial a(2*d);
     a.set_coeff(0,rand());
         
     clock_gettime( CLOCK_REALTIME, &start);

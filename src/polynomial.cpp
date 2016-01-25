@@ -59,23 +59,6 @@ Polynomial Polynomial::operator*(Polynomial &b){
   return p;
 }
 
-Polynomial Polynomial::operator*(ZZ b){
-      Polynomial p(*this);
-      if(p.get_crt_computed() || get_icrt_computed()){
-        // Operate on device
-        Integer I = b;
-        return I*p;
-      }else{
-
-        for(int i = 0; i <= p.deg();i++)
-          p.set_coeff(i,p.get_coeff(i)*b);
-        p.set_crt_computed(false);
-        p.set_icrt_computed(false);
-        p.set_host_updated(true);
-      }
-      return p;
-    }
-
 void Polynomial::operator delete(void *ptr){
   Polynomial *p = (Polynomial*)ptr;
 
@@ -349,6 +332,7 @@ void Polynomial::update_device_data(){
    */
   if(h_data)
     free(h_data);
+  h_data = 0x0;
   
   this->ON_COPY = false;
   this->set_crt_computed(true);
@@ -412,7 +396,7 @@ void Polynomial::update_host_data(){
     result = cudaMemcpy(aux,h_bn_coefs[0].dp,STD_BNT_WORDS_ALLOC*used_coefs*sizeof(cuyasheint_t),cudaMemcpyDeviceToHost);
 
     this->set_coeffs(used_coefs);
-    // #pragma omp parallel for
+    #pragma omp parallel for
     for(int i = 0; i < used_coefs; i++){
       bn_t bn_coef;
       bn_coef.used = h_bn_coefs[i].used;
@@ -429,7 +413,7 @@ void Polynomial::update_host_data(){
     
     this->set_host_updated(true);
 
-    normalize();
+    // normalize();
 }
 
 void Polynomial::DivRem(Polynomial a,Polynomial b,Polynomial &quot,Polynomial &rem){

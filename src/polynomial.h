@@ -208,15 +208,29 @@ class Polynomial{
       #endif
     }
     Polynomial(Polynomial *b){
-      #ifdef VERBOSE
-      std::cout << "Building a polynomial" << std::endl;
-      #endif
-      cudaStreamCreate(&this->stream);
+      /////////////////////////////
+      // Doesn't duplicate data //
+      /////////////////////////////
+      ///
+      this->stream = b->get_stream();
 
-      // Copy
-      this->copy(*b);
+      this->CRTSPACING = b->get_crt_spacing();
+      this->d_bn_coefs = b->d_bn_coefs;
+      this->h_bn_coefs = b->h_bn_coefs;
+      this->d_polyCRT = b->d_polyCRT;
+
+      this->set_crt_computed(b->get_crt_computed());
+      this->set_icrt_computed(b->get_icrt_computed());
+      this->set_host_updated(b->get_host_updated());
+
+      if(b->get_host_updated())
+        set_coeffs(b->get_coeffs());
+
     }
     void copy(Polynomial b){
+      ///////////////////////////
+      // Duplicates everything //
+      ///////////////////////////
       #ifdef VERBOSE
       // cuyasheint_t start,stop;
       // start = polynomial_get_cycles();
@@ -281,6 +295,22 @@ class Polynomial{
         #endif
         return *this;
     }
+        // Polynomial operator=(Polynomial b){//Copy
+    //     this->stream = b.get_stream();
+
+    //     this->CRTSPACING = b.get_crt_spacing();
+    //     this->d_bn_coefs = b.d_bn_coefs;
+    //     this->h_bn_coefs = b.h_bn_coefs;
+    //     this->d_polyCRT = b.d_polyCRT;
+
+    //     this->set_crt_computed(b.get_crt_computed());
+    //     this->set_icrt_computed(b.get_icrt_computed());
+    //     this->set_host_updated(b.get_host_updated());
+
+    //     if(b.get_host_updated())
+    //       set_coeffs(b.get_coeffs());
+    //     return *this;
+    // }
     Polynomial operator+(Polynomial &b);
     Polynomial operator+=(Polynomial &b);
     Polynomial operator-(Polynomial &b){
@@ -329,7 +359,44 @@ class Polynomial{
       return c;
     }
     Polynomial operator-=(Polynomial &b){
-      this->copy( ((*this)-b));
+      // Check align
+      if(this->CRTSPACING != b.CRTSPACING){
+        int new_spacing = std::max(this->CRTSPACING,b.CRTSPACING);
+        this->update_crt_spacing(new_spacing);
+        b.update_crt_spacing(new_spacing);
+      }
+
+      #ifdef VERBOSE
+      std::cout << "Sub:" << std::endl;
+      #endif
+
+      // Apply CRT and copy data to global memory, if needed
+      // #pragma omp parallel sections
+      {
+          // #pragma omp section
+          {
+
+              if(!this->get_crt_computed())
+                this->update_device_data();
+          }
+          // #pragma omp section
+          {
+              if(!b.get_crt_computed())
+                  b.update_device_data();
+          }
+      }
+
+      CUDAFunctions::callPolynomialAddSub(this->get_device_crt_residues(),
+                                          this->get_device_crt_residues(),
+                                          b.get_device_crt_residues(),
+                                          (int)(this->CRTSPACING*Polynomial::CRTPrimes.size()),
+                                          SUB,
+                                          this->stream);
+
+      this->set_host_updated(false);
+      this->set_icrt_computed(false);
+      this->set_crt_computed(true);
+      // cudaDeviceSynchronize();
       return this;
     }
     Polynomial operator*(Polynomial &b);
@@ -390,40 +457,118 @@ class Polynomial{
       return this;
     }
     Polynomial operator+(ZZ b){
-      Polynomial p(*this);
-      if(this->get_icrt_computed()){
-        Integer I = Integer(b);
-        return I+p;
+      if(this->get_crt_computed() || this->get_icrt_computed()){
+        return Integer(b)+(*this);
       }else{
+        Polynomial p(*this);
         p.set_coeff(0,p.get_coeff(0)+b);
         p.set_crt_computed(false);
         return p;
       }
     }
     Polynomial operator+=(ZZ b){
-      this->copy(((*this)+b));
+      Integer B(b);
+
+      if(this->get_icrt_computed()){
+        assert(this->get_crt_computed());
+        assert(this->d_bn_coefs);
+        CUDAFunctions::callPolynomialOPDigit( ADD,
+                                            this->get_stream(),
+                                            this->d_bn_coefs,
+                                            B.get_digits(),
+                                            this->deg()+1);
+        this->set_crt_computed(false);
+        this->set_host_updated(false);
+      }else if(this->get_crt_computed()){
+        CUDAFunctions::callPolynomialOPInteger( ADD,
+                                                this->get_stream(),
+                                                this->get_device_crt_residues(),
+                                                B.get_device_crt_residues(),
+                                                this->get_crt_spacing(),
+                                                Polynomial::CRTPrimes.size());   
+        this->set_host_updated(false);
+      }else{
+        assert(this->get_host_updated());  
+        this->set_coeff(0,this->get_coeff(0)-b);
+      }
       return *this;
     }
     Polynomial operator-(ZZ b){
-      Polynomial p(*this);
-      if(!this->get_host_updated()){
-        // Convert to polynomial and send to device
-        Polynomial B(this->get_mod(),this->get_phi(),this->get_crt_spacing());
-        B.set_coeff(0,b);
-        return p-B;
+     if(this->get_crt_computed() || this->get_icrt_computed()){
+        return Integer(b)-(*this);
       }else{
+        Polynomial p(*this);
         p.set_coeff(0,p.get_coeff(0)-b);
         p.set_crt_computed(false);
         return p;
       }
     }
     Polynomial operator-=(ZZ b){
-      this->copy(((*this)-b));
+      Integer B(b);
+
+      if(this->get_icrt_computed()){
+        assert(this->d_bn_coefs);
+        CUDAFunctions::callPolynomialOPDigit( SUB,
+                                            this->get_stream(),
+                                            this->d_bn_coefs,
+                                            B.get_digits(),
+                                            this->deg()+1);
+        this->set_crt_computed(false);
+        this->set_host_updated(false);
+      }else if(this->get_crt_computed()){
+        assert(this->d_polyCRT);
+        CUDAFunctions::callPolynomialOPInteger( SUB,
+                                                this->get_stream(),
+                                                this->get_device_crt_residues(),
+                                                B.get_device_crt_residues(),
+                                                this->get_crt_spacing(),
+                                                Polynomial::CRTPrimes.size());   
+        this->set_host_updated(false);
+      }else{
+        assert(this->get_host_updated());  
+        this->set_coeff(0,this->get_coeff(0)-b);
+      }
       return *this;
     }
-    Polynomial operator*(ZZ b);
+    Polynomial operator*(ZZ b){
+      if(this->get_crt_computed() || this->get_icrt_computed()){
+        // Operate on device
+        return Integer(b)*(*this);
+      }else{
+        Polynomial p(*this);
+        for(int i = 0; i <= p.deg();i++)
+          p.set_coeff(i,p.get_coeff(i)*b);
+        p.set_crt_computed(false);
+        p.set_icrt_computed(false);
+        p.set_host_updated(true);
+        return p;
+      }
+    }
     Polynomial operator*=(ZZ b){
-      this->copy(((*this)*b));
+      Integer B(b);
+
+      if(this->get_icrt_computed()){
+        assert(this->get_crt_computed());
+        assert(this->d_bn_coefs);
+        CUDAFunctions::callPolynomialOPDigit( MUL,
+                                            this->get_stream(),
+                                            this->d_bn_coefs,
+                                            B.get_digits(),
+                                            this->deg()+1);
+        this->set_crt_computed(false);
+        this->set_host_updated(false);
+      }else if(this->get_crt_computed()){
+        CUDAFunctions::callPolynomialOPInteger( MUL,
+                                                this->get_stream(),
+                                                this->get_device_crt_residues(),
+                                                B.get_device_crt_residues(),
+                                                this->get_crt_spacing(),
+                                                Polynomial::CRTPrimes.size());   
+        this->set_host_updated(false);
+      }else{
+        assert(this->get_host_updated());  
+        this->set_coeff(0,this->get_coeff(0)-b);
+      }
       return *this;
     }
     Polynomial operator%(ZZ b){
@@ -446,13 +591,13 @@ class Polynomial{
       }
     }
     Polynomial operator%=(ZZ b){
-      if(!this->get_host_updated()){
-        // if(!this->get_icrt_computed())
-        //   this->icrt();
+      #warning needed until modn bug fix
+      update_host_data();
 
-        // this->modn(b);
-        // return *this;
-        update_host_data();
+      if(!this->get_host_updated()){
+        icrt();
+        modn(b);
+        return *this;                
       }
 
       // #pragma omp parallel for
@@ -898,16 +1043,20 @@ class Polynomial{
     void crt();
     void icrt();
     void modn(ZZ n){
-
       cudaError_t result;
+      
+      // Compute ICRT, if needed
+      icrt();
 
+      // Get the words
       bn_t *h_m;
       h_m = (bn_t*)malloc(sizeof(bn_t));
       h_m->alloc = 0;
       get_words(h_m,n);
-      
+        
       bn_t u = get_reciprocal(n);
 
+      // Apply the operation
       callCuModN( d_bn_coefs,
                   d_bn_coefs,
                   get_crt_spacing(),
@@ -919,6 +1068,13 @@ class Polynomial{
       result = cudaDeviceSynchronize();
       assert(result == cudaSuccess);
 
+      // Set status
+      set_host_updated(false);
+      set_crt_computed(false);
+      set_icrt_computed(true);
+
+      // Release memory
+      
       bn_free(h_m);
       free(h_m);
     }
@@ -968,15 +1124,19 @@ class Polynomial{
       }
       return true;
     }
-    void update_crt_spacing(const int new_spacing){
+    void update_crt_spacing(const int spacing){
       
       #ifdef VERBOSE
-      std::cout << "update_crt_spacing - " << new_spacing << std::endl;
+      std::cout << "update_crt_spacing - " << spacing << std::endl;
       #endif
 
-      if(new_spacing <= 0)
+      if(spacing <= 0)
         // Do nothing
         return;
+
+      int new_spacing = pow(2,ceil(log2(spacing)));
+      // int phi_spacing = pow(2,ceil(log2(Polynomial::global_phi->deg()+1)));
+      // new_spacing = std::max( new_spacing, phi_spacing);
 
       /**
        * Adjust CRTSPACING

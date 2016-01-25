@@ -65,7 +65,6 @@ void Yashe::generate_keys(){
 
   h = t*fInv*g;
   h.reduce();
-  h %= q;
   h.update_device_data();
 
   gamma.resize(lwq);
@@ -109,8 +108,12 @@ Ciphertext Yashe::encrypt(Polynomial m){
   #endif
   struct timespec start,stop;
   clock_gettime( CLOCK_REALTIME, &start);
-  Polynomial ps = xerr.get_sample(2*(phi.deg()-1));
-  Polynomial e = xerr.get_sample(2*(phi.deg()-1));
+  /** 
+   * ps will be used in a D degree multiplication, resulting in a 2*D degree polynomial
+   * e will be used in a 2*D degree addition
+   */
+  Polynomial ps = xerr.get_sample(phi.deg()-1,2*(phi.deg()-1));
+  Polynomial e = xerr.get_sample(phi.deg()-1,2*(phi.deg()-1));
   clock_gettime( CLOCK_REALTIME, &stop);
   float diff = compute_time_ms(start,stop);
   // std::cout << "sampling: " << diff << std::endl;

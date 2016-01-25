@@ -83,6 +83,8 @@ class Integer{
 		}
 		Polynomial operator+(Polynomial &a);
 		Polynomial operator*(Polynomial &a);
+		Polynomial operator-(Polynomial &a);
+		Polynomial operator-=(Polynomial &a);
 		void set_value(ZZ a){
 			value = a;
 			get_words(&digits,a);
@@ -178,6 +180,9 @@ class Integer{
 			if(!this->get_crt_computed())
 				this->update_device_data();
 			return this->d_crt_values;
+		}
+		bn_t get_digits(){
+			return digits;
 		}
 		void update_device_data();
 		void update_host_data();

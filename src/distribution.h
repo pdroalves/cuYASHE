@@ -61,8 +61,9 @@ class Distribution{
     assert(result == CURAND_STATUS_SUCCESS);
   }
   Polynomial get_sample(int degree);
+  Polynomial get_sample(int degree, int spacing);
 private:
-  void callCuGetUniformSample(cuyasheint_t *array, int N);
+  void callCuGetUniformSample(cuyasheint_t *array, bn_t *coefs, int N);
   void callCuGetNormalSample(cuyasheint_t *array, int N, float mean, float stddev);
 };
 #endif

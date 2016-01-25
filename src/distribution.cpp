@@ -1,9 +1,8 @@
 #include <assert.h>
 #include "distribution.h"
 
-Polynomial Distribution::get_sample(int degree){
-  Polynomial p;
-  p.update_crt_spacing(degree+1);
+Polynomial Distribution::get_sample(int degree,int spacing){
+  Polynomial p(spacing);
   int mod;
   int rec;
   // int phase = 0;
@@ -39,15 +38,18 @@ Polynomial Distribution::get_sample(int degree){
   * a single cudaMalloc call 
   */
  // if(kind != DISCRETE_GAUSSIAN){
-  callCuGetUniformSample(p.h_bn_coefs[0].dp, degree+1);
-  cudaError_t result = cudaDeviceSynchronize();// cuRAND doesn't use the same synchronization mechanism as others CUDAs APIs
-  assert(result == cudaSuccess);
+  callCuGetUniformSample(p.h_bn_coefs[0].dp, p.d_bn_coefs, degree+1);
+
+  p.set_icrt_computed(true);
+  p.set_crt_computed(false);
+  p.set_host_updated(false);
   
   ///////////////////////////////////////
   // Adjust to the used distribution   //
   ///////////////////////////////////////
   p %= mod;
   p -= mod/2;  
+  p.update_device_data();
  // }else{
  //  callCuGetNormalSample(p.h_bn_coefs[0].dp, degree+1, 0,(float)(3.1915382432114616));
  //  cudaError_t result = cudaDeviceSynchronize();// cuRAND doesn't use the same synchronization mechanism as others CUDAs APIs
@@ -55,4 +57,8 @@ Polynomial Distribution::get_sample(int degree){
  // }
 
   return p;
+}
+
+Polynomial Distribution::get_sample(int degree){
+  return get_sample(degree,degree+1);
 }

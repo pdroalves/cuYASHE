@@ -489,19 +489,24 @@ __global__ void polynomialOPInteger(const int opcode,
 
   if(tid < size ){
       // Coalesced access to global memory. Doing this way we reduce required bandwich.
+    cuyasheint_t operand = integer_array[rid] % CRTPrimesConstant[rid];
 
     switch(opcode)
     {
     case ADD:
       if(cid == 0)
-        output[tid] = a[tid] + integer_array[rid];
+        output[tid] = (a[tid] + operand) % CRTPrimesConstant[rid];
       break;
     case SUB:
-      if(cid == 0)
-        output[tid] = a[tid] - integer_array[rid];
+      if(cid == 0){
+        if(a[tid] > operand)
+          output[tid] = (a[tid] - operand) % CRTPrimesConstant[rid];
+        else
+          output[tid] = ((CRTPrimesConstant[rid]-operand) + a[tid]) % CRTPrimesConstant[rid];
+      }
       break;
     case MUL:
-        output[tid] = a[tid] * integer_array[rid];
+        output[tid] = (a[tid] * operand)% CRTPrimesConstant[rid];
       break;
     default:
       //This case shouldn't be used. 

@@ -140,6 +140,30 @@ Polynomial Integer::operator+(Polynomial &a){
   return p;
 }
 
+Polynomial Integer::operator-(Polynomial &a){
+  Polynomial p = Polynomial(a);
+  if(a.get_icrt_computed()){
+    assert(p.get_crt_computed());
+    assert(p.d_bn_coefs);
+    CUDAFunctions::callPolynomialOPDigit( SUB,
+                                        p.get_stream(),
+                                        p.d_bn_coefs,
+                                        this->digits,
+                                        p.deg()+1);
+    p.set_crt_computed(false);
+    p.set_host_updated(false);
+  }
+  else{
+    CUDAFunctions::callPolynomialOPInteger( SUB,
+                                            p.get_stream(),
+                                            p.get_device_crt_residues(),
+                                            this->get_device_crt_residues(),
+                                            p.get_crt_spacing(),
+                                            Polynomial::CRTPrimes.size());   
+  }
+  return p;
+}
+
 Polynomial Integer::operator*(Polynomial &a){
   Polynomial *p = new Polynomial(a);
 
