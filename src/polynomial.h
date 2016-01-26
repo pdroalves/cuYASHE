@@ -573,27 +573,15 @@ class Polynomial{
     }
     Polynomial operator%(ZZ b){
 
-      if(!this->get_host_updated()){
         Polynomial p(*this);
-        
-        p %= b;
-  
-        return p;
-      }else{
-        // Doing this, we reduce needless cycles to copy device data
-        // bool crt_residues_computed_flag = get_crt_computed();
-        // this->set_crt_computed(false);
-        Polynomial p(*this);
-        // this->set_crt_computed(crt_residues_computed_flag);
           
         p %= b;
         return p;
-      }
     }
     Polynomial operator%=(ZZ b){
-      #warning needed until modn bug fix
-      update_host_data();
-
+      // #warning needed until modn bug fix
+      // update_host_data();
+      
       if(!this->get_host_updated()){
         icrt();
         modn(b);

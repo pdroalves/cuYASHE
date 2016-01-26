@@ -9,25 +9,20 @@ Polynomial Distribution::get_sample(int degree,int spacing){
   switch(this->kind){
     case DISCRETE_GAUSSIAN:
       mod = 7;
-      rec = 49;
     break;
     case BINARY:
       mod = 2;
-      rec = 4;
     break;
     case NARROW:
       mod = 2;
-      // phase = 1;
-      rec = 4;
     break;
     default:
       mod = 100;
-      rec = 10000;
     break;
   }
 
   // for(int i = 0; i <= degree; i++)
-  //   p.set_coeff(i,(rand() % mod - mod/2) - phase);
+  //   p.set_coeff(i,(rand() % mod));
   // p %= p.get_mod();
 
   //////////////////////////////////
@@ -38,7 +33,7 @@ Polynomial Distribution::get_sample(int degree,int spacing){
   * a single cudaMalloc call 
   */
  // if(kind != DISCRETE_GAUSSIAN){
-  callCuGetUniformSample(p.h_bn_coefs[0].dp, p.d_bn_coefs, degree+1);
+  callCuGetUniformSample(p.h_bn_coefs[0].dp, p.d_bn_coefs, degree+1, mod);
 
   p.set_icrt_computed(true);
   p.set_crt_computed(false);
@@ -47,9 +42,6 @@ Polynomial Distribution::get_sample(int degree,int spacing){
   ///////////////////////////////////////
   // Adjust to the used distribution   //
   ///////////////////////////////////////
-  p %= mod;
-  p -= mod/2;  
-  p.update_device_data();
  // }else{
  //  callCuGetNormalSample(p.h_bn_coefs[0].dp, degree+1, 0,(float)(3.1915382432114616));
  //  cudaError_t result = cudaDeviceSynchronize();// cuRAND doesn't use the same synchronization mechanism as others CUDAs APIs

@@ -119,7 +119,6 @@ void Integer::icrt(){
 Polynomial Integer::operator+(Polynomial &a){
   Polynomial p = Polynomial(a);
   if(a.get_icrt_computed()){
-    assert(p.get_crt_computed());
     assert(p.d_bn_coefs);
     CUDAFunctions::callPolynomialOPDigit( ADD,
                                         p.get_stream(),

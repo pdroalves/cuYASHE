@@ -45,9 +45,9 @@ void Yashe::generate_keys(){
     std::cout << "f: " << f.to_string() << std::endl;
     #endif
     try{
-      // fInv = Polynomial::InvMod(f,phi);
+      fInv = Polynomial::InvMod(f,phi);
       // fInv.normalize();
-      fInv = f;
+      // fInv = f;
 
       break;
     } catch (exception& e)
@@ -116,7 +116,7 @@ Ciphertext Yashe::encrypt(Polynomial m){
   Polynomial e = xerr.get_sample(phi.deg()-1,2*(phi.deg()-1));
   clock_gettime( CLOCK_REALTIME, &stop);
   float diff = compute_time_ms(start,stop);
-  // std::cout << "sampling: " << diff << std::endl;
+  std::cout << "sampling: " << diff << std::endl;
 
   #ifdef DEBUG
   std::cout << "ps: "<< ps.to_string() <<std::endl;

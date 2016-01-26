@@ -159,203 +159,216 @@ int main(int argc,char* argv[]){
     // /////////////////////////////////////////////
     // CRT/ICRT
     
-    // Polynomial::random(&a,d-1);
-    // a.update_device_data();
-    // result = cudaDeviceSynchronize();
-    // assert(result == cudaSuccess);
+    Polynomial::random(&a,d-1);
+    a.update_device_data();
+    result = cudaDeviceSynchronize();
+    assert(result == cudaSuccess);
 
-    // clock_gettime( CLOCK_REALTIME, &start);
-    // for(int i = 0; i < N;i++){
-    //   a.set_crt_computed(false);
-    //   a.crt();
-    //   result = cudaDeviceSynchronize();
-    //   assert(result == cudaSuccess);
-    // }
-    // clock_gettime( CLOCK_REALTIME, &stop);
-    // diff = compute_time_ms(start,stop)/N;
-    // std::cout << "CRT) Foward: " << diff << " ms" << std::endl;
-    // crt << d << " " << diff  << std::endl;
+    clock_gettime( CLOCK_REALTIME, &start);
+    for(int i = 0; i < N;i++){
+      a.set_crt_computed(false);
+      a.crt();
+      result = cudaDeviceSynchronize();
+      assert(result == cudaSuccess);
+    }
+    clock_gettime( CLOCK_REALTIME, &stop);
+    diff = compute_time_ms(start,stop)/N;
+    std::cout << "CRT) Foward: " << diff << " ms" << std::endl;
+    crt << d << " " << diff  << std::endl;
 
-    // cudaMemGetInfo(&f, &t);
+    cudaMemGetInfo(&f, &t);
 
-    // Polynomial::random(&a,d-1);
-    // a.update_device_data();
-    // a.icrt();
-    // result = cudaDeviceSynchronize();
-    // assert(result == cudaSuccess);
+    Polynomial::random(&a,d-1);
+    a.update_device_data();
+    a.icrt();
+    result = cudaDeviceSynchronize();
+    assert(result == cudaSuccess);
 
-    // clock_gettime( CLOCK_REALTIME, &start);
-    // for(int i = 0; i < N;i++){
-    //   a.set_icrt_computed(false);
-    //   a.icrt();
-    //   result = cudaDeviceSynchronize();
-    //   assert(result == cudaSuccess);
-    // }
-    // clock_gettime( CLOCK_REALTIME, &stop);
-    // diff = compute_time_ms(start,stop)/N;
-    // std::cout << "CRT) Inverse: " << diff << " ms" << std::endl;
-    // icrt << d << " " << diff  << std::endl;
+    clock_gettime( CLOCK_REALTIME, &start);
+    for(int i = 0; i < N;i++){
+      a.set_icrt_computed(false);
+      a.icrt();
+      result = cudaDeviceSynchronize();
+      assert(result == cudaSuccess);
+    }
+    clock_gettime( CLOCK_REALTIME, &stop);
+    diff = compute_time_ms(start,stop)/N;
+    std::cout << "CRT) Inverse: " << diff << " ms" << std::endl;
+    icrt << d << " " << diff  << std::endl;
 
-    // // /////////////////////////////////////////////
-    // // update_crt_spacing
-    // clock_gettime( CLOCK_REALTIME, &start);
-    // for(int i = 0; i < N;i++){
-    //   Polynomial p;
-    //   p.update_crt_spacing(d);
-    //   result = cudaDeviceSynchronize();
-    //   assert(result == cudaSuccess);
-    // }
-    // clock_gettime( CLOCK_REALTIME, &stop);
-    // diff = compute_time_ms(start,stop)/N;
-    // std::cout << "update_crt_spacing: " << diff << " ms" << std::endl;
-    // crt << d << " " << diff  << std::endl;
+    // /////////////////////////////////////////////
+    // update_crt_spacing
+    clock_gettime( CLOCK_REALTIME, &start);
+    for(int i = 0; i < N;i++){
+      Polynomial p;
+      p.update_crt_spacing(d);
+      result = cudaDeviceSynchronize();
+      assert(result == cudaSuccess);
+    }
+    clock_gettime( CLOCK_REALTIME, &stop);
+    diff = compute_time_ms(start,stop)/N;
+    std::cout << "update_crt_spacing: " << diff << " ms" << std::endl;
+    crt << d << " " << diff  << std::endl;
 
-    // // update_device_data
-    // Polynomial::random(&a,d-1);
-    // clock_gettime( CLOCK_REALTIME, &start);
-    // for(int i = 0; i < N;i++){
-    //   a.update_device_data();
+    // update_device_data
+    Polynomial::random(&a,d-1);
+    clock_gettime( CLOCK_REALTIME, &start);
+    for(int i = 0; i < N;i++){
+      a.update_device_data();
       
-    //   result = cudaDeviceSynchronize();
-    //   assert(result == cudaSuccess);
-    //   a.set_crt_computed(false);
-    //   a.set_icrt_computed(false);
-    // }
-    // clock_gettime( CLOCK_REALTIME, &stop);
-    // diff = compute_time_ms(start,stop)/N;
-    // std::cout << "update_device_data: " << diff << " ms" << std::endl;
-    // crt << d << " " << diff  << std::endl;
+      result = cudaDeviceSynchronize();
+      assert(result == cudaSuccess);
+      a.set_crt_computed(false);
+      a.set_icrt_computed(false);
+    }
+    clock_gettime( CLOCK_REALTIME, &stop);
+    diff = compute_time_ms(start,stop)/N;
+    std::cout << "update_device_data: " << diff << " ms" << std::endl;
+    crt << d << " " << diff  << std::endl;
 
-    // // update_host_data
-    // Polynomial::random(&a,d-1);
-    // a.update_device_data();
-    // a.set_host_updated(false);
-    // a.icrt();
-    // clock_gettime( CLOCK_REALTIME, &start);
-    // for(int i = 0; i < N;i++){
-    //   a.update_host_data();
+    // update_host_data
+    Polynomial::random(&a,d-1);
+    a.update_device_data();
+    a.set_host_updated(false);
+    a.icrt();
+    clock_gettime( CLOCK_REALTIME, &start);
+    for(int i = 0; i < N;i++){
+      a.update_host_data();
 
-    //   result = cudaDeviceSynchronize();
-    //   assert(result == cudaSuccess);
-    //   a.set_host_updated(false);
-    // }
-    // clock_gettime( CLOCK_REALTIME, &stop);
-    // diff = compute_time_ms(start,stop)/N;
-    // std::cout << "update_host_data: " << diff << " ms" << std::endl;
-    // crt << d << " " << diff  << std::endl;
-    // // /////////////////////////////////////////////
+      result = cudaDeviceSynchronize();
+      assert(result == cudaSuccess);
+      a.set_host_updated(false);
+    }
+    clock_gettime( CLOCK_REALTIME, &stop);
+    diff = compute_time_ms(start,stop)/N;
+    std::cout << "update_host_data: " << diff << " ms" << std::endl;
+    crt << d << " " << diff  << std::endl;
+    // /////////////////////////////////////////////
 
 
-    // Polynomial::random(&a,d-1);
-    // a.update_device_data();
-    // clock_gettime( CLOCK_REALTIME, &start);
-    // for(int i = 0; i < N;i++){
-    //   a.reduce();
-    //   result = cudaDeviceSynchronize();
-    //   assert(result == cudaSuccess);
-    // }
-    // clock_gettime( CLOCK_REALTIME, &stop);
-    // diff = compute_time_ms(start,stop)/N;
-    // std::cout << "Reduce) GPU: " << diff << " ms" << std::endl;
-    // gpu_reduce << d << " " << diff  << std::endl;
+    Polynomial::random(&a,d-1);
+    a.update_device_data();
+    clock_gettime( CLOCK_REALTIME, &start);
+    for(int i = 0; i < N;i++){
+      a.reduce();
+      result = cudaDeviceSynchronize();
+      assert(result == cudaSuccess);
+    }
+    clock_gettime( CLOCK_REALTIME, &stop);
+    diff = compute_time_ms(start,stop)/N;
+    std::cout << "Reduce) GPU: " << diff << " ms" << std::endl;
+    gpu_reduce << d << " " << diff  << std::endl;
 
-    // cudaMemGetInfo(&f, &t);
-    // // cout << "Free memory: " << f/(1024*1024) << std::endl;
-    // // std::cout << "Press Enter to Continue" << std::endl;
-    // //cin.ignore();
+    cudaMemGetInfo(&f, &t);
+    // cout << "Free memory: " << f/(1024*1024) << std::endl;
+    // std::cout << "Press Enter to Continue" << std::endl;
+    //cin.ignore();
 
-    // a.update_host_data();
-    // a.set_crt_computed(false);
-    // a.set_icrt_computed(false);
-    // clock_gettime( CLOCK_REALTIME, &start);
-    // for(int i = 0; i < N;i++){
-    //   a.reduce();
-    //   result = cudaDeviceSynchronize();
-    //   a.set_crt_computed(false);
-    //   a.set_icrt_computed(false);
-    //   assert(result == cudaSuccess);
-    // }
-    // clock_gettime( CLOCK_REALTIME, &stop);
-    // diff = compute_time_ms(start,stop)/N;
-    // std::cout << "Reduce) CPU: " << diff << " ms" << std::endl;
-    // cpu_reduce << d << " " << diff  << std::endl;
+    a.update_host_data();
+    a.set_crt_computed(false);
+    a.set_icrt_computed(false);
+    clock_gettime( CLOCK_REALTIME, &start);
+    for(int i = 0; i < N;i++){
+      a.reduce();
+      result = cudaDeviceSynchronize();
+      a.set_crt_computed(false);
+      a.set_icrt_computed(false);
+      assert(result == cudaSuccess);
+    }
+    clock_gettime( CLOCK_REALTIME, &stop);
+    diff = compute_time_ms(start,stop)/N;
+    std::cout << "Reduce) CPU: " << diff << " ms" << std::endl;
+    cpu_reduce << d << " " << diff  << std::endl;
 
-    // cudaMemGetInfo(&f, &t);
-    // // cout << "Free memory: " << f/(1024*1024) << std::endl;
-    // // std::cout << "Press Enter to Continue" << std::endl;
-    // // cin.ignore();
+    cudaMemGetInfo(&f, &t);
+    // cout << "Free memory: " << f/(1024*1024) << std::endl;
+    // std::cout << "Press Enter to Continue" << std::endl;
+    // cin.ignore();
 
-    // a.update_host_data();
-    // a.set_crt_computed(false);
-    // a.set_icrt_computed(false);
-    // clock_gettime( CLOCK_REALTIME, &start);
-    // for(int i = 0; i < N;i++){
-    //   a %= q;
-    // }
-    // clock_gettime( CLOCK_REALTIME, &stop);
-    // diff = compute_time_ms(start,stop)/N;
-    // std::cout << "%q): " << diff << " ms" << std::endl;
-    // modq << d << " " << diff  << std::endl;
+    a.update_host_data();
+    a.set_crt_computed(false);
+    a.set_icrt_computed(false);
+    clock_gettime( CLOCK_REALTIME, &start);
+    for(int i = 0; i < N;i++){
+      a %= q;
+    }
+    clock_gettime( CLOCK_REALTIME, &stop);
+    diff = compute_time_ms(start,stop)/N;
+    std::cout << "%q on host): " << diff << " ms" << std::endl;
+    modq << d << " " << diff  << std::endl;
 
-    // cudaMemGetInfo(&f, &t);
-    // // cout << "Free memory: " << f/(1024*1024) << std::endl;
-    // // std::cout << "Press Enter to Continue" << std::endl;
-    // //cin.ignore();
+    cudaMemGetInfo(&f, &t);
+    // cout << "Free memory: " << f/(1024*1024) << std::endl;
+    // std::cout << "Press Enter to Continue" << std::endl;
+    //cin.ignore();
+    
+    a.update_device_data();
+    a.set_host_updated(false);
+    a.set_crt_computed(true);
+    a.set_icrt_computed(true);
+    clock_gettime( CLOCK_REALTIME, &start);
+    for(int i = 0; i < N;i++){
+      a %= q;
+    }
+    clock_gettime( CLOCK_REALTIME, &stop);
+    diff = compute_time_ms(start,stop)/N;
+    std::cout << "%q on device): " << diff << " ms" << std::endl;
+    modq << d << " " << diff  << std::endl;
 
     
-    // ///////////////////////////////////////////////
-    // // ADD
+    ///////////////////////////////////////////////
+    // ADD
     
-    // ////////////////////////////////////
-    // // Time measured with memory copy //
-    // ////////////////////////////////////
-    // Polynomial::random(&a,d-1);
-    // Polynomial::random(&b,d-1);
-    // // std::cout << a.to_string() << std::endl;       
+    ////////////////////////////////////
+    // Time measured with memory copy //
+    ////////////////////////////////////
+    Polynomial::random(&a,d-1);
+    Polynomial::random(&b,d-1);
+    // std::cout << a.to_string() << std::endl;       
  
-    // clock_gettime( CLOCK_REALTIME, &start);
-    // for(int i = 0; i < N;i++){
+    clock_gettime( CLOCK_REALTIME, &start);
+    for(int i = 0; i < N;i++){
 
-    //   Polynomial c = (a+b);
-    //   a.set_crt_computed(false);
-    //   a.set_icrt_computed(false);
-    //   b.set_crt_computed(false);
-    //   b.set_icrt_computed(false);
-    //   result = cudaDeviceSynchronize();
-    //   assert(result == cudaSuccess);
-    //   // c.release();
-    // }
-    // clock_gettime( CLOCK_REALTIME, &stop);
-    // diff = compute_time_ms(start,stop)/N;
-    // std::cout << "ADD) Time measured with memory copy: " << diff << " ms" << std::endl;
-    // gpu_add_with_memcopy << d << " " << diff  << std::endl;
+      Polynomial c = (a+b);
+      a.set_crt_computed(false);
+      a.set_icrt_computed(false);
+      b.set_crt_computed(false);
+      b.set_icrt_computed(false);
+      result = cudaDeviceSynchronize();
+      assert(result == cudaSuccess);
+      // c.release();
+    }
+    clock_gettime( CLOCK_REALTIME, &stop);
+    diff = compute_time_ms(start,stop)/N;
+    std::cout << "ADD) Time measured with memory copy: " << diff << " ms" << std::endl;
+    gpu_add_with_memcopy << d << " " << diff  << std::endl;
 
-    // ///////////////////////////////////////
-    // // Time measured without memory copy //
-    // ///////////////////////////////////////
-    // Polynomial::random(&a,d-1);
-    // Polynomial::random(&b,d-1);
+    ///////////////////////////////////////
+    // Time measured without memory copy //
+    ///////////////////////////////////////
+    Polynomial::random(&a,d-1);
+    Polynomial::random(&b,d-1);
     
-    //     cudaMemGetInfo(&f, &t);
+        cudaMemGetInfo(&f, &t);
 
-    // // cout << "Free memory: " << f/(1024*1024) << std::endl;
-    // // std::cout << "Press Enter to Continue" << std::endl;
-    // //cin.ignore();
+    // cout << "Free memory: " << f/(1024*1024) << std::endl;
+    // std::cout << "Press Enter to Continue" << std::endl;
+    //cin.ignore();
 
-    // a.update_device_data();
-    // b.update_device_data();
+    a.update_device_data();
+    b.update_device_data();
 
-    // clock_gettime( CLOCK_REALTIME, &start);
-    // for(int i = 0; i < N;i++){
-    //   Polynomial c = (a+b);
-    //   result = cudaDeviceSynchronize();
-    //   assert(result == cudaSuccess);
-    //   // c.release();
-    // }
-    // clock_gettime( CLOCK_REALTIME, &stop);
-    // diff = compute_time_ms(start,stop)/N;
-    // std::cout << "ADD) Time measured without memory copy: " << diff << " ms" << std::endl;
-    // gpu_add_without_memcopy << d << " " << diff  << std::endl;
+    clock_gettime( CLOCK_REALTIME, &start);
+    for(int i = 0; i < N;i++){
+      Polynomial c = (a+b);
+      result = cudaDeviceSynchronize();
+      assert(result == cudaSuccess);
+      // c.release();
+    }
+    clock_gettime( CLOCK_REALTIME, &stop);
+    diff = compute_time_ms(start,stop)/N;
+    std::cout << "ADD) Time measured without memory copy: " << diff << " ms" << std::endl;
+    gpu_add_without_memcopy << d << " " << diff  << std::endl;
 
 
     // ///////////////////////////////////////////////

@@ -5,6 +5,7 @@
 #include "polynomial.h"
 #include <cuda.h>
 #include <curand.h>
+#include <curand_kernel.h>
 
 enum kind_t
 {
@@ -15,12 +16,18 @@ enum kind_t
   KINDS_COUNT
 };
 
+#define MAX_DEGREE 16384
+#define SEED (unsigned long)(7226776555987513888)
+
+void call_setup_kernel (curandState *states);
+ 
 class Distribution{
   private:
   int kind;
   float gaussian_std_deviation;
   int gaussian_bound;
   curandGenerator_t gen;
+  curandState *states;
 
   public:
   Distribution(kind_t kind, float std_dev, int bound){
@@ -29,41 +36,66 @@ class Distribution{
     this->gaussian_std_deviation = std_dev;
     this->gaussian_bound = bound;
 
-    curandStatus_t result = curandCreateGenerator(&gen, 
+    curandStatus_t resultRand = curandCreateGenerator(&gen, 
                 CURAND_RNG_PSEUDO_DEFAULT);
-    assert(result == CURAND_STATUS_SUCCESS);
+    assert(resultRand == CURAND_STATUS_SUCCESS);
 
-    result = curandSetPseudoRandomGeneratorSeed(gen, 
+    resultRand = curandSetPseudoRandomGeneratorSeed(gen, 
                 1234ULL);
-    assert(result == CURAND_STATUS_SUCCESS);
+    assert(resultRand == CURAND_STATUS_SUCCESS);
+
+    /**
+     * Setup
+    */
+    cudaError_t result = cudaMalloc((void**)&states,MAX_DEGREE*sizeof(curandState));
+    assert(result == cudaSuccess);
+    call_setup_kernel(states);
+
   }
   Distribution(kind_t kind){
     assert(kind != DISCRETE_GAUSSIAN);
     assert(kind < KINDS_COUNT);
     this->kind = kind;
 
-    curandStatus_t result = curandCreateGenerator(&gen, 
+    curandStatus_t resultRand = curandCreateGenerator(&gen, 
                 CURAND_RNG_PSEUDO_DEFAULT);
+    assert(resultRand == CURAND_STATUS_SUCCESS);
 
-    result = curandSetPseudoRandomGeneratorSeed(gen, 
+    resultRand = curandSetPseudoRandomGeneratorSeed(gen, 
                 1234ULL);
-    assert(result == CURAND_STATUS_SUCCESS);
+    assert(resultRand == CURAND_STATUS_SUCCESS);
+
+    /**
+     * Setup
+    */
+    cudaError_t result = cudaMalloc((void**)&states,MAX_DEGREE*sizeof(curandState));
+    assert(result == cudaSuccess);
+    call_setup_kernel(states);
+
   }
   Distribution(){
     this->kind = UNIFORMLY;
 
-    curandStatus_t result = curandCreateGenerator(&gen, 
+    curandStatus_t resultRand = curandCreateGenerator(&gen, 
                 CURAND_RNG_PSEUDO_DEFAULT);
-    assert(result == CURAND_STATUS_SUCCESS);
+    assert(resultRand == CURAND_STATUS_SUCCESS);
 
-    result = curandSetPseudoRandomGeneratorSeed(gen, 
+    resultRand = curandSetPseudoRandomGeneratorSeed(gen, 
                 1234ULL);
-    assert(result == CURAND_STATUS_SUCCESS);
+    assert(resultRand == CURAND_STATUS_SUCCESS);
+
+    /**
+     * Setup
+    */
+    cudaError_t result = cudaMalloc((void**)&states,MAX_DEGREE*sizeof(curandState));
+    assert(result == cudaSuccess);
+    call_setup_kernel(states);
+
   }
   Polynomial get_sample(int degree);
   Polynomial get_sample(int degree, int spacing);
 private:
-  void callCuGetUniformSample(cuyasheint_t *array, bn_t *coefs, int N);
+  void callCuGetUniformSample(cuyasheint_t *array, bn_t *coefs, int N, int mod);
   void callCuGetNormalSample(cuyasheint_t *array, int N, float mean, float stddev);
 };
 #endif

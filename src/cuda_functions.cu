@@ -17,6 +17,8 @@
 // #define PRIMITIVE_ROOT (int)3
 #define PRIMEP (uint64_t)18446744069414584321
 #define PRIMITIVE_ROOT (int)7
+#define W4 (uint64_t)281474976710656L
+#define W8 (uint64_t)18446744069397807105L
 
  ZZ PZZ = to_ZZ(PRIMEP); 
 
@@ -418,12 +420,12 @@ __host__ __device__ void butterfly<4,FORWARD>(uint64_t *v){
   
   // v0 + v1 + v2 + v3
   v[0] = s_add(s_add(s_add(v0,v1),v2),v3);
-  // v0 + 281474976710656L*v1 - v2 - 281474976710656L*v3
-  v[1] = s_sub(s_sub(s_add(v0,s_mul(281474976710656L,v1)),v2),s_mul(281474976710656L,v3)); 
+  // v0 + W4*v1 - v2 - W4*v3
+  v[1] = s_sub(s_sub(s_add(v0,s_mul(W4,v1)),v2),s_mul(W4,v3)); 
   // v0 - v1 + v2 - v3
   v[2] = s_sub(s_add(s_sub(v0,v1),v2),v3);
-  // v0 - 281474976710656L*v1 - v2 + 281474976710656L*v3
-  v[3] = s_add(s_sub(s_sub(v0,s_mul(281474976710656L,v1)),v2),s_mul(281474976710656L,v3)); 
+  // v0 - W4*v1 - v2 + W4*v3
+  v[3] = s_add(s_sub(s_sub(v0,s_mul(W4,v1)),v2),s_mul(W4,v3)); 
   
 }
 
@@ -439,12 +441,33 @@ __host__ __device__ void butterfly<4,INVERSE>(uint64_t *v){
   
   // v0 + v1 + v2 + v3
   v[0] = s_add(s_add(s_add(v0,v1),v2),v3);
-  // v0 - 281474976710656L*v1 - v2 + 281474976710656L*v3
-  v[1] = s_add(s_sub(s_sub(v0,s_mul(281474976710656L,v1)),v2),s_mul(281474976710656L,v3)); 
+  // v0 - W4*v1 - v2 + W4*v3
+  v[1] = s_add(s_sub(s_sub(v0,s_mul(W4,v1)),v2),s_mul(W4,v3)); 
   // v0 - v1 + v2 - v3
   v[2] = s_sub(s_add(s_sub(v0,v1),v2),v3);
-  // v0 + 281474976710656L*v1 - v2 - 281474976710656L*v3
-  v[3] = s_sub(s_sub(s_add(v0,s_mul(281474976710656L,v1)),v2),s_mul(281474976710656L,v3));  
+  // v0 + W4*v1 - v2 - W4*v3
+  v[3] = s_sub(s_sub(s_add(v0,s_mul(W4,v1)),v2),s_mul(W4,v3));  
+  
+}
+
+template<>
+__host__ __device__ void butterfly<8,FORWARD>(uint64_t *v){
+  ///////////////////////
+  // Radix-4 Butterfly //
+  ///////////////////////
+  const uint64_t v0 = s_rem(v[0]);
+  const uint64_t v1 = s_rem(v[1]);
+  const uint64_t v2 = s_rem(v[2]);
+  const uint64_t v3 = s_rem(v[3]);
+  
+  // v0 + v1 + v2 + v3
+  v[0] = s_add(s_add(s_add(v0,v1),v2),v3);
+  // v0 + W4*v1 - v2 - W4*v3
+  v[1] = s_sub(s_sub(s_add(v0,s_mul(W4,v1)),v2),s_mul(W4,v3)); 
+  // v0 - v1 + v2 - v3
+  v[2] = s_sub(s_add(s_sub(v0,v1),v2),v3);
+  // v0 - W4*v1 - v2 + W4*v3
+  v[3] = s_add(s_sub(s_sub(v0,s_mul(W4,v1)),v2),s_mul(W4,v3)); 
   
 }
 

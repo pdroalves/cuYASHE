@@ -300,6 +300,9 @@ void Polynomial::update_device_data(){
     cudaError_t result = cudaMalloc((void**)&d_data,get_crt_spacing()*STD_BNT_WORDS_ALLOC*sizeof(cuyasheint_t));
     assert(result == cudaSuccess);
 
+    result = cudaMemsetAsync(d_data,0,get_crt_spacing()*STD_BNT_WORDS_ALLOC*sizeof(cuyasheint_t),get_stream());
+    assert(result == cudaSuccess);
+
     for(int i = 0; i < (deg()+1); i++)
       get_words_allocatted(&h_bn_coefs[i],get_coeff(i),h_data,d_data,i,get_stream());  
 
@@ -505,7 +508,7 @@ bn_t get_reciprocal(ZZ q){
       cuyasheint_t *reciprocal = std::get<0>(pair);
       int su = std::get<1>(pair);
 
-      if( reciprocal != NULL){
+      if( reciprocal == NULL){
         /** 
          * Not computed yet
          */

@@ -156,6 +156,21 @@ int main(int argc, char* argv[]){
     clock_gettime( CLOCK_REALTIME, &stop);
       std::cout << "Keys generated in " << compute_time_ms(start,stop) << " ms." << std::endl;
 
+    ////////////////
+    // Get sample //
+    ////////////////
+    Distribution xkey = Distribution(NARROW);
+    clock_gettime( CLOCK_REALTIME, &start);
+    for(int i = 0; i < N;i++){
+      xkey.get_sample(d+1);
+      cudaDeviceSynchronize();
+    }
+        
+    clock_gettime( CLOCK_REALTIME, &stop);
+    diff = compute_time_ms(start,stop)/N;
+    std::cout << "get_sample) " << diff << " ms" << std::endl;
+    // encrypt << d << " " << diff << std::endl;;
+
     Ciphertext c;
     Polynomial a(2*d);
     a.set_coeff(0,rand());

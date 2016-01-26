@@ -153,8 +153,11 @@ __host__ __device__ bool bn_is_zero(const bn_t* a) {
 	/**
 	 * This version doesn't have branchings, what is good for GPUs
 	 */
-		return !isEqual( isEqual(a->used,0) + isEqual(a->used,1)*isEqual(a->dp[0],0)
-						,false);
+		// return !isEqual( isEqual(a->used,0) + isEqual(a->used,1)*isEqual(a->dp[0],0)
+		// 				,false);
+	 bool testA = a->used == 0;
+	 bool testB = (a->used == 1) && (a->dp[0] == 0);
+	 return testA || testB;
 	#else
 		if (a->used == 0) {
 			return true;
@@ -168,32 +171,48 @@ __host__ __device__ bool bn_is_zero(const bn_t* a) {
 
 __global__ void bn_get_deg(int *r, bn_t *coefs, int N){
 	/**
-	 * This kernel must be executed by a single thread. 
+	 * This kernel must be executed by N threads
 	 */
-	
-	int index;
-	for(index = N-1; index >= 0; index--){
-		coefs[index].used = get_used_index(coefs[index].dp,coefs[index].alloc)+1;
-		if(!bn_is_zero(&coefs[index]))
-			break;
+	const int tid = threadIdx.x + blockIdx.x*blockDim.x;
+
+	if(tid < N){
+		coefs[tid].used = get_used_index(coefs[tid].dp,coefs[tid].alloc)+1;
+		r[tid] = bn_is_zero(&coefs[tid]);		
 	}
-	*r = index;
 }
 
 __host__ int callBNGetDeg(bn_t *coefs, int N){
-	int *d_value;
-	cudaError_t result = cudaMalloc((void**)&d_value,sizeof(int));
+	/**
+	 * Alloc memory
+	 */
+	int *d_result;
+	int *h_result;
+	cudaError_t result = cudaMalloc((void**)&d_result,N*sizeof(int));
 	assert(result == cudaSuccess);
+	h_result = (int*)malloc(N*sizeof(int));
 	
-	bn_get_deg<<<1,1,0>>>(d_value,coefs,N);
+	/** 
+	 * Kernel
+	 */
+	int size = N;
+	const int ADDGRIDXDIM = (size%ADDBLOCKXDIM == 0? size/ADDBLOCKXDIM : size/ADDBLOCKXDIM + 1);
+	dim3 gridDim(ADDGRIDXDIM);
+	dim3 blockDim(ADDBLOCKXDIM);
+
+	bn_get_deg<<<gridDim,blockDim>>>(d_result,coefs,N);
 	result = cudaGetLastError();
 	assert(result == cudaSuccess);
 
-	int h_value;
-	result = cudaMemcpy(&h_value,d_value,sizeof(int),cudaMemcpyDeviceToHost);
+	/** 
+	 * Recover
+	 */
+	result = cudaMemcpy(h_result,d_result,N*sizeof(int),cudaMemcpyDeviceToHost);
 	assert(result == cudaSuccess);
 
-	return h_value;
+	for(int i = N-1; i >= 0; i--)
+		if(h_result[i] != 0)
+			return i-1;
+	return -1;
 }
 
 /**
@@ -1027,7 +1046,7 @@ void callICRT(bn_t *coefs,cuyasheint_t *d_polyCRT,const int N, const int NPolis,
 												N,
 												NPolis
 												);
-	blockSize = ADDBLOCKXDIM;
+	blockSize = 64;
 
 	gridSize = ( N % blockSize == 0? 
 						N/blockSize : 
