@@ -15,7 +15,7 @@
 
 #define BILLION  1000000000L
 #define MILLION  1000000L
-#define N 10
+#define N 1
 
 
 int main(int argc, char* argv[]){
@@ -111,6 +111,7 @@ int main(int argc, char* argv[]){
     std::cout << "Writing keyswitch data to " << keyswitch_filename << std::endl;
     ZZ_p::init(q); // Defines GF(q)
        
+    // for(int d = 1024;d <= 4096;d *= 2){
     for(int d = 4096;d <= 4096;d *= 2){
 
       std::cout << "d: " << d << std::endl;
@@ -186,81 +187,62 @@ int main(int argc, char* argv[]){
     std::cout << "Decrypt) Time measured with memory copy: " << diff << " ms" << std::endl;
     decrypt << d << " " << diff << std::endl;;
 
-    Polynomial b;
-    Polynomial::random(&a,d-1);
-    Polynomial::random(&b,d-1);
+    // Polynomial b;
+    // Polynomial::random(&a,d-1);
+    // Polynomial::random(&b,d-1);
 
-    Ciphertext ct_a = cipher.encrypt(a);
-    Ciphertext ct_b = cipher.encrypt(b);
-    ct_a.update_host_data();
-    ct_a.set_crt_computed(false);
-    ct_a.set_icrt_computed(false);
-    ct_b.update_host_data();
-    ct_b.set_crt_computed(false);  
-    ct_b.set_icrt_computed(false);  
+    // Ciphertext ct_a = cipher.encrypt(a);
+    // Ciphertext ct_b = cipher.encrypt(b);
+    // ct_a.update_host_data();
+    // ct_a.set_crt_computed(false);
+    // ct_a.set_icrt_computed(false);
+    // ct_b.update_host_data();
+    // ct_b.set_crt_computed(false);  
+    // ct_b.set_icrt_computed(false);  
 
-    clock_gettime( CLOCK_REALTIME, &start);
-    for(int i = 0; i < N;i++){
-      #ifdef VERBOSE
-      std::cout << i << std::endl;
-      #endif
+    // clock_gettime( CLOCK_REALTIME, &start);
+    // for(int i = 0; i < N;i++){
+    //   #ifdef VERBOSE
+    //   std::cout << i << std::endl;
+    //   #endif
 
-      c = (ct_a+ct_b);
-      // delete &a;
-      ct_a.set_crt_computed(false);
-      ct_a.set_icrt_computed(false);
-      ct_b.set_crt_computed(false);
-      ct_b.set_icrt_computed(false);
-      cudaDeviceSynchronize();
-    }
+    //   c = (ct_a+ct_b);
+    //   // delete &a;
+    //   ct_a.set_crt_computed(false);
+    //   ct_a.set_icrt_computed(false);
+    //   ct_b.set_crt_computed(false);
+    //   ct_b.set_icrt_computed(false);
+    //   cudaDeviceSynchronize();
+    // }
         
-    clock_gettime( CLOCK_REALTIME, &stop);
-    diff = compute_time_ms(start,stop)/N;
-    std::cout << "Homomorphic Addition) Time measured with memory copy: " << diff << " ms" << std::endl;
-    add_with_memcopy << d << " " << diff << std::endl;;
+    // clock_gettime( CLOCK_REALTIME, &stop);
+    // diff = compute_time_ms(start,stop)/N;
+    // std::cout << "Homomorphic Addition) Time measured with memory copy: " << diff << " ms" << std::endl;
+    // add_with_memcopy << d << " " << diff << std::endl;;
     
-    ct_a.update_device_data();
-    ct_b.update_device_data();
-    clock_gettime( CLOCK_REALTIME, &start);
-    for(int i = 0; i < N;i++){
-      #ifdef VERBOSE
-      std::cout << i << std::endl;
-      #endif
-
-       c = (ct_a+ct_b);
-      // delete &a;
-      cudaDeviceSynchronize();
-    }
-        
-    clock_gettime( CLOCK_REALTIME, &stop);
-    diff = compute_time_ms(start,stop)/N;
-    std::cout << "Homomorphic Addition) Time measured without memory copy: " << diff << " ms" << std::endl;
-    add_without_memcopy << d << " " << diff << std::endl;;
-
-    Polynomial::random(&a,d-1);
-    Polynomial::random(&b,d-1);
-    ct_a = cipher.encrypt(a);
-    ct_b = cipher.encrypt(b);    
-
-    clock_gettime( CLOCK_REALTIME, &start);
-        for(int i = 0; i < N;i++){
-          #ifdef VERBOSE
-          std::cout << i << std::endl;
-          #endif
-
-          Ciphertext c =  (ct_a*ct_b);
-          cudaDeviceSynchronize();
-        }
-        
-    clock_gettime( CLOCK_REALTIME, &stop);
-    diff = compute_time_ms(start,stop)/N;
-    std::cout << "Homomorphic Multiplication) Time measured with memory copy: " << diff << " ms" << std::endl;
-    mult_with_memcopy << d << " " << diff << std::endl;;
-
-
     // ct_a.update_device_data();
     // ct_b.update_device_data();
+    // clock_gettime( CLOCK_REALTIME, &start);
+    // for(int i = 0; i < N;i++){
+    //   #ifdef VERBOSE
+    //   std::cout << i << std::endl;
+    //   #endif
+
+    //    c = (ct_a+ct_b);
+    //   // delete &a;
+    //   cudaDeviceSynchronize();
+    // }
         
+    // clock_gettime( CLOCK_REALTIME, &stop);
+    // diff = compute_time_ms(start,stop)/N;
+    // std::cout << "Homomorphic Addition) Time measured without memory copy: " << diff << " ms" << std::endl;
+    // add_without_memcopy << d << " " << diff << std::endl;;
+
+    // Polynomial::random(&a,d-1);
+    // Polynomial::random(&b,d-1);
+    // ct_a = cipher.encrypt(a);
+    // ct_b = cipher.encrypt(b);    
+
     // clock_gettime( CLOCK_REALTIME, &start);
     //     for(int i = 0; i < N;i++){
     //       #ifdef VERBOSE
@@ -268,29 +250,48 @@ int main(int argc, char* argv[]){
     //       #endif
 
     //       Ciphertext c =  (ct_a*ct_b);
-    //       // delete &a;
+    //       cudaDeviceSynchronize();
+    //     }
+        
+    // clock_gettime( CLOCK_REALTIME, &stop);
+    // diff = compute_time_ms(start,stop)/N;
+    // std::cout << "Homomorphic Multiplication) Time measured with memory copy: " << diff << " ms" << std::endl;
+    // mult_with_memcopy << d << " " << diff << std::endl;;
+
+
+    // // ct_a.update_device_data();
+    // // ct_b.update_device_data();
+        
+    // // clock_gettime( CLOCK_REALTIME, &start);
+    // //     for(int i = 0; i < N;i++){
+    // //       #ifdef VERBOSE
+    // //       std::cout << i << std::endl;
+    // //       #endif
+
+    // //       Ciphertext c =  (ct_a*ct_b);
+    // //       // delete &a;
+    // //       cudaDeviceSynchronize();
+
+    // //     }
+        
+    // // clock_gettime( CLOCK_REALTIME, &stop);
+    // //     diff = compute_time_ms(start,stop)/N;
+    // //     std::cout << "Homomorphic Multiplication) Time measured without memory copy: " << diff << " ms" << std::endl;
+    // //     mult_without_memcopy << d << " " << diff << std::endl;;
+
+    //     c = ct_a;
+        
+    // clock_gettime( CLOCK_REALTIME, &start);
+    //     for(int i = 0; i < N;i++){
+    //       c.convert();
     //       cudaDeviceSynchronize();
 
     //     }
         
     // clock_gettime( CLOCK_REALTIME, &stop);
     //     diff = compute_time_ms(start,stop)/N;
-    //     std::cout << "Homomorphic Multiplication) Time measured without memory copy: " << diff << " ms" << std::endl;
-    //     mult_without_memcopy << d << " " << diff << std::endl;;
-
-        c = ct_a;
-        
-    clock_gettime( CLOCK_REALTIME, &start);
-        for(int i = 0; i < N;i++){
-          c.convert();
-          cudaDeviceSynchronize();
-
-        }
-        
-    clock_gettime( CLOCK_REALTIME, &stop);
-        diff = compute_time_ms(start,stop)/N;
-        std::cout << "KeySwitch) Time measured with memory copy: " << diff << " ms" << std::endl;
-        keyswitch << d << " " << diff << std::endl;;
+    //     std::cout << "KeySwitch) Time measured with memory copy: " << diff << " ms" << std::endl;
+    //     keyswitch << d << " " << diff << std::endl;;
     }
 
 }

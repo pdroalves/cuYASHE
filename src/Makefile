@@ -1,4 +1,4 @@
-OPT = -O0
+OPT = -O3
 
 CUDA_CC = nvcc $(OPT) -G -g -std=c++11
 CC = g++ -std=c++11 -g -Wall -Wfatal-errors -m64 $(OPT)
@@ -30,7 +30,7 @@ tests:  polynomial.o cuda_functions.o cuda_bn.o cuda_distribution.o test.o test_
 	$(CUDA_CC) $(CUDA_ARCH) $(LCUDA) $(ICUDA) -o $(TESTBIN)_reduce test_reduce.o polynomial.o cuda_functions.o cuda_bn.o cuda_distribution.o ciphertext.o distribution.o yashe.o common.o integer.o -lcufft -lcurand -Xcompiler $(OPENMP) $(NTL)
 	# $(CUDA_CC) $(CUDA_ARCH) $(LCUDA) $(ICUDA) -o $(TESTBIN)_ct_mul test_ct_mul.o polynomial.o cuda_functions.o cuda_bn.o cuda_distribution.o ciphertext.o distribution.o yashe.o common.o integer.o -lcufft -lcurand -Xcompiler $(OPENMP) $(NTL)
 	$(CUDA_CC) $(CUDA_ARCH) $(LCUDA) $(ICUDA) -o $(TESTBIN)_mul test_mul.o polynomial.o cuda_functions.o cuda_bn.o cuda_distribution.o ciphertext.o distribution.o yashe.o common.o integer.o -lcufft -lcurand -Xcompiler $(OPENMP) $(NTL)
-	$(CUDA_CC) $(CUDA_ARCH) $(LCUDA) $(ICUDA) -o $(TESTBIN)_ntt test_ntt.o  polynomial.o cuda_functions.o cuda_bn.o cuda_distribution.o ciphertext.o distribution.o yashe.o common.o integer.o -lcufft -lcurand -Xcompiler $(OPENMP) $(NTL)
+	# $(CUDA_CC) $(CUDA_ARCH) $(LCUDA) $(ICUDA) -o $(TESTBIN)_ntt test_ntt.o  polynomial.o cuda_functions.o cuda_bn.o cuda_distribution.o ciphertext.o distribution.o yashe.o common.o integer.o -lcufft -lcurand -Xcompiler $(OPENMP) $(NTL)
 	$(CUDA_CC) $(CUDA_ARCH) $(LCUDA) $(ICUDA) -o $(TESTBIN)_bnt test_bnt.o  polynomial.o cuda_functions.o cuda_bn.o cuda_distribution.o ciphertext.o distribution.o yashe.o common.o integer.o -lcufft -lcurand -Xcompiler $(OPENMP) $(NTL)
 	
 test_fft:
@@ -90,7 +90,7 @@ test_ct_mul.o: test_ct_mul.cu
 
 
 test_ntt.o:test_ntt.cu
-	$(CUDA_CC) -c test_ntt.cu -o test_ntt.o  $(NTL)
+	# $(CUDA_CC) -c test_ntt.cu -o test_ntt.o  $(NTL)
 
 test_bnt.o:test_bnt.cu 
 	$(CUDA_CC) -c test_bnt.cu -o test_bnt.o --relocatable-device-code true

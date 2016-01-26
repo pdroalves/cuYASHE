@@ -376,18 +376,76 @@ __host__ __device__ uint64_t s_sub(uint64_t a,uint64_t b){
   //   res = a-b;
   res = (a-b) + (b > a)*PRIMEP; 
 
-  #ifdef __CUDA_ARCH__
-  __syncthreads();
-  #endif
   return res;
 }
 
+template <int RADIX, int type>
 __host__ __device__ void butterfly(uint64_t *v){
-  // Butterfly
+  printf("Nothing to do");
+}
+
+template<>
+__host__ __device__ void butterfly<2,FORWARD>(uint64_t *v){
+  ///////////////////////
+  // Radix-2 Butterfly //
+  ///////////////////////
   const uint64_t v0 = s_rem(v[0]);
   const uint64_t v1 = s_rem(v[1]);
   v[0] = s_add(v0,v1);
   v[1] = s_sub(v0,v1);
+}
+
+template<>
+__host__ __device__ void butterfly<2,INVERSE>(uint64_t *v){
+  ///////////////////////
+  // Radix-2 Butterfly //
+  ///////////////////////
+  const uint64_t v0 = s_rem(v[0]);
+  const uint64_t v1 = s_rem(v[1]);
+  v[0] = s_add(v0,v1);
+  v[1] = s_sub(v0,v1);
+}
+
+template<>
+__host__ __device__ void butterfly<4,FORWARD>(uint64_t *v){
+  ///////////////////////
+  // Radix-4 Butterfly //
+  ///////////////////////
+  const uint64_t v0 = s_rem(v[0]);
+  const uint64_t v1 = s_rem(v[1]);
+  const uint64_t v2 = s_rem(v[2]);
+  const uint64_t v3 = s_rem(v[3]);
+  
+  // v0 + v1 + v2 + v3
+  v[0] = s_add(s_add(s_add(v0,v1),v2),v3);
+  // v0 + 281474976710656L*v1 - v2 - 281474976710656L*v3
+  v[1] = s_sub(s_sub(s_add(v0,s_mul(281474976710656L,v1)),v2),s_mul(281474976710656L,v3)); 
+  // v0 - v1 + v2 - v3
+  v[2] = s_sub(s_add(s_sub(v0,v1),v2),v3);
+  // v0 - 281474976710656L*v1 - v2 + 281474976710656L*v3
+  v[3] = s_add(s_sub(s_sub(v0,s_mul(281474976710656L,v1)),v2),s_mul(281474976710656L,v3)); 
+  
+}
+
+template<>
+__host__ __device__ void butterfly<4,INVERSE>(uint64_t *v){
+  ///////////////////////
+  // Radix-4 Butterfly //
+  ///////////////////////
+  const uint64_t v0 = s_rem(v[0]);
+  const uint64_t v1 = s_rem(v[1]);
+  const uint64_t v2 = s_rem(v[2]);
+  const uint64_t v3 = s_rem(v[3]);
+  
+  // v0 + v1 + v2 + v3
+  v[0] = s_add(s_add(s_add(v0,v1),v2),v3);
+  // v0 - 281474976710656L*v1 - v2 + 281474976710656L*v3
+  v[1] = s_add(s_sub(s_sub(v0,s_mul(281474976710656L,v1)),v2),s_mul(281474976710656L,v3)); 
+  // v0 - v1 + v2 - v3
+  v[2] = s_sub(s_add(s_sub(v0,v1),v2),v3);
+  // v0 + 281474976710656L*v1 - v2 - 281474976710656L*v3
+  v[3] = s_sub(s_sub(s_add(v0,s_mul(281474976710656L,v1)),v2),s_mul(281474976710656L,v3));  
+  
 }
 
 __host__ __device__ int expand(int idxL, int N1, int N2){
@@ -401,61 +459,58 @@ __global__ void NTTScale(cuyasheint_t *data,const int size,const int N){
     data[tid] /= N;
 } 
 
+template<int RADIX, int type>
 __host__ __device__ void NTTIteration(cuyasheint_t *W,
                                       cuyasheint_t *WInv,
                                       const int residue_index,
                                       const int j,
                                       const int N,
-                                      const int R,
                                       const int Ns,
                                       const cuyasheint_t* data0,
-                                      cuyasheint_t *data1,
-                                      const int type){
-	uint64_t v[2] = {0,0};
+                                      cuyasheint_t *data1){
+	uint64_t v[4] = {0,0,0,0};
 	const int idxS = j+residue_index;
-  int w_index = ((j%Ns)*N)/(Ns*R);
+  int w_index = ((j%Ns)*N)/(Ns*RADIX);
 
-  for(int r=0; r<R; r++)
+  for(int r=0; r<RADIX; r++)
     if(type == FORWARD)
-      v[r] = s_mul(data0[idxS+r*N/R],W[w_index*r]);
+      v[r] = s_mul(data0[idxS+r*N/RADIX],W[w_index*r]);
     else
-      v[r] = s_mul(data0[idxS+r*N/R],WInv[w_index*r]);
+      v[r] = s_mul(data0[idxS+r*N/RADIX],WInv[w_index*r]);
 
-	butterfly(v);
+  butterfly<RADIX,type>(v);
 
-	const int idxD = expand(j,Ns,R)+residue_index;
-	for(int r=0; r<R;r++){
+	const int idxD = expand(j,Ns,RADIX)+residue_index;
+	for(int r=0; r<RADIX;r++)
   		data1[idxD+r*Ns] = v[r];
-    #ifdef __CUDA_ARCH__
-    __syncthreads();
-    #endif
-  }
+  
 }
 
-__global__ void NTT(cuyasheint_t *d_W,cuyasheint_t *d_WInv,const int N, const int R, const int Ns, cuyasheint_t* dataI, cuyasheint_t* dataO,const int type){
+template<int RADIX, int type>
+__global__ void NTT(cuyasheint_t *d_W,cuyasheint_t *d_WInv,const int N, const int Ns, cuyasheint_t* dataI, cuyasheint_t* dataO){
 
   const int residue_index = (blockIdx.x)*N;
-  for(int i = 0; i < N/R; i += 1024){
+  for(int i = 0; i < N/RADIX; i += 1024){
     // " Threads virtuais "
     const int j = (threadIdx.x+i);
     if( j < N)
-      NTTIteration(d_W,d_WInv,residue_index,j, N, R, Ns, dataI, dataO,type);
+      NTTIteration<RADIX,type>(d_W,d_WInv,residue_index,j, N, Ns, dataI, dataO);
     __syncthreads();
   }
 }
 
-__host__ void CUDAFunctions::callNTT(const int N, const int NPolis,cuyasheint_t* dataI, cuyasheint_t* dataO,const int type){
+// __host__ void CUDAFunctions::callNTT(const int N, const int NPolis,cuyasheint_t* dataI, cuyasheint_t* dataO,const int type){
 
-  const int RADIX = 2;
-  dim3 blockDim(std::min(N/RADIX,1024));
-  dim3 gridDim(NPolis);
+//   const int RADIX = 4;
+//   dim3 blockDim(std::min(N/RADIX,1024));
+//   dim3 gridDim(NPolis);
 
-  for(int Ns=1; Ns<N; Ns*=RADIX){
-    NTT<<<gridDim,blockDim>>>(CUDAFunctions::d_W,CUDAFunctions::d_WInv,N,RADIX,Ns,dataI,dataO,type);
-    assert(cudaGetLastError() == cudaSuccess);
-    std::swap(dataI,dataO);
-  }
-}
+//   for(int Ns=1; Ns<N; Ns*=RADIX){
+//     NTT<4,type><<<gridDim,blockDim>>>(CUDAFunctions::d_W,CUDAFunctions::d_WInv,N,Ns,dataI,dataO);
+//     assert(cudaGetLastError() == cudaSuccess);
+//     std::swap(dataI,dataO);
+//   }
+// }
 
 __global__ void polynomialNTTMul(cuyasheint_t *a,const cuyasheint_t *b,const int size){
   // We have one thread per polynomial coefficient on 32 threads-block.
@@ -663,44 +718,56 @@ __host__ cuyasheint_t* CUDAFunctions::callPolynomialMul(cudaStream_t stream,
   cuyasheint_t *aux;
 
   cudaError_t result;
-  // result = cudaMalloc((void**)&d_result,size*sizeof(cuyasheint_t));
-  // assert(result == cudaSuccess);
-  // result = cudaMalloc((void**)&d_a,size*sizeof(cuyasheint_t));
-  // assert(result == cudaSuccess);
-  // result = cudaMalloc((void**)&d_b,size*sizeof(cuyasheint_t));
-  // assert(result == cudaSuccess);
-  // result = cudaMalloc((void**)&aux,size*sizeof(cuyasheint_t));
-  // assert(result == cudaSuccess);
+  result = cudaMalloc((void**)&d_result,size*sizeof(cuyasheint_t));
+  assert(result == cudaSuccess);
+  result = cudaMalloc((void**)&d_a,size*sizeof(cuyasheint_t));
+  assert(result == cudaSuccess);
+  result = cudaMalloc((void**)&d_b,size*sizeof(cuyasheint_t));
+  assert(result == cudaSuccess);
+  result = cudaMalloc((void**)&aux,size*sizeof(cuyasheint_t));
+  assert(result == cudaSuccess);
    
-  cuyasheint_t *mem;
-  result = cudaMalloc((void**)&mem,(4*size)*sizeof(cuyasheint_t));
-  assert(result == cudaSuccess);
-
-  d_result = mem + 0*size;
-  d_a =      mem + 1*size;
-  d_b =      mem + 2*size;
-  aux =      mem + 3*size;
-
-  // result = cudaMemsetAsync(aux,0,size*sizeof(cuyasheint_t),stream);
-  // assert(result == cudaSuccess);
-  // result = cudaMemsetAsync(d_result,0,size*sizeof(cuyasheint_t),stream);
+  // cuyasheint_t *mem;
+  // result = cudaMalloc((void**)&mem,(4*size)*sizeof(cuyasheint_t));
   // assert(result == cudaSuccess);
 
-  result = cudaMemsetAsync(mem,0,(4*size)*sizeof(cuyasheint_t),stream);
+  // d_result = mem + 0*size;
+  // d_a =      mem + 1*size;
+  // d_b =      mem + 2*size;
+  // aux =      mem + 3*size;
+
+  result = cudaMemsetAsync(aux,0,size*sizeof(cuyasheint_t),stream);
   assert(result == cudaSuccess);
+  result = cudaMemsetAsync(d_result,0,size*sizeof(cuyasheint_t),stream);
+  assert(result == cudaSuccess);
+
+  // result = cudaMemsetAsync(mem,0,(4*size)*sizeof(cuyasheint_t),stream);
+  // assert(result == cudaSuccess);
 
   result = cudaMemcpyAsync(d_a,a,size*sizeof(cuyasheint_t),cudaMemcpyDeviceToDevice,stream);
   assert(result == cudaSuccess);
   result = cudaMemcpyAsync(d_b,b,size*sizeof(cuyasheint_t),cudaMemcpyDeviceToDevice,stream);
   assert(result == cudaSuccess);
 
-  const int RADIX = 2;
-	dim3 blockDim(std::min(N/RADIX,1024));
-	dim3 gridDim(NPolis);
+  int RADIX;
+  if(N % 4 == 0)
+    RADIX = 4;
+  else{
+    assert(N % 2 == 0);
+    RADIX = 2;
+  }
+  // const int RADIX = 2;
+  dim3 blockDim(std::min(N/RADIX,1024));
+  dim3 gridDim(NPolis);
 
   // Forward
   for(int Ns=1; Ns<N; Ns*=RADIX){
-    NTT<<<gridDim,blockDim,1,stream >>>(CUDAFunctions::d_W,CUDAFunctions::d_WInv,N,RADIX,Ns,d_a,aux,FORWARD);
+    if(RADIX == 4)
+      NTT<4,FORWARD><<<gridDim,blockDim,1,stream >>>(CUDAFunctions::d_W,CUDAFunctions::d_WInv,N,Ns,d_a,aux);
+    else{
+      assert(RADIX == 2);
+      NTT<2,FORWARD><<<gridDim,blockDim,1,stream >>>(CUDAFunctions::d_W,CUDAFunctions::d_WInv,N,Ns,d_a,aux);
+    }
     assert(cudaGetLastError() == cudaSuccess);
     std::swap(aux,d_a);
   }
@@ -710,7 +777,12 @@ __host__ cuyasheint_t* CUDAFunctions::callPolynomialMul(cudaStream_t stream,
   assert(result == cudaSuccess);
 
   for(int Ns=1; Ns<N; Ns*=RADIX){
-    NTT<<<gridDim,blockDim,1,stream >>>(CUDAFunctions::d_W,CUDAFunctions::d_WInv,N,RADIX,Ns,d_b,aux,FORWARD);
+    if(RADIX == 4)
+      NTT<4,FORWARD><<<gridDim,blockDim,1,stream >>>(CUDAFunctions::d_W,CUDAFunctions::d_WInv,N,Ns,d_b,aux);
+    else{
+      assert(RADIX == 2);
+      NTT<2,FORWARD><<<gridDim,blockDim,1,stream >>>(CUDAFunctions::d_W,CUDAFunctions::d_WInv,N,Ns,d_b,aux);
+    }
     assert(cudaGetLastError() == cudaSuccess);
     std::swap(aux,d_b);
   }
@@ -723,7 +795,12 @@ __host__ cuyasheint_t* CUDAFunctions::callPolynomialMul(cudaStream_t stream,
 
   // Inverse
   for(int Ns=1; Ns<N; Ns*=RADIX){
-    NTT<<<gridDim,blockDim,1,stream >>>(CUDAFunctions::d_W,CUDAFunctions::d_WInv,N,RADIX,Ns,d_a,d_result,INVERSE);
+    if(RADIX == 4)
+      NTT<4,INVERSE><<<gridDim,blockDim,1,stream >>>(CUDAFunctions::d_W,CUDAFunctions::d_WInv,N,Ns,d_a,d_result);
+    else{
+      assert(RADIX == 2);
+      NTT<2,INVERSE><<<gridDim,blockDim,1,stream >>>(CUDAFunctions::d_W,CUDAFunctions::d_WInv,N,Ns,d_a,d_result);
+    }
     assert(cudaGetLastError() == cudaSuccess);
     std::swap(d_a,d_result);
   }
