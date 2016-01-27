@@ -153,11 +153,11 @@ __host__ __device__ bool bn_is_zero(const bn_t* a) {
 	/**
 	 * This version doesn't have branchings, what is good for GPUs
 	 */
-		// return !isEqual( isEqual(a->used,0) + isEqual(a->used,1)*isEqual(a->dp[0],0)
-		// 				,false);
-	 bool testA = a->used == 0;
-	 bool testB = (a->used == 1) && (a->dp[0] == 0);
-	 return testA || testB;
+		return !isEqual( isEqual(a->used,0) + isEqual(a->used,1)*isEqual(a->dp[0],0)
+						,false);
+	 // bool testA = a->used == 0;
+	 // bool testB = (a->used == 1) && (a->dp[0] == 0);
+	 // return testA || testB;
 	#else
 		if (a->used == 0) {
 			return true;
@@ -177,7 +177,7 @@ __global__ void bn_get_deg(int *r, bn_t *coefs, int N){
 
 	if(tid < N){
 		coefs[tid].used = get_used_index(coefs[tid].dp,coefs[tid].alloc)+1;
-		r[tid] = bn_is_zero(&coefs[tid]);		
+		r[tid] = !bn_is_zero(&coefs[tid]);		
 	}
 }
 
@@ -211,7 +211,7 @@ __host__ int callBNGetDeg(bn_t *coefs, int N){
 
 	for(int i = N-1; i >= 0; i--)
 		if(h_result[i] != 0)
-			return i-1;
+			return i;
 	return -1;
 }
 

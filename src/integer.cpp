@@ -192,11 +192,12 @@ Polynomial Integer::operator*(Polynomial &a){
     }
 
     cuyasheint_t *result = CUDAFunctions::callPolynomialOPInteger( MUL,
-                                            a.get_stream(),
-                                            a.get_device_crt_residues(),
-                                            this->get_device_crt_residues(),
-                                            a.get_crt_spacing(),
-                                            Polynomial::CRTPrimes.size());
+                                                                    a.get_stream(),
+                                                                    a.get_device_crt_residues(),
+                                                                    this->get_device_crt_residues(),
+                                                                    a.get_crt_spacing(),
+                                                                    Polynomial::CRTPrimes.size()
+                                                                  );
 
     p->set_device_crt_residues(result);
     p->set_host_updated(false);
@@ -204,19 +205,17 @@ Polynomial Integer::operator*(Polynomial &a){
     p->set_crt_computed(true);
       
   }else if (get_icrt_computed()){
-    assert(p->get_icrt_computed());
     assert(p->d_bn_coefs);
     CUDAFunctions::callPolynomialOPDigit( MUL,
                                         p->get_stream(),
                                         p->d_bn_coefs,
                                         this->digits,
-                                        p->deg()+1);
+                                        p->deg()+1
+                                      );
     p->set_crt_computed(false);
     p->set_host_updated(false);
   }else{
     throw "Don't know how to multiply";
   }
-
-  *(p) %= a.get_mod();
   return p;
 }

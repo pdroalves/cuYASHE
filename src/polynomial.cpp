@@ -252,6 +252,10 @@ ZZ get_ZZ(bn_t *a){
 void Polynomial::crt(){
   if(get_crt_computed())
     return;
+
+  #ifdef VERBOSE
+  std::cout << "Applying CRT." << std::endl;
+  #endif
   callCRT(d_bn_coefs,
           (deg()+1),
           get_device_crt_residues(),
@@ -278,6 +282,10 @@ void Polynomial::update_device_data(){
 
   cuyasheint_t *h_data = 0x0;
   if(!get_icrt_computed()){
+    #ifdef VERBOSE
+    std::cout << "Allocating memory and copying bn_t's." << std::endl;
+    #endif
+    
     // Verifica se o espaçamento é válido. Se não for, ajusta.
     if(this->get_crt_spacing() < (this->deg()+1)){
       int new_spacing;
@@ -345,6 +353,10 @@ void Polynomial::update_device_data(){
 void Polynomial::icrt(){  
   if(get_icrt_computed())
     return;
+
+  #ifdef VERBOSE
+  std::cout << "Applying ICRT." << std::endl;
+  #endif
 
   if(get_crt_spacing() > CUDAFunctions::N)
     CUDAFunctions::init(get_crt_spacing());

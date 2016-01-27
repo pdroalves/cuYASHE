@@ -18,6 +18,146 @@
 #define N 50
 
 
+double runEncrypt(Yashe cipher, int d){
+  struct timespec start, stop;
+  
+  Polynomial a(d);
+  a.set_coeff(0,rand());
+  a.update_device_data();
+      
+  clock_gettime( CLOCK_REALTIME, &start);
+  for(int i = 0; i < N;i++){
+    cipher.encrypt(a);
+    cudaDeviceSynchronize();
+  }
+  clock_gettime( CLOCK_REALTIME, &stop);
+  return compute_time_ms(start,stop)/N;
+}
+
+double runDecrypt(Yashe cipher, int d){
+  struct timespec start, stop;
+  
+  Polynomial a(d-1);
+  a.set_coeff(0,rand());
+  a.update_device_data();
+
+  Ciphertext c = cipher.encrypt(a);
+  // c.update_crt_spacing(2*d-1);
+  c.update_device_data();
+
+  clock_gettime( CLOCK_REALTIME, &start);
+  for(int i = 0; i < N;i++){
+    cipher.decrypt(c);
+    cudaDeviceSynchronize();
+  }
+  clock_gettime( CLOCK_REALTIME, &stop);
+  return compute_time_ms(start,stop)/N;
+}
+
+double runAdditionWithMemoryCopy(Yashe cipher, int d){
+  struct timespec start, stop;
+  
+  Polynomial a,b;
+  a.set_coeff(0,rand());
+  b.set_coeff(0,rand());
+
+  Ciphertext ct_a = cipher.encrypt(a);
+  Ciphertext ct_b = cipher.encrypt(b);
+  ct_a.update_host_data();
+  ct_a.set_crt_computed(false);
+  ct_a.set_icrt_computed(false);
+  ct_b.update_host_data();
+  ct_b.set_crt_computed(false);  
+  ct_b.set_icrt_computed(false);  
+
+  clock_gettime( CLOCK_REALTIME, &start);
+  for(int i = 0; i < N;i++){
+    Ciphertext c= (ct_a+ct_b);
+
+    ct_a.set_crt_computed(false);
+    ct_a.set_icrt_computed(false);
+    ct_b.set_crt_computed(false);
+    ct_b.set_icrt_computed(false);
+    cudaDeviceSynchronize();
+  }
+  clock_gettime( CLOCK_REALTIME, &stop);
+  return compute_time_ms(start,stop)/N;
+}
+
+double runAdditionWithoutMemoryCopy(Yashe cipher, int d){
+  struct timespec start, stop;
+
+  Polynomial a,b;
+  a.set_coeff(0,rand());
+  b.set_coeff(0,rand());
+  Ciphertext ct_a = cipher.encrypt(a);
+  Ciphertext ct_b = cipher.encrypt(b);
+  ct_a.update_device_data();
+  ct_b.update_device_data();
+  clock_gettime( CLOCK_REALTIME, &start);
+  for(int i = 0; i < N;i++){
+    Ciphertext c = (ct_a+ct_b);
+    cudaDeviceSynchronize();
+  }
+  clock_gettime( CLOCK_REALTIME, &stop);
+  return compute_time_ms(start,stop)/N;
+}
+
+double runMulWithMemoryCopy(Yashe cipher, int d){
+  struct timespec start, stop;
+
+  Polynomial a,b;
+  a.set_coeff(0,rand());
+  b.set_coeff(0,rand());
+  Ciphertext ct_a = cipher.encrypt(a);
+  Ciphertext ct_b = cipher.encrypt(b);    
+
+  clock_gettime( CLOCK_REALTIME, &start);
+  for(int i = 0; i < N;i++){
+    Ciphertext c =  (ct_a*ct_b);
+    cudaDeviceSynchronize();
+  }
+  clock_gettime( CLOCK_REALTIME, &stop);
+  return compute_time_ms(start,stop)/N;
+}
+
+double runMulWithoutMemoryCopy(Yashe cipher, int d){
+  struct timespec start, stop;
+
+  Polynomial a,b;
+  a.set_coeff(0,rand());
+  b.set_coeff(0,rand());
+  Ciphertext ct_a = cipher.encrypt(a);
+  Ciphertext ct_b = cipher.encrypt(b);
+
+  ct_a.update_device_data();
+  ct_b.update_device_data();
+        
+  clock_gettime( CLOCK_REALTIME, &start);
+  for(int i = 0; i < N;i++){
+    Ciphertext c =  (ct_a*ct_b);
+    cudaDeviceSynchronize();
+  }
+  clock_gettime( CLOCK_REALTIME, &stop);
+  return compute_time_ms(start,stop)/N;
+}
+
+double runKeyswitch(Yashe cipher, int d){
+  struct timespec start, stop;
+
+  Polynomial a;
+  a.set_coeff(0,rand());
+  Ciphertext c = cipher.encrypt(a);
+  c.update_device_data();
+  clock_gettime( CLOCK_REALTIME, &start);
+  for(int i = 0; i < N;i++){
+    c.convert();
+    cudaDeviceSynchronize();
+  }
+  clock_gettime( CLOCK_REALTIME, &stop);
+  return compute_time_ms(start,stop)/N;
+}
+
 int main(int argc, char* argv[]){
     struct timespec start, stop;
     double diff;
@@ -30,7 +170,6 @@ int main(int argc, char* argv[]){
     std::cout << time(NULL) << std::endl;
 
     std::cout << " 1 sec: " << compute_time_ms(stop,start) << std::endl;
-
 
     // Polynomial R;
     uint64_t t;
@@ -114,40 +253,42 @@ int main(int argc, char* argv[]){
     // for(int d = 1024;d <= 4096;d *= 2){
     for(int d = 4096;d <= 4096;d *= 2){
 
-      std::cout << "d: " << d << std::endl;
+    //////////////////////
+    // Polynomial setup //
+    //////////////////////
+    std::cout << "d: " << d << std::endl;
 
-      Polynomial::BuildNthCyclotomic(&phi, d); // generate an cyclotomic polynomial
-             
-      std::cout << "Irreducible polynomial generated in " << diff << " ms." << std::endl;
-      std::cout << "Generating " << phi.deg() << " degree polynomials." << std::endl;
-      phi.set_mod(Polynomial::global_mod);
-      Polynomial::global_phi = &phi;
+    Polynomial::BuildNthCyclotomic(&phi, d); // generate an cyclotomic polynomial
+           
+    std::cout << "Irreducible polynomial generated in " << diff << " ms." << std::endl;
+    std::cout << "Generating " << phi.deg() << " degree polynomials." << std::endl;
+    phi.set_mod(Polynomial::global_mod);
+    Polynomial::global_phi = &phi;
 
-      // Set params to NTL 
-      ZZ_p::init(Polynomial::global_mod);
-      for(int i = 0; i <= phi.deg();i++){
-        NTL::SetCoeff(NTL_Phi,i,conv<ZZ_p>(phi.get_coeff(i)));
-      }
-      ZZ_pE::init(NTL_Phi);
+    // Set params to NTL 
+    ZZ_p::init(Polynomial::global_mod);
+    for(int i = 0; i <= phi.deg();i++){
+      NTL::SetCoeff(NTL_Phi,i,conv<ZZ_p>(phi.get_coeff(i)));
+    }
+    ZZ_pE::init(NTL_Phi);
 
-      
-      Polynomial::gen_crt_primes(Polynomial::global_mod,d);
-      CUDAFunctions::init(2*d);
-      
-      
-      std::cout << "CRT primes generated in " << diff << " ms." << std::endl;
+    Polynomial::gen_crt_primes(Polynomial::global_mod,d);
+    CUDAFunctions::init(2*d);
+    
+    std::cout << "CRT primes generated in " << diff << " ms." << std::endl;
+    std::cout << "q: " << NTL::NumBytes(q)*8 << " bits" << std::endl;
 
-      std::cout << "q: " << NTL::NumBytes(q)*8 << " bits" << std::endl;
-
+    //////////////////
+    // Cipher setup //
+    //////////////////
     Yashe cipher = Yashe();
 
-      Yashe::d = d;
-      Yashe::phi = phi;
-      Yashe::q = q;
-
-      Yashe::t = t;
-      Yashe::w = conv<ZZ>(w);
-      Yashe::lwq = floor(NTL::log(q)/(log(2)*w)+1);
+    Yashe::d = d;
+    Yashe::phi = phi;
+    Yashe::q = q;
+    Yashe::t = t;
+    Yashe::w = conv<ZZ>(w);
+    Yashe::lwq = floor(NTL::log(q)/(log(2)*w)+1);
 
       
     clock_gettime( CLOCK_REALTIME, &start);
@@ -169,144 +310,34 @@ int main(int argc, char* argv[]){
     clock_gettime( CLOCK_REALTIME, &stop);
     diff = compute_time_ms(start,stop)/N;
     std::cout << "get_sample) " << diff << " ms" << std::endl;
-    // encrypt << d << " " << diff << std::endl;;
 
-    Ciphertext c;
-    Polynomial a(2*d);
-    Polynomial b;
-    // a.set_coeff(0,rand());
-    // a.update_device_data();
-        
-    // clock_gettime( CLOCK_REALTIME, &start);
-    // for(int i = 0; i < N;i++){
-    //   cipher.encrypt(a);
-    //   cudaDeviceSynchronize();
-    // }
-        
-    // clock_gettime( CLOCK_REALTIME, &stop);
-    // diff = compute_time_ms(start,stop)/N;
-    // std::cout << "Encrypt) Time measured with memory copy: " << diff << " ms" << std::endl;
-    // encrypt << d << " " << diff << std::endl;;
-        
-    c = cipher.encrypt(a);
-    c.update_device_data();
-
-    clock_gettime( CLOCK_REALTIME, &start);
-    for(int i = 0; i < N;i++){
-      cipher.decrypt(c);
-      cudaDeviceSynchronize();
-    }
-        
-    clock_gettime( CLOCK_REALTIME, &stop);
-    diff = compute_time_ms(start,stop)/N;
+    diff = runEncrypt(cipher, d);
+    std::cout << "Encrypt) Time measured with memory copy: " << diff << " ms" << std::endl;
+    encrypt << d << " " << diff << std::endl;
+    
+    diff = runDecrypt(cipher, d);
     std::cout << "Decrypt) Time measured with memory copy: " << diff << " ms" << std::endl;
     decrypt << d << " " << diff << std::endl;;
-
-    Polynomial::random(&a,d-1);
-    Polynomial::random(&b,d-1);
-
-    Ciphertext ct_a = cipher.encrypt(a);
-    Ciphertext ct_b = cipher.encrypt(b);
-    ct_a.update_host_data();
-    ct_a.set_crt_computed(false);
-    ct_a.set_icrt_computed(false);
-    ct_b.update_host_data();
-    ct_b.set_crt_computed(false);  
-    ct_b.set_icrt_computed(false);  
-
-    // clock_gettime( CLOCK_REALTIME, &start);
-    // for(int i = 0; i < N;i++){
-    //   #ifdef VERBOSE
-    //   std::cout << i << std::endl;
-    //   #endif
-
-    //   c = (ct_a+ct_b);
-    //   // delete &a;
-    //   ct_a.set_crt_computed(false);
-    //   ct_a.set_icrt_computed(false);
-    //   ct_b.set_crt_computed(false);
-    //   ct_b.set_icrt_computed(false);
-    //   cudaDeviceSynchronize();
-    // }
-        
-    // clock_gettime( CLOCK_REALTIME, &stop);
-    // diff = compute_time_ms(start,stop)/N;
-    // std::cout << "Homomorphic Addition) Time measured with memory copy: " << diff << " ms" << std::endl;
-    // add_with_memcopy << d << " " << diff << std::endl;;
     
-    // ct_a.update_device_data();
-    // ct_b.update_device_data();
-    // clock_gettime( CLOCK_REALTIME, &start);
-    // for(int i = 0; i < N;i++){
-    //   #ifdef VERBOSE
-    //   std::cout << i << std::endl;
-    //   #endif
+    diff = runAdditionWithMemoryCopy(cipher, d);
+    std::cout << "Homomorphic Addition) Time measured with memory copy: " << diff << " ms" << std::endl;
+    add_with_memcopy << d << " " << diff << std::endl;;
 
-    //    c = (ct_a+ct_b);
-    //   // delete &a;
-    //   cudaDeviceSynchronize();
-    // }
-        
-    // clock_gettime( CLOCK_REALTIME, &stop);
-    // diff = compute_time_ms(start,stop)/N;
-    // std::cout << "Homomorphic Addition) Time measured without memory copy: " << diff << " ms" << std::endl;
-    // add_without_memcopy << d << " " << diff << std::endl;;
+    diff = runAdditionWithoutMemoryCopy(cipher, d);
+    std::cout << "Homomorphic Addition) Time measured without memory copy: " << diff << " ms" << std::endl;
+    add_without_memcopy << d << " " << diff << std::endl;;
 
-    Polynomial::random(&a,d-1);
-    Polynomial::random(&b,d-1);
-    ct_a = cipher.encrypt(a);
-    ct_b = cipher.encrypt(b);    
-
-    clock_gettime( CLOCK_REALTIME, &start);
-        for(int i = 0; i < N;i++){
-          #ifdef VERBOSE
-          std::cout << i << std::endl;
-          #endif
-
-          Ciphertext c =  (ct_a*ct_b);
-          cudaDeviceSynchronize();
-        }
-        
-    clock_gettime( CLOCK_REALTIME, &stop);
-    diff = compute_time_ms(start,stop)/N;
+    diff = runMulWithMemoryCopy(cipher, d);
     std::cout << "Homomorphic Multiplication) Time measured with memory copy: " << diff << " ms" << std::endl;
     mult_with_memcopy << d << " " << diff << std::endl;;
-
-
-    ct_a.update_device_data();
-    ct_b.update_device_data();
-        
-    clock_gettime( CLOCK_REALTIME, &start);
-        for(int i = 0; i < N;i++){
-          #ifdef VERBOSE
-          std::cout << i << std::endl;
-          #endif
-
-          Ciphertext c =  (ct_a*ct_b);
-          // delete &a;
-          cudaDeviceSynchronize();
-
-        }
-        
-    clock_gettime( CLOCK_REALTIME, &stop);
-        diff = compute_time_ms(start,stop)/N;
-        std::cout << "Homomorphic Multiplication) Time measured without memory copy: " << diff << " ms" << std::endl;
-        mult_without_memcopy << d << " " << diff << std::endl;;
-
-        c = ct_a;
     
-    c.update_device_data();
-    clock_gettime( CLOCK_REALTIME, &start);
-        for(int i = 0; i < N;i++){
-          c.convert();
-          cudaDeviceSynchronize();
+    diff = runMulWithoutMemoryCopy(cipher, d);
+    std::cout << "Homomorphic Multiplication) Time measured without memory copy: " << diff << " ms" << std::endl;
+    mult_without_memcopy << d << " " << diff << std::endl;;
 
-        }
-        
-    clock_gettime( CLOCK_REALTIME, &stop);
-        diff = compute_time_ms(start,stop)/N;
-        std::cout << "KeySwitch) Time measured with memory copy: " << diff << " ms" << std::endl;
-        keyswitch << d << " " << diff << std::endl;;
-    }
-
+    diff = runKeyswitch(cipher, d);
+    std::cout << "KeySwitch) Time measured with memory copy: " << diff << " ms" << std::endl;
+    keyswitch << d << " " << diff << std::endl;;
+  }
+  cudaDeviceReset();
 }

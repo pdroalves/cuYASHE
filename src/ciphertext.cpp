@@ -47,8 +47,8 @@ Ciphertext Ciphertext::operator*(Ciphertext &b){
     c2.convert();
 
   Polynomial g = common_multiplication<Polynomial>(&c1,&c2);
-  g *= (Yashe::t.get_value());
   g.reduce();
+  g *= (Yashe::t.get_value());
 
   Ciphertext p;
   p.set_coeffs(g.deg()+1);

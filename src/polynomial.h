@@ -288,7 +288,23 @@ class Polynomial{
     // Operators
     Polynomial operator=(Polynomial b){//Copy
 
-        this->copy(b);
+      /////////////////////////////
+      // Doesn't duplicate data //
+      /////////////////////////////
+      ///
+      this->stream = b.get_stream();
+
+      this->CRTSPACING = b.get_crt_spacing();
+      this->d_bn_coefs = b.d_bn_coefs;
+      this->h_bn_coefs = b.h_bn_coefs;
+      this->d_polyCRT = b.d_polyCRT;
+
+      this->set_crt_computed(b.get_crt_computed());
+      this->set_icrt_computed(b.get_icrt_computed());
+      this->set_host_updated(b.get_host_updated());
+
+      if(b.get_host_updated())
+        set_coeffs(b.get_coeffs());
 
         #ifdef VERBOSE
           std::cout << "Polynomial copied. " << std::endl;
@@ -549,6 +565,8 @@ class Polynomial{
 
       if(this->get_icrt_computed()){
         assert(this->d_bn_coefs);
+        if(this->deg()+1 == 0)
+          return *this;
         CUDAFunctions::callPolynomialOPDigit( MUL,
                                             this->get_stream(),
                                             this->d_bn_coefs,
@@ -1117,26 +1135,26 @@ class Polynomial{
       std::cout << "update_crt_spacing - " << spacing << std::endl;
       #endif
 
+      int new_spacing;
       if(spacing <= 0)
-        // Do nothing
-        return;
-
-      int new_spacing = pow(2,ceil(log2(spacing)));
-      // int phi_spacing = pow(2,ceil(log2(Polynomial::global_phi->deg()+1)));
-      // new_spacing = std::max( new_spacing, phi_spacing);
+        new_spacing = pow(2,ceil(log2(get_phi().deg())));
+      else
+        new_spacing = pow(2,ceil(log2(spacing)));
 
       /**
        * Adjust CRTSPACING
        *
        * Realloc *_bn_coefs and d_poly_CRT either
        */
-      if(this->get_crt_spacing() == new_spacing && get_crt_computed()){
+      if(this->get_crt_spacing() == new_spacing){
         // Data lies in GPU's global memory and has the correct alignment
         #ifdef VERBOSE
         std::cout << "No need to update crt spacing." << std::endl;
         #endif
         return;
-      }else if(!get_crt_computed() || get_icrt_computed()){
+      }else if(!get_crt_computed()){
+        update_host_data();
+        
         #ifdef VERBOSE
         std::cout << "Will alloc memory  to update crt spacing." << std::endl;
         #endif
@@ -1225,9 +1243,9 @@ class Polynomial{
 
         return; 
       }else{
-        // #ifdef VERBOSE
+        #ifdef VERBOSE
         std::cout << "Need a realign to update crt spacing." << std::endl;
-        // #endif
+        #endif
         cudaError_t result;
         /**
          * Update bn_coefs
@@ -1236,8 +1254,8 @@ class Polynomial{
         if(d_bn_coefs){
           //result = cudaFree(d_bn_coefs);
           d_bn_coefs = 0x0;
-          if(result != cudaSuccess)
-            throw  cudaGetErrorString(result);
+          // if(result != cudaSuccess)
+          //   throw  cudaGetErrorString(result);
         } 
        }catch(const char* s){
         std::cerr << "Exception on release of d_bn_coefs: " << s << std::endl;

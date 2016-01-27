@@ -1121,10 +1121,10 @@ __host__ void CUDAFunctions::init(int N){
 
   #ifdef NTTMUL
   // W used on NTT
-  #ifdef VERBOSE
+  // #ifdef VERBOSE
   std::cout << "Will compute W -- N = " << N << std::endl;
   std::cout << "P " << PZZ << std::endl;
-  #endif
+  // #endif
 
   cuyasheint_t *h_W;
   cuyasheint_t *h_WInv;
@@ -1336,10 +1336,15 @@ __global__ void polynomialReductionCoefs(bn_t *a,const int half,const int N,cons
     a[cid].used = get_used_index(a[cid].dp,STD_BNT_WORDS_ALLOC)+1;
     a[cid + half +1].used = get_used_index(a[cid + half +1].dp,STD_BNT_WORDS_ALLOC)+1;
 
+    // a[i] = a[i] - a[i+half]
     int carry = bn_subn_low(a[cid].dp, a[cid].dp, a[cid + half + 1].dp, min_d(a[cid+half].used,a[cid + half + 1].used));
     a[cid].used = min_d(a[cid+half].used,a[cid + half + 1].used);
     
     if(carry == BN_NEG){
+      // q - (UINT64_MAX - c)
+      // compl2 == UINT64_MAX -C
+      // 
+      // SOMAR Q
       bn_2_compl(&a[cid]);
       carry = bn_subn_low(a[cid].dp,q.dp,a[cid].dp,q.used);
       assert(carry == BN_POS);

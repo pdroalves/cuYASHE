@@ -38,6 +38,8 @@ Polynomial Distribution::get_sample(int degree,int spacing){
   p.set_icrt_computed(true);
   p.set_crt_computed(false);
   p.set_host_updated(false);
+
+  p.crt();
   
   ///////////////////////////////////////
   // Adjust to the used distribution   //
