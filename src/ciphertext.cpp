@@ -86,17 +86,18 @@ void Ciphertext::keyswitch(){
   #endif
 
   std::vector<Polynomial> P(Yashe::lwq,2*Polynomial::global_phi->deg()-1);
-  // this->worddecomp(&P);
-  bn_t WDMasking;
-  get_words(&WDMasking,Yashe::WDMasking);
-  int deg = this->deg();
+
+  bn_t W;
+  get_words(&W,Yashe::w);
+  bn_t u_W = get_reciprocal(Yashe::w);
+
   update_device_data();
+
   callWordDecomp( &P,
                   this->d_bn_coefs,
-                  deg,
                   Yashe::lwq,
-                  NumBits(Yashe::w),
-                  WDMasking,
+                  W,
+                  u_W,
                   get_stream());
   
   for(int i = 0; i < Yashe::lwq; i ++){

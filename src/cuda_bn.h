@@ -62,8 +62,12 @@ __device__ void bn_muld_low(cuyasheint_t * c,
 									int sb, 
 									int l, 
 									int h);
-__device__ void bn_mod_barrt(	bn_t *C, const bn_t *A,const int NCoefs,
-								const cuyasheint_t * m,  int sm, const cuyasheint_t * u, int su);
+__device__ void bn_mod_barrt(	bn_t *C, 
+								const bn_t *A,const int NCoefs,
+								const cuyasheint_t * m, 
+								int sm, 
+								const cuyasheint_t * u,
+								int su);
 __host__ __device__ int bn_cmpn_low(const cuyasheint_t *a,
 									const cuyasheint_t *b,
 									int size);
