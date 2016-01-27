@@ -1,5 +1,6 @@
 #include "ciphertext.h"
 #include "yashe.h"
+#include "cuda_ciphertext.h"
 
 Ciphertext Ciphertext::operator+(Ciphertext &b){
   Ciphertext c = common_addition<Ciphertext>(this,&b);
@@ -84,17 +85,21 @@ void Ciphertext::keyswitch(){
   start = get_cycles();
   #endif
 
-  this->update_host_data();
-
-  std::vector<Polynomial> P(Yashe::lwq);
-  for(int i = 0; i < Yashe::lwq;i++)
-    P[i].set_coeffs(this->get_crt_spacing());
-  this->worddecomp(&P);
-  this->set_coeffs();//Discards all coefficients
-
+  std::vector<Polynomial> P(Yashe::lwq,2*Polynomial::global_phi->deg()-1);
+  // this->worddecomp(&P);
+  bn_t WDMasking;
+  get_words(&WDMasking,Yashe::WDMasking);
+  int deg = this->deg();
+  update_device_data();
+  callWordDecomp( &P,
+                  this->d_bn_coefs,
+                  deg,
+                  Yashe::lwq,
+                  NumBits(Yashe::w),
+                  WDMasking,
+                  get_stream());
   
   for(int i = 0; i < Yashe::lwq; i ++){
-    P[i].normalize();
     Polynomial p = (P[i])*(Yashe::gamma[i]);
     *this += p;
   }
@@ -103,28 +108,5 @@ void Ciphertext::keyswitch(){
   #ifdef CYCLECOUNTING
   end = get_cycles();
   // std::cout << (end-start) << " cycles for the loop on keyswitch" << std::endl;
-  #endif
-}
-
-void Ciphertext::worddecomp(std::vector<Polynomial> *P){
-  #ifdef CYCLECOUNTING
-  uint64_t start,end;
-  start = get_cycles();
-  #endif
-
-  for(int i = 0; i <= this->deg() ; i++){
-    ZZ c = this->get_coeff(i);
-    int j = 0;
-    while(c > 0){
-      Polynomial p = P->at(j);
-      p.set_coeff(i,(c & Yashe::WDMasking));
-      c = NTL::RightShift(c,conv<long>(Yashe::w));
-      j++;
-    }
-
-  }
-  #ifdef CYCLECOUNTING
-  end = get_cycles();
-  std::cout << (end-start) << " cycles to worddecomp" << std::endl;
   #endif
 }

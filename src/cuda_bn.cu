@@ -296,9 +296,45 @@ __host__ void bn_grow(bn_t *a,const unsigned int new_size){
 
 }
 
+__host__ __device__ void bn_copy(bn_t *a, bn_t *b){
+	// Copy b to a
+	assert(a->alloc >= b->alloc);
+	a->used = b->used;
+	a->sign = b->sign;
+	for(int i = 0; i < b->used; i++)
+		a->dp[i] = b->dp[i];
+}
 __host__ __device__ void bn_2_compl(bn_t *a){
 	for(int i = 0; i < a->used; i++)
 		a->dp[i] = (a->dp[i]^UINT64_MAX)+1; 
+}
+
+__host__ __device__ void bn_bitwise_and(bn_t *a, bn_t *b){
+	// Compute a = a & b
+	for(int i = 0; i < min_d(a->used,b->used);i++)
+		a->dp[i] = (a->dp[i] & b->dp[i]);
+}
+
+
+__host__ __device__ cuyasheint_t bn_rshb_low(cuyasheint_t *c, const cuyasheint_t *a, int size, int bits) {
+	int i;
+	cuyasheint_t r, carry, shift, mask;
+
+	c += size - 1;
+	a += size - 1;
+	/* Prepare the bit mask. */
+	shift = BN_DIGIT - bits;
+	carry = 0;
+	mask = MASK(bits);
+	for (i = size - 1; i >= 0; i--, a--, c--) {
+		/* Get the needed least significant bits. */
+		r = (*a) & mask;
+		/* Shift left the operand. */
+		*c = ((*a) >> bits) | (carry << shift);
+		/* Update the carry. */
+		carry = r;
+	}
+	return carry;
 }
 
 ////////////////
@@ -980,7 +1016,7 @@ __global__ void cuICRT(	bn_t *poly,
 						M_used,
 						u,
 						u_used);
-    	poly[cid].used = get_used_index(poly[cid].dp,STD_BNT_WORDS_ALLOC)+1;
+    	poly[cid].used = get_used_index(poly[cid].dp,M_used+1)+1;
     	bn_zero_non_used(&poly[cid]);
 	 }
 

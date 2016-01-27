@@ -38,16 +38,16 @@ void Yashe::generate_keys(){
     Polynomial fl = xkey.get_sample(phi.deg()-1);
 
     f = t*fl + 1;
-    f %= q;
+    f.reduce();
 
     #ifdef DEBUG
     std::cout << "fl: " << fl.to_string() << std::endl;
     std::cout << "f: " << f.to_string() << std::endl;
     #endif
     try{
-      fInv = Polynomial::InvMod(f,phi);
+      // fInv = Polynomial::InvMod(f,phi);
       // fInv.normalize();
-      // fInv = f;
+      fInv = f;
 
       break;
     } catch (exception& e)
@@ -82,7 +82,7 @@ void Yashe::generate_keys(){
     hs.reduce();
     gamma[k] += e;
     gamma[k] += hs;
-    gamma[k] %= q;
+    gamma[k].reduce();
     gamma[k].update_device_data();
 
     #ifdef DEBUG
@@ -93,7 +93,7 @@ void Yashe::generate_keys(){
   }
 
   // Word decomp mask
-  WDMasking = NTL::LeftShift(ZZ(1),conv<long>(Yashe::w - 1));
+  WDMasking = NTL::LeftShift(ZZ(1),NumBits(Yashe::w))-1;
 
 
   #ifdef VERBOSE
@@ -116,7 +116,6 @@ Ciphertext Yashe::encrypt(Polynomial m){
   Polynomial e = xerr.get_sample(phi.deg()-1,2*(phi.deg()-1));
   clock_gettime( CLOCK_REALTIME, &stop);
   float diff = compute_time_ms(start,stop);
-  std::cout << "sampling: " << diff << std::endl;
 
   #ifdef DEBUG
   std::cout << "ps: "<< ps.to_string() <<std::endl;
@@ -124,11 +123,9 @@ Ciphertext Yashe::encrypt(Polynomial m){
   #endif
  
   Polynomial p;
-  p = (h*ps) + e;
   Polynomial mdelta = delta*m;
-  p += mdelta;
+  p = (h*ps) + e + mdelta;
   p.reduce();
-
 
   // std::cout << "phi.deg() " << phi.deg() << std::endl;
   // std::cout << "h " << h.to_string() << std::endl;
@@ -137,7 +134,10 @@ Ciphertext Yashe::encrypt(Polynomial m){
   // std::cout << "mdelta " << mdelta.to_string() << std::endl;
   // std::cout << "p " << p.to_string() << std::endl;
 
-  Ciphertext c(p);
+  Ciphertext c = p;
+  // mdelta.release();
+  // ps.release();
+  // e.release();
   return c;
 }
 Polynomial Yashe::decrypt(Ciphertext c){
@@ -168,7 +168,6 @@ Polynomial Yashe::decrypt(Ciphertext c){
 
   }
   g.reduce();
-  g %= q;
   ZZ g_value = g.get_coeff(0);
 
   ZZ coeff = g_value*t.get_value();

@@ -22,6 +22,14 @@ typedef struct bn_st{
 	cuyasheint_t *dp = NULL;
 } bn_t;
 
+/**
+ * Returns a bit mask to isolate the lowest part of a digit.
+ *
+ * @param[in] B			- the number of bits to isolate.
+ */
+#define MASK(B)				(((cuyasheint_t)1 << (B)) - 1)
+ 
+
 __host__  void bn_new(bn_t *a);
 __host__ __device__ void bn_zero(bn_t *a);
 __host__ __device__ void bn_zero_non_used(bn_t *a);
@@ -29,7 +37,10 @@ __host__ __device__ bool bn_is_zero(const bn_t* a);
 __host__ __device__ void bn_set_dig(bn_t *a, cuyasheint_t digit);
 __host__  void bn_free(bn_t *a);
 __host__ void bn_grow(bn_t *a,const unsigned int new_size);
+__host__ __device__ void bn_copy(bn_t *a, bn_t *b);
 __host__ __device__ void bn_2_compl(bn_t *a);
+__host__ __device__ void bn_bitwise_and(bn_t *a, bn_t *b);
+__host__ __device__ cuyasheint_t bn_rshb_low(cuyasheint_t *c, const cuyasheint_t *a, int size, int bits);
 __host__ __device__ cuyasheint_t bn_addn_low(cuyasheint_t *c,
 									cuyasheint_t *a,
 									cuyasheint_t *b,

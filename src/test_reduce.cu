@@ -48,6 +48,7 @@ int main(){
   ZZ_p::init(Polynomial::global_mod);
 
   std::cout << "Phi: " << phi.to_string() << std::endl;
+  std::cout << "M: " << Polynomial::CRTProduct << std::endl;
 
   // GPU
   Polynomial a;

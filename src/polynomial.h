@@ -548,7 +548,6 @@ class Polynomial{
       Integer B(b);
 
       if(this->get_icrt_computed()){
-        assert(this->get_crt_computed());
         assert(this->d_bn_coefs);
         CUDAFunctions::callPolynomialOPDigit( MUL,
                                             this->get_stream(),
@@ -579,10 +578,10 @@ class Polynomial{
         return p;
     }
     Polynomial operator%=(ZZ b){
-      // #warning needed until modn bug fix
+      #warning needed until modn bug fix
       // update_host_data();
       
-      if(!this->get_host_updated()){
+      if(get_icrt_computed() || get_crt_computed()){
         icrt();
         modn(b);
         return *this;                
@@ -1137,7 +1136,7 @@ class Polynomial{
         std::cout << "No need to update crt spacing." << std::endl;
         #endif
         return;
-      }else if(!get_crt_computed()){
+      }else if(!get_crt_computed() || get_icrt_computed()){
         #ifdef VERBOSE
         std::cout << "Will alloc memory  to update crt spacing." << std::endl;
         #endif
@@ -1197,10 +1196,7 @@ class Polynomial{
         result = cudaMalloc((void**)&d_polyCRT,new_spacing*(CRTPrimes.size())*sizeof(cuyasheint_t));        
         assert(result == cudaSuccess);
         result = cudaMalloc((void**)&tmp,new_spacing*STD_BNT_WORDS_ALLOC*sizeof(cuyasheint_t));        
-        if(result != cudaSuccess){
-          std::cout << "Erro! " << cudaGetErrorString(result) << std::endl;
-          exit(1);
-        }
+        assert(result == cudaSuccess);
         // tmp = &d_polyCRT[new_spacing*(CRTPrimes.size())];
 
         h_bn_coefs = (bn_t*)malloc(new_spacing*sizeof(bn_t));
@@ -1224,18 +1220,21 @@ class Polynomial{
         result = cudaMemsetAsync(d_polyCRT,0,new_spacing*(CRTPrimes.size())*sizeof(cuyasheint_t),get_stream());
         assert(result == cudaSuccess);
 
+        if(get_icrt_computed())
+          crt();
+
         return; 
       }else{
-        #ifdef VERBOSE
+        // #ifdef VERBOSE
         std::cout << "Need a realign to update crt spacing." << std::endl;
-        #endif
+        // #endif
         cudaError_t result;
         /**
          * Update bn_coefs
          */
        try{
         if(d_bn_coefs){
-          result = cudaFree(d_bn_coefs);
+          //result = cudaFree(d_bn_coefs);
           d_bn_coefs = 0x0;
           if(result != cudaSuccess)
             throw  cudaGetErrorString(result);
@@ -1246,7 +1245,7 @@ class Polynomial{
        } 
        try{
          if(h_bn_coefs){
-            free(h_bn_coefs);
+            // free(h_bn_coefs);
             h_bn_coefs = 0x0;
          }
        }catch(const char* s){
@@ -1327,6 +1326,9 @@ class Polynomial{
       // To-do
       // throw "Polynomial InvMod not implemented!";
       #warning "Polynomial InvMod not implemented!"
+
+      a.update_host_data();
+      b.update_host_data();
 
       //
       ZZ_pEX a_ntl;

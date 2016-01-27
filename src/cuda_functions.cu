@@ -18,12 +18,11 @@
 #define PRIMEP (uint64_t)18446744069414584321
 #define PRIMITIVE_ROOT (int)7
 #define W4 (uint64_t)281474976710656L
-#define W8 (uint64_t)18446744069397807105L
 
  ZZ PZZ = to_ZZ(PRIMEP); 
 
 cuyasheint_t CUDAFunctions::wN = 0;
-cuyasheint_t *CUDAFunctions::d_W = NULL;
+cuyasheint_t *CUDAFunctions::d_W = NULL;//W and WInv doesn't fit constant memory
 cuyasheint_t *CUDAFunctions::d_WInv = NULL;
 cuyasheint_t *CUDAFunctions::d_inner_results = NULL;
 cuyasheint_t *CUDAFunctions::d_inner_results_used = NULL;
@@ -32,6 +31,10 @@ extern __constant__ int M_used;
 extern __constant__ cuyasheint_t u[STD_BNT_WORDS_ALLOC];
 extern __constant__ int u_used;
 extern __constant__ cuyasheint_t CRTPrimesConstant[PRIMES_BUCKET_SIZE];
+__constant__ cuyasheint_t W16[225]; 
+__constant__ cuyasheint_t WInv16[225]; 
+__constant__ cuyasheint_t W8[50]; 
+__constant__ cuyasheint_t WInv8[50]; 
 
 #elif defined(CUFFTMUL)
 cufftHandle CUDAFunctions::plan;
@@ -382,12 +385,12 @@ __host__ __device__ uint64_t s_sub(uint64_t a,uint64_t b){
 }
 
 template <int RADIX, int type>
-__host__ __device__ void butterfly(uint64_t *v){
+__device__ void butterfly(uint64_t *v){
   printf("Nothing to do");
 }
 
 template<>
-__host__ __device__ void butterfly<2,FORWARD>(uint64_t *v){
+__device__ void butterfly<2,FORWARD>(uint64_t *v){
   ///////////////////////
   // Radix-2 Butterfly //
   ///////////////////////
@@ -398,7 +401,7 @@ __host__ __device__ void butterfly<2,FORWARD>(uint64_t *v){
 }
 
 template<>
-__host__ __device__ void butterfly<2,INVERSE>(uint64_t *v){
+__device__ void butterfly<2,INVERSE>(uint64_t *v){
   ///////////////////////
   // Radix-2 Butterfly //
   ///////////////////////
@@ -409,7 +412,7 @@ __host__ __device__ void butterfly<2,INVERSE>(uint64_t *v){
 }
 
 template<>
-__host__ __device__ void butterfly<4,FORWARD>(uint64_t *v){
+__device__ void butterfly<4,FORWARD>(uint64_t *v){
   ///////////////////////
   // Radix-4 Butterfly //
   ///////////////////////
@@ -430,7 +433,7 @@ __host__ __device__ void butterfly<4,FORWARD>(uint64_t *v){
 }
 
 template<>
-__host__ __device__ void butterfly<4,INVERSE>(uint64_t *v){
+__device__ void butterfly<4,INVERSE>(uint64_t *v){
   ///////////////////////
   // Radix-4 Butterfly //
   ///////////////////////
@@ -450,8 +453,11 @@ __host__ __device__ void butterfly<4,INVERSE>(uint64_t *v){
   
 }
 
+///////////////////
+// Doesn't work! //
+///////////////////
 template<>
-__host__ __device__ void butterfly<8,FORWARD>(uint64_t *v){
+__device__ void butterfly<8,FORWARD>(uint64_t *v){
   ///////////////////////
   // Radix-4 Butterfly //
   ///////////////////////
@@ -459,16 +465,143 @@ __host__ __device__ void butterfly<8,FORWARD>(uint64_t *v){
   const uint64_t v1 = s_rem(v[1]);
   const uint64_t v2 = s_rem(v[2]);
   const uint64_t v3 = s_rem(v[3]);
+  const uint64_t v4 = s_rem(v[4]);
+  const uint64_t v5 = s_rem(v[5]);
+  const uint64_t v6 = s_rem(v[6]);
+  const uint64_t v7 = s_rem(v[7]);
   
-  // v0 + v1 + v2 + v3
-  v[0] = s_add(s_add(s_add(v0,v1),v2),v3);
-  // v0 + W4*v1 - v2 - W4*v3
-  v[1] = s_sub(s_sub(s_add(v0,s_mul(W4,v1)),v2),s_mul(W4,v3)); 
-  // v0 - v1 + v2 - v3
-  v[2] = s_sub(s_add(s_sub(v0,v1),v2),v3);
-  // v0 - W4*v1 - v2 + W4*v3
-  v[3] = s_add(s_sub(s_sub(v0,s_mul(W4,v1)),v2),s_mul(W4,v3)); 
+
+  v[0] = s_add(s_add(s_add(s_add(s_add(s_add(s_add(v0,v1),v2),v3),v4),v5),v6),v7);
+  v[1] = s_add(s_add(s_add(s_add(s_add(s_add(s_add( v0,
+                                                    s_mul(v1,W8[1])),
+                                                    s_mul(v2,W8[2])),
+                                                    s_mul(v3,W8[3])),
+                                                    s_mul(v4,W8[4])),
+                                                    s_mul(v5,W8[5])),
+                                                    s_mul(v6,W8[6])),
+                                                    s_mul(v7,W8[7]));
+  v[2] = s_add(s_add(s_add(s_add(s_add(s_add(s_add( v0,
+                                                    s_mul(v1,W8[2])),
+                                                    s_mul(v2,W8[4])),
+                                                    s_mul(v3,W8[6])),
+                                                    s_mul(v4,W8[8])),
+                                                    s_mul(v5,W8[10])),
+                                                    s_mul(v6,W8[12])),
+                                                    s_mul(v7,W8[14]));
+  v[3] = s_add(s_add(s_add(s_add(s_add(s_add(s_add( v0,
+                                                    s_mul(v1,W8[3])),
+                                                    s_mul(v2,W8[6])),
+                                                    s_mul(v3,W8[9])),
+                                                    s_mul(v4,W8[12])),
+                                                    s_mul(v5,W8[15])),
+                                                    s_mul(v6,W8[18])),
+                                                    s_mul(v7,W8[21]));
+  v[4] = s_add(s_add(s_add(s_add(s_add(s_add(s_add( v0,
+                                                    s_mul(v1,W8[4])),
+                                                    s_mul(v2,W8[8])),
+                                                    s_mul(v3,W8[12])),
+                                                    s_mul(v4,W8[16])),
+                                                    s_mul(v5,W8[20])),
+                                                    s_mul(v6,W8[24])),
+                                                    s_mul(v7,W8[28]));
+  v[5] = s_add(s_add(s_add(s_add(s_add(s_add(s_add( v0,
+                                                    s_mul(v1,W8[5])),
+                                                    s_mul(v2,W8[10])),
+                                                    s_mul(v3,W8[15])),
+                                                    s_mul(v4,W8[20])),
+                                                    s_mul(v5,W8[25])),
+                                                    s_mul(v6,W8[30])),
+                                                    s_mul(v7,W8[35]));
+  v[6] = s_add(s_add(s_add(s_add(s_add(s_add(s_add( v0,
+                                                    s_mul(v1,W8[6])),
+                                                    s_mul(v2,W8[12])),
+                                                    s_mul(v3,W8[18])),
+                                                    s_mul(v4,W8[24])),
+                                                    s_mul(v5,W8[30])),
+                                                    s_mul(v6,W8[36])),
+                                                    s_mul(v7,W8[42]));
+  v[7] = s_add(s_add(s_add(s_add(s_add(s_add(s_add( v0,
+                                                    s_mul(v1,W8[7])),
+                                                    s_mul(v2,W8[14])),
+                                                    s_mul(v3,W8[21])),
+                                                    s_mul(v4,W8[28])),
+                                                    s_mul(v5,W8[35])),
+                                                    s_mul(v6,W8[42])),
+                                                    s_mul(v7,W8[49]));
+}
+
+template<>
+__device__ void butterfly<8,INVERSE>(uint64_t *v){
+  ///////////////////////
+  // Radix-4 Butterfly //
+  ///////////////////////
+  const uint64_t v0 = s_rem(v[0]);
+  const uint64_t v1 = s_rem(v[1]);
+  const uint64_t v2 = s_rem(v[2]);
+  const uint64_t v3 = s_rem(v[3]);
+  const uint64_t v4 = s_rem(v[4]);
+  const uint64_t v5 = s_rem(v[5]);
+  const uint64_t v6 = s_rem(v[6]);
+  const uint64_t v7 = s_rem(v[7]);
   
+
+  v[0] = s_add(s_add(s_add(s_add(s_add(s_add(s_add(v0,v1),v2),v3),v4),v5),v6),v7);
+  v[1] = s_add(s_add(s_add(s_add(s_add(s_add(s_add( v0,
+                                                    s_mul(v1,WInv8[1])),
+                                                    s_mul(v2,WInv8[2])),
+                                                    s_mul(v3,WInv8[3])),
+                                                    s_mul(v4,WInv8[4])),
+                                                    s_mul(v5,WInv8[5])),
+                                                    s_mul(v6,WInv8[6])),
+                                                    s_mul(v7,WInv8[7]));
+  v[2] = s_add(s_add(s_add(s_add(s_add(s_add(s_add( v0,
+                                                    s_mul(v1,WInv8[2])),
+                                                    s_mul(v2,WInv8[4])),
+                                                    s_mul(v3,WInv8[6])),
+                                                    s_mul(v4,WInv8[8])),
+                                                    s_mul(v5,WInv8[10])),
+                                                    s_mul(v6,WInv8[12])),
+                                                    s_mul(v7,WInv8[14]));
+  v[3] = s_add(s_add(s_add(s_add(s_add(s_add(s_add( v0,
+                                                    s_mul(v1,WInv8[3])),
+                                                    s_mul(v2,WInv8[6])),
+                                                    s_mul(v3,WInv8[9])),
+                                                    s_mul(v4,WInv8[12])),
+                                                    s_mul(v5,WInv8[15])),
+                                                    s_mul(v6,WInv8[18])),
+                                                    s_mul(v7,WInv8[21]));
+  v[4] = s_add(s_add(s_add(s_add(s_add(s_add(s_add( v0,
+                                                    s_mul(v1,WInv8[4])),
+                                                    s_mul(v2,WInv8[8])),
+                                                    s_mul(v3,WInv8[12])),
+                                                    s_mul(v4,WInv8[16])),
+                                                    s_mul(v5,WInv8[20])),
+                                                    s_mul(v6,WInv8[24])),
+                                                    s_mul(v7,WInv8[28]));
+  v[5] = s_add(s_add(s_add(s_add(s_add(s_add(s_add( v0,
+                                                    s_mul(v1,WInv8[5])),
+                                                    s_mul(v2,WInv8[10])),
+                                                    s_mul(v3,WInv8[15])),
+                                                    s_mul(v4,WInv8[20])),
+                                                    s_mul(v5,WInv8[25])),
+                                                    s_mul(v6,WInv8[30])),
+                                                    s_mul(v7,WInv8[35]));
+  v[6] = s_add(s_add(s_add(s_add(s_add(s_add(s_add( v0,
+                                                    s_mul(v1,WInv8[6])),
+                                                    s_mul(v2,WInv8[12])),
+                                                    s_mul(v3,WInv8[18])),
+                                                    s_mul(v4,WInv8[24])),
+                                                    s_mul(v5,WInv8[30])),
+                                                    s_mul(v6,WInv8[36])),
+                                                    s_mul(v7,WInv8[42]));
+  v[7] = s_add(s_add(s_add(s_add(s_add(s_add(s_add( v0,
+                                                    s_mul(v1,WInv8[7])),
+                                                    s_mul(v2,WInv8[14])),
+                                                    s_mul(v3,WInv8[21])),
+                                                    s_mul(v4,WInv8[28])),
+                                                    s_mul(v5,WInv8[35])),
+                                                    s_mul(v6,WInv8[42])),
+                                                    s_mul(v7,WInv8[49]));
 }
 
 __host__ __device__ int expand(int idxL, int N1, int N2){
@@ -491,7 +624,7 @@ __host__ __device__ void NTTIteration(cuyasheint_t *W,
                                       const int Ns,
                                       const cuyasheint_t* data0,
                                       cuyasheint_t *data1){
-	uint64_t v[4] = {0,0,0,0};
+	uint64_t v[RADIX] = {0};
 	const int idxS = j+residue_index;
   int w_index = ((j%Ns)*N)/(Ns*RADIX);
 
@@ -773,7 +906,9 @@ __host__ cuyasheint_t* CUDAFunctions::callPolynomialMul(cudaStream_t stream,
   assert(result == cudaSuccess);
 
   int RADIX;
-  if(N % 4 == 0)
+  /*if(N % 8 == 0)
+    RADIX = 8;
+  else*/ if(N % 4 == 0)
     RADIX = 4;
   else{
     assert(N % 2 == 0);
@@ -785,7 +920,9 @@ __host__ cuyasheint_t* CUDAFunctions::callPolynomialMul(cudaStream_t stream,
 
   // Forward
   for(int Ns=1; Ns<N; Ns*=RADIX){
-    if(RADIX == 4)
+    /*if(RADIX == 8)
+      NTT<8,FORWARD><<<gridDim,blockDim,1,stream >>>(CUDAFunctions::d_W,CUDAFunctions::d_WInv,N,Ns,d_a,aux);
+    else*/ if(RADIX == 4)
       NTT<4,FORWARD><<<gridDim,blockDim,1,stream >>>(CUDAFunctions::d_W,CUDAFunctions::d_WInv,N,Ns,d_a,aux);
     else{
       assert(RADIX == 2);
@@ -800,7 +937,9 @@ __host__ cuyasheint_t* CUDAFunctions::callPolynomialMul(cudaStream_t stream,
   assert(result == cudaSuccess);
 
   for(int Ns=1; Ns<N; Ns*=RADIX){
-    if(RADIX == 4)
+    /*if(RADIX == 8) 
+      NTT<8,FORWARD><<<gridDim,blockDim,1,stream >>>(CUDAFunctions::d_W,CUDAFunctions::d_WInv,N,Ns,d_b,aux);
+    else*/ if(RADIX == 4)
       NTT<4,FORWARD><<<gridDim,blockDim,1,stream >>>(CUDAFunctions::d_W,CUDAFunctions::d_WInv,N,Ns,d_b,aux);
     else{
       assert(RADIX == 2);
@@ -818,7 +957,9 @@ __host__ cuyasheint_t* CUDAFunctions::callPolynomialMul(cudaStream_t stream,
 
   // Inverse
   for(int Ns=1; Ns<N; Ns*=RADIX){
-    if(RADIX == 4)
+    /*if(RADIX == 8) 
+      NTT<8,INVERSE><<<gridDim,blockDim,1,stream >>>(CUDAFunctions::d_W,CUDAFunctions::d_WInv,N,Ns,d_a,d_result);
+    else*/ if(RADIX == 4)
       NTT<4,INVERSE><<<gridDim,blockDim,1,stream >>>(CUDAFunctions::d_W,CUDAFunctions::d_WInv,N,Ns,d_a,d_result);
     else{
       assert(RADIX == 2);
@@ -979,6 +1120,7 @@ __host__ void CUDAFunctions::init(int N){
   CUDAFunctions::N = N;
 
   #ifdef NTTMUL
+  // W used on NTT
   #ifdef VERBOSE
   std::cout << "Will compute W -- N = " << N << std::endl;
   std::cout << "P " << PZZ << std::endl;
@@ -1017,6 +1159,71 @@ __host__ void CUDAFunctions::init(int N){
 
   free(h_W);
   free(h_WInv);
+
+  int RADIX_N = 8;
+  // W used on radix-8 NTT
+  #ifdef VERBOSE
+  std::cout << "Will compute W -- N = 8" << std::endl;
+  std::cout << "P " << PZZ << std::endl;
+  #endif
+
+  k = conv<cuyasheint_t>(PZZ-1)/RADIX_N;
+  wNZZ = NTL::PowerMod(ZZ(PRIMITIVE_ROOT),k,PZZ);
+
+  wN = conv<cuyasheint_t>(wNZZ);
+  
+  int VALUES_TO_COMPUTE = (RADIX_N - 1)*(RADIX_N - 1)+1;
+  h_W = (cuyasheint_t*)malloc(VALUES_TO_COMPUTE*sizeof(cuyasheint_t));
+  h_WInv = (cuyasheint_t*)malloc(VALUES_TO_COMPUTE*sizeof(cuyasheint_t));
+
+  // Computes 1-th column from W
+  for(int j = 0; j < VALUES_TO_COMPUTE; j++)
+    h_W[j] = conv<cuyasheint_t>(NTL::PowerMod(wNZZ,j,PZZ));
+
+  // Computes 1-th column from WInv
+  for(int j = 0; j < VALUES_TO_COMPUTE; j++)
+      h_WInv[j] = conv<cuyasheint_t>(NTL::InvMod(conv<ZZ>(h_W[j]),PZZ ));
+
+  result = cudaMemcpyToSymbol (W8,h_W, VALUES_TO_COMPUTE*sizeof(cuyasheint_t));
+  assert(result == cudaSuccess);
+  result = cudaMemcpyToSymbol (WInv8,h_WInv, VALUES_TO_COMPUTE*sizeof(cuyasheint_t));
+  assert(result == cudaSuccess);
+
+  free(h_W);
+  free(h_WInv);
+
+  RADIX_N = 16;
+  // W used on radix-16 NTT
+  #ifdef VERBOSE
+  std::cout << "Will compute W -- N = 16" << std::endl;
+  std::cout << "P " << PZZ << std::endl;
+  #endif
+
+  k = conv<cuyasheint_t>(PZZ-1)/RADIX_N;
+  wNZZ = NTL::PowerMod(ZZ(PRIMITIVE_ROOT),k,PZZ);
+
+  wN = conv<cuyasheint_t>(wNZZ);
+  
+  VALUES_TO_COMPUTE = (RADIX_N - 1)*(RADIX_N - 1)+1;
+  h_W = (cuyasheint_t*)malloc(VALUES_TO_COMPUTE*sizeof(cuyasheint_t));
+  h_WInv = (cuyasheint_t*)malloc(VALUES_TO_COMPUTE*sizeof(cuyasheint_t));
+
+  // Computes 1-th column from W
+  for(int j = 0; j < VALUES_TO_COMPUTE; j++)
+    h_W[j] = conv<cuyasheint_t>(NTL::PowerMod(wNZZ,j,PZZ));
+
+  // Computes 1-th column from WInv
+  for(int j = 0; j < VALUES_TO_COMPUTE; j++)
+      h_WInv[j] = conv<cuyasheint_t>(NTL::InvMod(conv<ZZ>(h_W[j]),PZZ ));
+
+  result = cudaMemcpyToSymbol (W8,h_W, VALUES_TO_COMPUTE*sizeof(cuyasheint_t));
+  assert(result == cudaSuccess);
+  result = cudaMemcpyToSymbol (WInv8,h_WInv, VALUES_TO_COMPUTE*sizeof(cuyasheint_t));
+  assert(result == cudaSuccess);
+
+  free(h_W);
+  free(h_WInv);
+
   #elif defined(CUFFTMUL)
     cufftResult fftResult;
 
@@ -1072,14 +1279,22 @@ __global__ void cuICRTFix(bn_t *a, const int N, bn_t q,bn_t u_q,bn_t q2){
        *
        * coef = q - (M - coef)
        */
+      // result = M - coef
       int carry = bn_subn_low(coef.dp, M, coef.dp, max_d(coef.used,M_used));
       assert(carry == BN_POS);     
       coef.used = get_used_index(coef.dp,STD_BNT_WORDS_ALLOC)+1;
-
+      // result = q - result
       carry = bn_subn_low(coef.dp,q.dp,coef.dp,max_d(coef.used,q.used));
-      assert(carry == BN_POS);     
       coef.used = get_used_index(coef.dp,STD_BNT_WORDS_ALLOC)+1;
-
+      
+      // result = result % q
+      bn_mod_barrt( a,
+                    a,
+                    N,
+                    q.dp,
+                    q.used,
+                    u_q.dp,
+                    u_q.used); 
     }
   
     a[tid] = coef;
@@ -1101,7 +1316,7 @@ __global__ void polynomialReductionCRT(cuyasheint_t *a,const int half,const int 
 
     bool is_neg = (a[rid*N + cid] < a[rid*N + cid + half + 1]);
     a[rid*N + cid] -= a[rid*N + cid + half + 1];
-    a[rid*N + cid] += is_neg*CRTPrimesConstant[rid]*CRTPrimesConstant[rid];
+    // a[rid*N + cid] += is_neg*CRTPrimesConstant[rid]*CRTPrimesConstant[rid];
     __syncthreads();
     a[rid*N + cid + half + 1] = 0;
     a[rid*N + cid] %= CRTPrimesConstant[rid];
@@ -1148,6 +1363,7 @@ __host__ void Polynomial::reduce(){
   ZZ q = (Polynomial::global_mod);
   
   // Until we debug reduction on GPU, we need this
+  #warning Polynomial reduction forced to HOST
   update_host_data();
   this->set_crt_computed(false);
 
