@@ -82,6 +82,7 @@ void Yashe::generate_keys(){
     gamma[k] += e;
     gamma[k] += hs;
     gamma[k].reduce();
+    gamma[k].update_crt_spacing(2*phi.deg()-1);
     gamma[k].update_device_data();
 
     #ifdef DEBUG
@@ -118,11 +119,12 @@ Ciphertext Yashe::encrypt(Polynomial m){
   std::cout << "e: "<< e.to_string() <<std::endl;
   #endif
  
-  Polynomial p;
   Polynomial mdelta = delta*m;
-  p = (h*ps);
+  Polynomial p = (h*ps) + e + mdelta;
+
+  // p = (h*ps);
   p.reduce();
-  p = e + mdelta;
+  // p = e + mdelta;
 
   // std::cout << "phi.deg() " << phi.deg() << std::endl;
   // std::cout << "h " << h.to_string() << std::endl;

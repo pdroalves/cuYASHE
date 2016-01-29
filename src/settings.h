@@ -17,11 +17,14 @@
 extern const uint32_t PRIMES_BUCKET[];
 #endif
 // #define DEBUG
-// #define CYCLECOUNTING
 // #define VERBOSE
 // #define VERBOSEMEMORYCOPY
-// #define MAYADDONCPU
 
+/**
+ * If defined, the program will print a message everytime it
+ * applies CRT, ICRT, update_*_data or update_crt_spacing.
+ */
+// #define SPEEDCHECK
 
 // CRT cannot use primes bigger than WORD/2 bits
 #define WORD 64

@@ -135,6 +135,17 @@ __host__ __device__ void dv_zero(cuyasheint_t *a, int digits) {
 }
 
 /**
+ * Returns the highest bit set on a digit.
+ *
+ * About __builtin_clzll: https://gcc.gnu.org/onlinedocs/gcc/Other-Builtins.html
+ * @param  a [description]
+ * @return   [description]
+ */
+__device__ int util_bits_dig(cuyasheint_t a) {
+	return WORD - __clz(a);
+}
+
+/**
  * Set a big number struct to zero
  * @param a operand
  */
@@ -257,7 +268,16 @@ __host__ void bn_free(bn_t *a){
 
 }
 
-__host__ __device__ int bn_cmpn_low(const cuyasheint_t *a, const cuyasheint_t *b, int size) {
+/**
+ * Compares two digit vectors of the same size.
+ *
+ * @param  a    [description]
+ * @param  b    [description]
+ * @param  size [description]
+ * @return      [description]
+ */
+template<typename T>
+__host__ __device__ int bn_cmpn_low(const T *a, const T *b, int size) {
 	int i, r;
 
 	a += (size - 1);
@@ -265,18 +285,20 @@ __host__ __device__ int bn_cmpn_low(const cuyasheint_t *a, const cuyasheint_t *b
 
 	r = CMP_EQ;
 	for (i = 0; i < size; i++, --a, --b) {
-		r = 			r				*(!((*a != *b) && r == CMP_EQ)) + 
-			((*a > *b)*CMP_GT + (*a <= *b)*CMP_LT)*(*a != *b && r == CMP_EQ);
+		// r = 			r				*(!((*a != *b) && r == CMP_EQ)) + 
+		// 	((*a > *b)*CMP_GT + (*a <= *b)*CMP_LT)*(*a != *b && r == CMP_EQ);
+		if (*a != *b && r == CMP_EQ) {
+			r = (*a > *b ? CMP_GT : CMP_LT);
+		}
 	}
 	return r;
 }
-
 
 __host__ __device__ int bn_cmp_abs(const bn_t *a, const bn_t *b) {
 	if(a->used != b-> used)
 		return CMP_GT*(a->used > b->used) + CMP_LT*(a->used < b->used); 
 	else
-		return bn_cmpn_low(a->dp, b->dp, a->used);
+		return bn_cmpn_low<cuyasheint_t>(a->dp, b->dp, a->used);
 }
 
 /**
@@ -315,15 +337,50 @@ __host__ __device__ void bn_bitwise_and(bn_t *a, bn_t *b){
 		a->dp[i] = (a->dp[i] & b->dp[i]);
 }
 
-
-__host__ __device__ cuyasheint_t bn_rshb_low(cuyasheint_t *c, const cuyasheint_t *a, int size, int bits) {
+/**
+ * Shifts a digit vector to the right by some digits. 
+ * Computes c = a >> (digits * DIGIT).
+ *
+ * 64 bits version
+ * @param c      [description]
+ * @param a      [description]
+ * @param size   [description]
+ * @param digits [description]
+ */
+template<typename T>
+__host__ __device__ void bn_rshd_low(T *c, const T *a, int size, int digits) {
+	const T *top;
+	T *bot;
 	int i;
-	cuyasheint_t r, carry, shift, mask;
+
+	top = a + digits;
+	bot = c;
+
+	for (i = 0; i < size - digits; i++, top++, bot++) {
+		*bot = *top;
+	}
+}
+
+
+/**
+ * Shifts a digit vector to the right by an amount smaller than a digit. 
+ * Computes c = a >> bits.
+ *
+ * 64 bits version
+ * @param  c    [description]
+ * @param  a    [description]
+ * @param  size [description]
+ * @param  bits [description]
+ * @return      [description]
+ */
+__host__ __device__ uint64_t bn_rshb_low(uint64_t *c, const uint64_t *a, int size, int bits) {
+	int i;
+	uint64_t r, carry, shift, mask;
 
 	c += size - 1;
 	a += size - 1;
 	/* Prepare the bit mask. */
-	shift = BN_DIGIT - bits;
+	shift = 64 - bits;
 	carry = 0;
 	mask = MASK(bits);
 	for (i = size - 1; i >= 0; i--, a--, c--) {
@@ -331,6 +388,129 @@ __host__ __device__ cuyasheint_t bn_rshb_low(cuyasheint_t *c, const cuyasheint_t
 		r = (*a) & mask;
 		/* Shift left the operand. */
 		*c = ((*a) >> bits) | (carry << shift);
+		/* Update the carry. */
+		carry = r;
+	}
+	return carry;
+}
+
+/**
+ * Shifts a digit vector to the right by an amount smaller than a digit. 
+ * Computes c = a >> bits.
+ *
+ * 32 bits version
+ * @param  c    [description]
+ * @param  a    [description]
+ * @param  size [description]
+ * @param  bits [description]
+ * @return      [description]
+ */
+__host__ __device__ uint32_t bn_rshb_low_32(uint32_t *c, const uint32_t *a, int size, int bits) {
+	int i;
+	uint32_t r, carry, shift, mask;
+
+	c += size - 1;
+	a += size - 1;
+	/* Prepare the bit mask. */
+	shift = 32 - bits;
+	carry = 0;
+	mask = MASK_32(bits);
+	for (i = size - 1; i >= 0; i--, a--, c--) {
+		/* Get the needed least significant bits. */
+		r = (*a) & mask;
+		/* Shift left the operand. */
+		*c = ((*a) >> bits) | (carry << shift);
+		/* Update the carry. */
+		carry = r;
+	}
+	return carry;
+}
+
+
+
+/**
+ * Shifts a digit vector to the left by some digits. 
+ * Computes c = a << (digits * DIGIT). 
+ *
+ * @param  c    [description]
+ * @param  a    [description]
+ * @param  size [description]
+ * @param  bits [description]
+ * @return      [description]
+ */
+template<typename T>
+__host__ __device__ void bn_lshd_low(T *c, const T *a, int size, int digits) {
+	T *top;
+	const T *bot;
+	int i;
+
+	top = c + size + digits - 1;
+	bot = a + size - 1;
+
+	for (i = 0; i < size; i++, top--, bot--) {
+		*top = *bot;
+	}
+	for (i = 0; i < digits; i++, c++) {
+		*c = 0;
+	}
+}
+/**
+ * Shifts a digit vector to the left by an amount smaller than a digit. 
+ *
+ * 64 bits version
+ * Computes c = a << bits.
+ * @param  c    [description]
+ * @param  a    [description]
+ * @param  size [description]
+ * @param  bits [description]
+ * @return      [description]
+ */
+template<typename T>
+__host__ __device__  T bn_lshb_low(T *c, const T *a, int size, int bits);
+
+template<>
+__host__ __device__  uint64_t bn_lshb_low<uint64_t>(uint64_t *c, const uint64_t *a, int size, int bits) {
+	int i;
+	uint64_t r, carry, shift, mask;
+
+	shift = 64 - bits;
+	carry = 0;
+	mask = MASK(bits);
+	for (i = 0; i < size; i++, a++, c++) {
+		/* Get the needed least significant bits. */
+		r = ((*a) >> shift) & mask;
+		/* Shift left the operand. */
+		*c = ((*a) << bits) | carry;
+		/* Update the carry. */
+		carry = r;
+	}
+	return carry;
+}
+
+/**
+ * Shifts a digit vector to the left by an amount smaller than a digit. 
+ *
+ * 32 bits version
+ * Computes c = a << bits.
+ * @param  c    [description]
+ * @param  a    [description]
+ * @param  size [description]
+ * @param  bits [description]
+ * @return      [description]
+ */
+template<>
+__host__ __device__  uint32_t bn_lshb_low<uint32_t>(uint32_t *c, const uint32_t *a, int size, int bits) {
+	int i;
+	uint32_t r, carry, shift, mask;
+
+	shift = 32 - bits;
+	carry = 0;
+	mask = MASK_32(bits);
+	for (i = 0; i < size; i++, a++, c++) {
+		/* Get the needed least significant bits. */
+		r = ((*a) >> shift) & mask;
+		/* Shift left the operand. */
+		*c = ((*a) << bits) | carry;
 		/* Update the carry. */
 		carry = r;
 	}
@@ -381,7 +561,7 @@ __host__ __device__ cuyasheint_t bn_mod1_low(	const uint64_t *a,
  * @param  size  input: number of words in a
  * @return       output: result's last word
  */
-__host__ __device__ cuyasheint_t bn_mul1_low(uint64_t *c,
+__host__ __device__ uint64_t bn_mul1_low(uint64_t *c,
 											const uint64_t *a,
 											uint64_t digit,
 											int size) {
@@ -415,10 +595,27 @@ __host__ __device__ cuyasheint_t bn_mul1_low(uint64_t *c,
 		#endif
 	}
 
-	#ifdef __CUDA_ARCH__
-	__syncthreads();
-	#endif
+	return carry;
+}
 
+__host__ __device__ uint32_t bn_mul1_low_32(uint32_t *c,
+											const uint32_t *a,
+											uint32_t digit,
+											int size) {
+	int i;
+	uint32_t carry;
+	uint64_t r;
+
+	carry = 0;
+	for (i = 0; i < size; i++, a++, c++) {
+		/* Multiply the digit *tmpa by b and accumulate with the previous
+		 * result in the same columns and the propagated carry. */
+		r = (uint64_t)(carry) + (uint64_t)(*a) * (uint64_t)(digit);
+		/* Increment the column and assign the result. */
+		*c = (uint32_t)r;
+		/* Update the carry. */
+		carry = (uint32_t)(r >> (uint64_t)32);
+	}
 	return carry;
 }
 
@@ -451,6 +648,116 @@ __device__ void bn_64bits_mulmod(cuyasheint_t *result,
 	*result = bn_mod1_low(r,4,(uint64_t)m);
 }
 
+// Div
+/**
+ * Divides a digit vector by another digit vector. 
+ * Computes c = floor(a / b) and d = a mod b. 
+ * 
+ * The dividend and the divisor are destroyed inside the function.
+ * 
+ * @param c  [description]
+ * @param d  [description]
+ * @param a  [description]
+ * @param sa [description]
+ * @param b  [description]
+ * @param sb [description]
+ */
+__device__ void bn_divn_low( 	uint32_t *c, 
+								uint32_t *d, 
+								uint32_t *a, 
+								int sa, 
+								uint32_t *b, 
+								int sb
+							) {
+	int norm, i, n, t, sd;
+	uint32_t carry, t1[3], t2[3];
+
+	/* Normalize x and y so that the leading digit of y is bigger than
+	 * 2^(BN_DIGIT-1). */
+	norm = util_bits_dig(b[sb - 1]) % 32;
+
+	if (norm < (int)(32 - 1)) {
+		norm = (32 - 1) - norm;
+		carry = bn_lshb_low<uint32_t>(a,  a, sa, norm);
+		if (carry) {
+			a[sa++] = carry;
+		}
+		carry = bn_lshb_low<uint32_t>(b, b, sb, norm);
+		if (carry) {
+			b[sb++] = carry;
+		}
+	} else {
+		norm = 0;
+	}
+
+	n = sa - 1;
+	t = sb - 1;
+
+	/* Shift y so that the most significant digit of y is aligned with the
+	 * most significant digit of x. */
+	bn_lshd_low<uint32_t>(b, b, sb, (n - t));
+
+	/* Find the most significant digit of the quotient. */
+	while (bn_cmpn_low<uint32_t>(a, b, sa) != CMP_LT) {
+		c[n - t]++;
+		bn_subn_low((cuyasheint_t*)a, (cuyasheint_t*)a, (cuyasheint_t*)b, sa);
+	}
+	/* Shift y back. */
+
+	bn_rshd_low<uint32_t>(b, b, sb + (n - t), (n - t));
+
+	/* Find the remaining digits. */
+	for (i = n; i >= (t + 1); i--) {
+		if (i > sa) {
+			continue;
+		}
+
+		if (a[i] == b[t]) {
+			c[i - t - 1] = ((((uint64_t)1) << 32) - 1);
+		} else {
+			uint64_t tmp;
+			tmp = ((uint64_t)a[i]) << ((uint64_t)32);
+			tmp |= (uint64_t)(a[i - 1]);
+			tmp /= (uint64_t)(b[t]);
+			c[i - t - 1] = (uint32_t)tmp;
+		}
+
+		c[i - t - 1]++;
+		do {
+			c[i - t - 1]--;
+			t1[0] = (t - 1 < 0) ? 0 : b[t - 1];
+			t1[1] = b[t];
+
+			carry = bn_mul1_low_32(t1, t1, c[i - t - 1], 2);
+			t1[2] = carry;
+
+			t2[0] = (i - 2 < 0) ? 0 : a[i - 2];
+			t2[1] = (i - 1 < 0) ? 0 : a[i - 1];
+			t2[2] = a[i];
+		} while (bn_cmpn_low<uint32_t>(t1, t2, 3) == CMP_GT);
+
+		carry = bn_mul1_low_32(d, b, c[i - t - 1], sb);
+		sd = sb;
+		if (carry) {
+			d[sd++] = carry;
+		}
+
+		carry = bn_subn_low_32((a + (i - t - 1)), (a + (i - t - 1)), d, sd);
+		sd += (i - t - 1);
+		if (sa - sd > 0) {
+			carry = bn_sub1_low_32((a + sd), (a + sd), carry, sa - sd);
+		}
+
+		if (carry) {
+			sd = sb + (i - t - 1);
+			carry = bn_addn_low_32((a + (i - t - 1)), (a + (i - t - 1)), b, sb);
+			carry = bn_add1_low_32((a + sd), (a + sd), carry, sa - sd);
+			c[i - t - 1]--;
+		}
+	}
+	/* Remainder should be not be longer than the divisor. */
+	bn_rshb_low_32(d, a, sb, norm);
+}
 // Add
 
 /**
@@ -461,13 +768,33 @@ __device__ void bn_64bits_mulmod(cuyasheint_t *result,
  * @param  size input: number of words to add
  * @return      output: result's last word
  */
-__host__ __device__ cuyasheint_t bn_addn_low(cuyasheint_t *c,
-									cuyasheint_t *a,
-									cuyasheint_t *b,
+__host__ __device__ uint64_t bn_addn_low(uint64_t *c,
+									uint64_t *a,
+									uint64_t *b,
 									const int size
 									) {
 	int i;
-	register cuyasheint_t carry, c0, c1, r0, r1;
+	register uint64_t carry, c0, c1, r0, r1;
+
+	carry = 0;
+	for (i = 0; i < size; i++, a++, b++, c++) {
+		r0 = (*a) + (*b);
+		c0 = (r0 < (*a));
+		r1 = r0 + carry;
+		c1 = (r1 < r0);
+		carry = c0 | c1;
+		(*c) = r1;
+	}
+	return carry;
+}
+
+__host__ __device__ uint32_t bn_addn_low_32(uint32_t *c,
+									uint32_t *a,
+									uint32_t *b,
+									const int size
+									) {
+	int i;
+	register uint32_t carry, c0, c1, r0, r1;
 
 	carry = 0;
 	for (i = 0; i < size; i++, a++, b++, c++) {
@@ -489,9 +816,9 @@ __host__ __device__ cuyasheint_t bn_addn_low(cuyasheint_t *c,
  * @param  size  [description]
  * @return       [description]
  */
-__host__ __device__ cuyasheint_t bn_add1_low(cuyasheint_t *c, const cuyasheint_t *a, cuyasheint_t digit, int size) {
+__host__ __device__ uint64_t bn_add1_low(uint64_t *c, const uint64_t *a, uint64_t digit, int size) {
 	int i;
-	register cuyasheint_t carry, r0;
+	register uint64_t carry, r0;
 
 	carry = digit;
 	for (i = 0; i < size && carry; i++, a++, c++) {
@@ -505,6 +832,21 @@ __host__ __device__ cuyasheint_t bn_add1_low(cuyasheint_t *c, const cuyasheint_t
 	return carry;
 }
 
+__host__ __device__ uint32_t bn_add1_low_32(uint32_t *c, const uint32_t *a, uint32_t digit, int size) {
+	int i;
+	register uint32_t carry, r0;
+
+	carry = digit;
+	for (i = 0; i < size && carry; i++, a++, c++) {
+		r0 = (*a) + carry;
+		carry = (r0 < carry);
+		(*c) = r0;
+	}
+	for (; i < size; i++, a++, c++) {
+		(*c) = (*a);
+	}
+	return carry;
+}
 
 ////////////////////////
 // Subtract
@@ -517,10 +859,26 @@ __host__ __device__ cuyasheint_t bn_add1_low(cuyasheint_t *c, const cuyasheint_t
  * @param  size [description]
  * @return      [description]
  */
-__host__ __device__ cuyasheint_t bn_subn_low(cuyasheint_t * c, const cuyasheint_t * a,
-		const cuyasheint_t * b, int size) {
+__host__ __device__ uint64_t bn_subn_low(uint64_t * c, const uint64_t * a,
+		const uint64_t * b, int size) {
 	int i;
-	cuyasheint_t carry, r0, diff;
+	uint64_t carry, r0, diff;
+
+	/* Zero the carry. */
+	carry = 0;
+	for (i = 0; i < size; i++, a++, b++, c++) {
+		diff = (*a) - (*b);
+		r0 = diff - carry;
+		carry = ((*a) < (*b)) || (carry && !diff);
+		(*c) = r0;
+	}
+	return carry;
+}
+
+__host__ __device__ uint32_t bn_subn_low_32(uint32_t * c, const uint32_t * a,
+		const uint32_t * b, int size) {
+	int i;
+	uint32_t carry, r0, diff;
 
 	/* Zero the carry. */
 	carry = 0;
@@ -541,9 +899,25 @@ __host__ __device__ cuyasheint_t bn_subn_low(cuyasheint_t * c, const cuyasheint_
  * @param  size  [description]
  * @return       [description]
  */
-__host__ __device__ cuyasheint_t bn_sub1_low(cuyasheint_t *c, const cuyasheint_t *a, cuyasheint_t digit, int size) {
+__host__ __device__ uint64_t bn_sub1_low(uint64_t *c, const uint64_t *a, uint64_t digit, int size) {
 	int i;
-	cuyasheint_t carry, r0;
+	uint64_t carry, r0;
+
+	carry = digit;
+	for (i = 0; i < size && carry; i++, c++, a++) {
+		r0 = (*a) - carry;
+		carry = (r0 > (*a));
+		(*c) = r0;
+	}
+	for (; i < size; i++, a++, c++) {
+		(*c) = (*a);
+	}
+	return carry;
+}
+
+__host__ __device__ uint32_t bn_sub1_low_32(uint32_t *c, const uint32_t *a, uint32_t digit, int size) {
+	int i;
+	uint32_t carry, r0;
 
 	carry = digit;
 	for (i = 0; i < size && carry; i++, c++, a++) {

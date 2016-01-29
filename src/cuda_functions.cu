@@ -19,7 +19,7 @@
 #define PRIMITIVE_ROOT (int)7
 #define W4 (uint64_t)281474976710656L
 
- ZZ PZZ = to_ZZ(PRIMEP); 
+ZZ PZZ = to_ZZ(PRIMEP); 
 
 cuyasheint_t CUDAFunctions::wN = 0;
 cuyasheint_t *CUDAFunctions::d_W = NULL;//W and WInv doesn't fit constant memory
@@ -1333,27 +1333,34 @@ __global__ void polynomialReductionCoefs(bn_t *a,const int half,const int N,cons
   const int cid = tid % (N-half);
 
   if(cid + half + 1 < N){
-    a[cid].used = get_used_index(a[cid].dp,STD_BNT_WORDS_ALLOC)+1;
+    bn_t coef = a[cid];
+    bn_t coefPlusHalf = a[cid+half+1];
+
+    coef.used = get_used_index(coef.dp,STD_BNT_WORDS_ALLOC)+1;
     a[cid + half +1].used = get_used_index(a[cid + half +1].dp,STD_BNT_WORDS_ALLOC)+1;
 
     // a[i] = a[i] - a[i+half]
-    int carry = bn_subn_low(a[cid].dp, a[cid].dp, a[cid + half + 1].dp, min_d(a[cid+half].used,a[cid + half + 1].used));
-    a[cid].used = min_d(a[cid+half].used,a[cid + half + 1].used);
+    int carry = bn_subn_low(coef.dp, coef.dp, a[cid + half + 1].dp, min_d(a[cid+half].used,a[cid + half + 1].used));
+    coef.used = min_d(a[cid+half].used,a[cid + half + 1].used);
     
     if(carry == BN_NEG){
       // q - (UINT64_MAX - c)
       // compl2 == UINT64_MAX -C
       // 
       // SOMAR Q
-      bn_2_compl(&a[cid]);
-      carry = bn_subn_low(a[cid].dp,q.dp,a[cid].dp,q.used);
-      assert(carry == BN_POS);
-      a[cid].used = q.used;
-      bn_zero_non_used(&a[cid]);
+      carry = bn_addn_low(coef.dp,q.dp,coef.dp,q.used);
+      coef.used = max_d(coef.used,q.used);
+      coef.dp[coef.used] = carry;
+      coef.used += (carry > 0);
+      bn_zero_non_used(&coef);
     }
+    
 
     __syncthreads();
     bn_zero(&a[cid + half + 1]);
+
+    a[cid] = coef;
+    a[cid+half+1] = coefPlusHalf;
   }
 }
 

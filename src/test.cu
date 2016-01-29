@@ -124,7 +124,7 @@ struct YasheSuite
 
         Yashe::t = t;
         Yashe::w = w;
-        Yashe::lwq = floor(NTL::log(q)/(log(2)*w)+1);
+        Yashe::lwq = floor(NTL::log(q)/NTL::log(to_ZZ(w)))+1;
 
         cipher.generate_keys();
 

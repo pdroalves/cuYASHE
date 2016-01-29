@@ -15,7 +15,7 @@
 
 #define BILLION  1000000000L
 #define MILLION  1000000L
-#define N 50
+#define N 10
 
 
 double runEncrypt(Yashe cipher, int d){
@@ -149,12 +149,14 @@ double runKeyswitch(Yashe cipher, int d){
   a.set_coeff(0,rand());
   Ciphertext c = cipher.encrypt(a);
   c.update_device_data();
+
   clock_gettime( CLOCK_REALTIME, &start);
   for(int i = 0; i < N;i++){
     c.convert();
     cudaDeviceSynchronize();
   }
   clock_gettime( CLOCK_REALTIME, &stop);
+  
   return compute_time_ms(start,stop)/N;
 }
 
@@ -288,7 +290,7 @@ int main(int argc, char* argv[]){
     Yashe::q = q;
     Yashe::t = t;
     Yashe::w = conv<ZZ>(w);
-    Yashe::lwq = floor(NTL::log(q)/(log(2)*w)+1);
+    Yashe::lwq = floor(NTL::log(q)/NTL::log(to_ZZ(w)))+1;
 
       
     clock_gettime( CLOCK_REALTIME, &start);

@@ -71,7 +71,7 @@ void Polynomial::operator delete(void *ptr){
         throw string( cudaGetErrorString(result));
       
     }catch(string s){
-      #ifdef VERBOSE
+      #ifdef SPEEDCHECK
       std::cout << "Exception at cudaFree: " << s << std::endl;
       #endif 
       cudaGetLastError();//Reset last error
@@ -253,7 +253,15 @@ void Polynomial::crt(){
   if(get_crt_computed())
     return;
 
-  #ifdef VERBOSE
+  /**
+   * To run CRT we need a copy of the coeficients on device's memory
+   */
+  if(!get_icrt_computed()){
+    update_device_data();
+    return;
+  }
+
+  #ifdef SPEEDCHECK
   std::cout << "Applying CRT." << std::endl;
   #endif
   callCRT(d_bn_coefs,
@@ -274,7 +282,7 @@ void Polynomial::update_device_data(){
   if(this->get_crt_computed())
     return;
 
-  #ifdef VERBOSE
+  #ifdef SPEEDCHECK
   std::cout << "Copying data to GPU." << std::endl;
   #endif
 
@@ -282,7 +290,7 @@ void Polynomial::update_device_data(){
 
   cuyasheint_t *h_data = 0x0;
   if(!get_icrt_computed()){
-    #ifdef VERBOSE
+    #ifdef SPEEDCHECK
     std::cout << "Allocating memory and copying bn_t's." << std::endl;
     #endif
     
@@ -354,7 +362,15 @@ void Polynomial::icrt(){
   if(get_icrt_computed())
     return;
 
-  #ifdef VERBOSE
+  /**
+   * If there is no residue computed on GPU, just copy host data
+   */
+  if(!get_crt_computed()){
+    update_device_data();
+    return;
+  }
+
+  #ifdef SPEEDCHECK
   std::cout << "Applying ICRT." << std::endl;
   #endif
 
@@ -386,7 +402,7 @@ void Polynomial::update_host_data(){
     // Copy //
     //////////
 
-    #ifdef VERBOSE
+    #ifdef SPEEDCHECK
     std::cout << "Copying data to CPU." << std::endl;
     #endif
 

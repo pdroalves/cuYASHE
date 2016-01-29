@@ -1131,7 +1131,7 @@ class Polynomial{
     }
     void update_crt_spacing(const int spacing){
       
-      #ifdef VERBOSE
+      #ifdef SPEEDCHECK
       std::cout << "update_crt_spacing - " << spacing << std::endl;
       #endif
 
@@ -1148,14 +1148,14 @@ class Polynomial{
        */
       if(this->get_crt_spacing() == new_spacing){
         // Data lies in GPU's global memory and has the correct alignment
-        #ifdef VERBOSE
+        #ifdef SPEEDCHECK
         std::cout << "No need to update crt spacing." << std::endl;
         #endif
         return;
       }else if(!get_crt_computed()){
         update_host_data();
         
-        #ifdef VERBOSE
+        #ifdef SPEEDCHECK
         std::cout << "Will alloc memory  to update crt spacing." << std::endl;
         #endif
         cudaError_t result;
@@ -1243,7 +1243,7 @@ class Polynomial{
 
         return; 
       }else{
-        #ifdef VERBOSE
+        #ifdef SPEEDCHECK
         std::cout << "Need a realign to update crt spacing." << std::endl;
         #endif
         cudaError_t result;
