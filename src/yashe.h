@@ -6,11 +6,14 @@
 #include "ciphertext.h"
 #include "distribution.h"
 #include "integer.h"
+#include "cuda_ciphertext.h"
 
 class Yashe{
   private:
     Distribution xkey;
+    Polynomial ps;
     Distribution xerr;
+    Polynomial e;
 
   public:
     static int d;

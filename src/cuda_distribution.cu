@@ -7,7 +7,7 @@ __global__ void setup_kernel ( curandState * states, unsigned long seed )
     curand_init ( seed, tid, 0, &states[tid] );
 }
 
-__host__ void call_setup_kernel(curandState *states){
+__host__ void Distribution::call_setup_kernel(){
 	const int N = MAX_DEGREE;
 	const int ADDGRIDXDIM = (N%ADDBLOCKXDIM == 0? N/ADDBLOCKXDIM : N/ADDBLOCKXDIM + 1);
 	const dim3 gridDim(ADDGRIDXDIM);

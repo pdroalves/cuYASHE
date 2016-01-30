@@ -6,7 +6,7 @@
 #include <cuda.h>
 #include <curand.h>
 #include <curand_kernel.h>
-
+#include <NTL/ZZ.h>
 enum kind_t
 {
   DISCRETE_GAUSSIAN,
@@ -19,8 +19,6 @@ enum kind_t
 #define MAX_DEGREE 16384
 #define SEED (unsigned long)(7226776555987513888)
 
-void call_setup_kernel (curandState *states);
- 
 class Distribution{
   private:
   int kind;
@@ -49,7 +47,8 @@ class Distribution{
     */
     cudaError_t result = cudaMalloc((void**)&states,MAX_DEGREE*sizeof(curandState));
     assert(result == cudaSuccess);
-    call_setup_kernel(states);
+    call_setup_kernel();
+
 
   }
   Distribution(kind_t kind){
@@ -70,7 +69,7 @@ class Distribution{
     */
     cudaError_t result = cudaMalloc((void**)&states,MAX_DEGREE*sizeof(curandState));
     assert(result == cudaSuccess);
-    call_setup_kernel(states);
+    call_setup_kernel();
 
   }
   Distribution(){
@@ -89,13 +88,17 @@ class Distribution{
     */
     cudaError_t result = cudaMalloc((void**)&states,MAX_DEGREE*sizeof(curandState));
     assert(result == cudaSuccess);
-    call_setup_kernel(states);
+    call_setup_kernel();
 
   }
   Polynomial get_sample(int degree);
+  Polynomial get_sample(Polynomial *p, int degree);
   Polynomial get_sample(int degree, int spacing);
 private:
   void callCuGetUniformSample(cuyasheint_t *array, bn_t *coefs, int N, int mod);
   void callCuGetNormalSample(cuyasheint_t *array, int N, float mean, float stddev);
+  void generate_sample(Polynomial *p,int mod,int degree);
+__host__ void call_setup_kernel();
+
 };
 #endif

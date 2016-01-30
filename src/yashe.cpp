@@ -95,7 +95,9 @@ void Yashe::generate_keys(){
   // Word decomp mask
   WDMasking = NTL::LeftShift(ZZ(1),NumBits(Yashe::w))-1;
 
-
+  // Intialize the samples used by encrypt()
+  Yashe::ps.update_crt_spacing(2*phi.deg()-1);
+  Yashe::e.update_crt_spacing(phi.deg()-1);
   #ifdef VERBOSE
   std::cout << "Keys generated." << std::endl;
   #endif
@@ -110,9 +112,8 @@ Ciphertext Yashe::encrypt(Polynomial m){
    * ps will be used in a D degree multiplication, resulting in a 2*D degree polynomial
    * e will be used in a 2*D degree addition
    */
-  Polynomial ps = xerr.get_sample(phi.deg()-1,2*(phi.deg()-1));
-  // Polynomial e = xerr.get_sample(phi.deg()-1,2*(phi.deg()-1));
-  Polynomial e = xerr.get_sample(phi.deg()-1);
+  xerr.get_sample(&ps,phi.deg()-1);
+  xerr.get_sample(&e,phi.deg()-1);
 
   #ifdef DEBUG
   std::cout << "ps: "<< ps.to_string() <<std::endl;
@@ -149,7 +150,6 @@ Polynomial Yashe::decrypt(Ciphertext c){
   // std::cout << "c " << c.to_string() << std::endl;
   // uint64_t start,end;
 
-
   Polynomial g;
 
   if(c.aftermul){
@@ -169,32 +169,45 @@ Polynomial Yashe::decrypt(Ciphertext c){
 
   }
   g.reduce();
-  ZZ g_value = g.get_coeff(0);
 
-  ZZ coeff = g_value*t.get_value();
-  ZZ quot;
-  ZZ rem;
-  NTL::DivRem(quot,rem,coeff,q);
-
-  quot %= q;
-  #ifdef VERBOSE
-  std::cout << "g_value: " << g_value << std::endl;
-  std::cout << "rem: " << rem << std::endl;
-  std::cout << "coeff: " << coeff << std::endl;
-  std::cout << "q: " << q << std::endl;
-  std::cout << "2*rem: " << 2*rem << std::endl;
-  #endif
+  Polynomial m(g.deg()+1);
   
-  Polynomial m;
-  if(2*rem > q){
-    if(coeff == t.get_value()-1){
-      m.set_coeff(0,0);
-    }else{
-      m.set_coeff(0,(quot+1)%t.get_value());
-    }
-  }else{
-    m.set_coeff(0,(quot)%t.get_value());
-  }
+  g.icrt();
+  callCiphertextMulAux( m.d_bn_coefs, 
+                        g.d_bn_coefs, 
+                        Yashe::q, 
+                        g.deg()+1, 
+                        g.get_stream());
+  m.set_crt_computed(false);
+  m.set_icrt_computed(true);
+  m.set_host_updated(false);
+
+
+  // ZZ g_value = g.get_coeff(0);
+
+  // ZZ coeff = g_value*t.get_value();
+  // ZZ quot;
+  // ZZ rem;
+  // NTL::DivRem(quot,rem,coeff,q);
+
+  // quot %= q;
+  // #ifdef VERBOSE
+  // std::cout << "g_value: " << g_value << std::endl;
+  // std::cout << "rem: " << rem << std::endl;
+  // std::cout << "coeff: " << coeff << std::endl;
+  // std::cout << "q: " << q << std::endl;
+  // std::cout << "2*rem: " << 2*rem << std::endl;
+  // #endif
+  
+  // if(2*rem > q){
+  //   if(coeff == t.get_value()-1){
+  //     m.set_coeff(0,0);
+  //   }else{
+  //     m.set_coeff(0,(quot+1)%t.get_value());
+  //   }
+  // }else{
+  //   m.set_coeff(0,(quot)%t.get_value());
+  // }
 
   // std::cout << (end-start) << " cycles to decrypt I" << std::endl;
   return m;
