@@ -38,10 +38,46 @@ class Ciphertext: public Polynomial{
     } 
     // Constructors
     Ciphertext(Polynomial *p){
-        this->copy(*p);
+      level = 0;
+      /////////////////////////////
+      // Doesn't duplicate data //
+      /////////////////////////////
+      ///
+      this->stream = p->get_stream();
+
+      this->CRTSPACING = p->get_crt_spacing();
+      this->d_bn_coefs = p->d_bn_coefs;
+      this->h_bn_coefs = p->h_bn_coefs;
+      this->d_polyCRT = p->get_device_crt_residues();
+
+      this->set_crt_computed(p->get_crt_computed());
+      this->set_icrt_computed(p->get_icrt_computed());
+      this->set_host_updated(p->get_host_updated());
+
+      if(p->get_host_updated())
+        set_coeffs(p->get_coeffs());
+
     }
     Ciphertext(Polynomial p){
-        this->copy(p);
+      level = 0;
+      /////////////////////////////
+      // Doesn't duplicate data //
+      /////////////////////////////
+      ///
+      this->stream = p.get_stream();
+
+      this->CRTSPACING = p.get_crt_spacing();
+      this->d_bn_coefs = p.d_bn_coefs;
+      this->h_bn_coefs = p.h_bn_coefs;
+      this->d_polyCRT = p.get_device_crt_residues();
+
+      this->set_crt_computed(p.get_crt_computed());
+      this->set_icrt_computed(p.get_icrt_computed());
+      this->set_host_updated(p.get_host_updated());
+
+      if(p.get_host_updated())
+        set_coeffs(p.get_coeffs());
+
     }
     Ciphertext(){
       this->set_stream();

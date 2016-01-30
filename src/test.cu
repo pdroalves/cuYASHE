@@ -440,10 +440,11 @@ BOOST_AUTO_TEST_CASE(simpleMultiplyByPolynomial)
     NTL::SetCoeff(b_ntl,i,conv<ZZ_p>(b.get_coeff(i)));
 
   Polynomial c = a*b;
+  c.reduce();
   c.normalize();
 
   ZZ_pEX c_ntl = a_ntl*b_ntl;
-  // c_ntl %= conv<ZZ_pEX>(NTL_Phi);
+  c_ntl %= conv<ZZ_pEX>(NTL_Phi);
 
   #ifdef DEBUG
   std::cout << "degree = " << degree << std::endl;
@@ -491,7 +492,6 @@ BOOST_AUTO_TEST_CASE(multiplyByPolynomial)
 
     Polynomial c = a*b;
     c.reduce();
-    c %= Polynomial::global_mod;
 
     ZZ_pEX c_ntl = a_ntl*b_ntl;
     c_ntl %= conv<ZZ_pEX>(NTL_Phi);
@@ -546,7 +546,6 @@ BOOST_AUTO_TEST_CASE(multiplyAndAddByPolynomial)
 
     Polynomial c = a*b+a;
     c.reduce();
-    c %= q;
 
     ZZ_pEX c_ntl = a_ntl*b_ntl+a_ntl;
     c_ntl %= conv<ZZ_pEX>(NTL_Phi);
@@ -808,7 +807,6 @@ BOOST_AUTO_TEST_CASE(modularInversion)
   // std::cout << "aInv: " << aInv.to_string() << std::endl;
   // std::cout << "result before reduce: " << result.to_string() << std::endl;
   result.reduce();
-  result %= a.get_mod();
   // std::cout << "result after reduce: " << result.to_string() << std::endl;
 
   Polynomial one = Polynomial();

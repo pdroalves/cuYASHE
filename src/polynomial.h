@@ -416,10 +416,7 @@ class Polynomial{
       return this;
     }
     Polynomial operator*(Polynomial &b);
-    Polynomial operator*=(Polynomial &b){
-      this->copy( ((*this)*b));
-      return *this;
-    }
+    Polynomial operator*=(Polynomial &b);
     Polynomial operator/(Polynomial &b){
       Polynomial *quot = new Polynomial();
       Polynomial *rem = new Polynomial();

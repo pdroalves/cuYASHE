@@ -51,7 +51,7 @@ class CUDAFunctions{
                                             cuyasheint_t *b,
                                             int size,
                                             int OP);
-    static cuyasheint_t* callPolynomialMul(cudaStream_t stream,
+    static cuyasheint_t* callPolynomialMul(cuyasheint_t *d_result,
                                             cuyasheint_t *a,
                                             const bool realign_A,
                                             const int A_N,
@@ -59,7 +59,8 @@ class CUDAFunctions{
                                             const bool realign_B,
                                             const int B_N,
                                             const int N,
-                                            const int NPolis);
+                                            const int NPolis,
+                                            cudaStream_t stream);
     static cuyasheint_t* callPolynomialOPInteger( const int opcode,
                                             cudaStream_t stream,
                                             cuyasheint_t *a,

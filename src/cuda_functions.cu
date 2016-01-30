@@ -825,7 +825,7 @@ __host__ void CUDAFunctions::callPolynomialOPDigit( const int opcode,
 }
 
 
-__host__ cuyasheint_t* CUDAFunctions::callPolynomialMul(cudaStream_t stream,
+__host__ cuyasheint_t* CUDAFunctions::callPolynomialMul(cuyasheint_t *output,
                                                         cuyasheint_t *a,
                                                         const bool realign_A,
                                                         const int A_N,
@@ -833,7 +833,8 @@ __host__ cuyasheint_t* CUDAFunctions::callPolynomialMul(cudaStream_t stream,
                                                         const bool realign_B,
                                                         const int B_N,
                                                         const int N,
-                                                        const int NPolis){
+                                                        const int NPolis,
+                                                        cudaStream_t stream){
   // This method expects that both arrays are aligned
 
   // Input:
@@ -849,7 +850,7 @@ __host__ cuyasheint_t* CUDAFunctions::callPolynomialMul(cudaStream_t stream,
   // All representations should be concatenated aligned
   assert((N>0)&&((N & (N - 1)) == 0));//Check if N is power of 2
   assert(N == CUDAFunctions::N);
-  cuyasheint_t *d_result;
+  cuyasheint_t *d_result = output;
 
   #ifdef PLAINMUL
     // #ifdef VERBOSE
@@ -874,8 +875,6 @@ __host__ cuyasheint_t* CUDAFunctions::callPolynomialMul(cudaStream_t stream,
   cuyasheint_t *aux;
 
   cudaError_t result;
-  result = cudaMalloc((void**)&d_result,size*sizeof(cuyasheint_t));
-  assert(result == cudaSuccess);
   result = cudaMalloc((void**)&d_a,size*sizeof(cuyasheint_t));
   assert(result == cudaSuccess);
   result = cudaMalloc((void**)&d_b,size*sizeof(cuyasheint_t));
@@ -1337,11 +1336,11 @@ __global__ void polynomialReductionCoefs(bn_t *a,const int half,const int N,cons
     bn_t coefPlusHalf = a[cid+half+1];
 
     coef.used = get_used_index(coef.dp,STD_BNT_WORDS_ALLOC)+1;
-    a[cid + half +1].used = get_used_index(a[cid + half +1].dp,STD_BNT_WORDS_ALLOC)+1;
+    coefPlusHalf.used = get_used_index(coefPlusHalf.dp,STD_BNT_WORDS_ALLOC)+1;
 
     // a[i] = a[i] - a[i+half]
-    int carry = bn_subn_low(coef.dp, coef.dp, a[cid + half + 1].dp, min_d(a[cid+half].used,a[cid + half + 1].used));
-    coef.used = min_d(a[cid+half].used,a[cid + half + 1].used);
+    int carry = bn_subn_low(coef.dp, coef.dp, a[cid + half + 1].dp, min_d(a[cid].used,a[cid + half + 1].used));
+    coef.used = min_d(a[cid].used,a[cid + half + 1].used);
     
     if(carry == BN_NEG){
       // q - (UINT64_MAX - c)

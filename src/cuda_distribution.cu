@@ -52,12 +52,16 @@ __host__  void Distribution::callCuGetUniformSample(cuyasheint_t* array, bn_t *c
   	/**
    	 * Sync
    	 */
-    // result = cudaDeviceSynchronize();// cuRAND doesn't use the same synchronization mechanism as others CUDAs APIs
+	// cudaError_t result;
+   	// result = cudaDeviceSynchronize();// cuRAND doesn't use the same synchronization mechanism as others CUDAs APIs
   	// assert(result == cudaSuccess);
 
   	/**
   	 * Adjust "used" attribute of each coefficient
   	 */
+	const int ADDGRIDXDIM = (N%128 == 0? N/128 : N/128 + 1);
+	const dim3 gridDim(ADDGRIDXDIM);
+	const dim3 blockDim(128);
 
   	// cuSetBNT<<< gridDim, blockDim, 0>>>(coefs, random,N,mod);
   	// assert(cudaGetLastError() == cudaSuccess);
@@ -65,10 +69,6 @@ __host__  void Distribution::callCuGetUniformSample(cuyasheint_t* array, bn_t *c
   	// result = cudaFree(random);
   	// assert(cudaGetLastError() == cudaSuccess);
 	
-	const int ADDGRIDXDIM = (N%ADDBLOCKXDIM == 0? N/ADDBLOCKXDIM : N/ADDBLOCKXDIM + 1);
-	const dim3 gridDim(ADDGRIDXDIM);
-	const dim3 blockDim(ADDBLOCKXDIM);
-	cudaError_t result;
 
 	/** 
 	 * Generate values

@@ -120,8 +120,10 @@ Ciphertext Yashe::encrypt(Polynomial m){
   #endif
  
   Polynomial mdelta = delta*m;
-  Polynomial p = (h*ps) + e + mdelta;
+  Polynomial hps = (h*ps);
 
+  Polynomial p = (e + mdelta);
+  p += hps;
   // p = (h*ps);
   p.reduce();
   // p = e + mdelta;

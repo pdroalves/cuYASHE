@@ -164,7 +164,8 @@ Polynomial Integer::operator-(Polynomial &a){
 }
 
 Polynomial Integer::operator*(Polynomial &a){
-  Polynomial *p = new Polynomial(a);
+  Polynomial p;
+  p.copy(a);
 
   // Apply CRT and copy data to global memory, if needed
   if(get_crt_computed()){
@@ -191,29 +192,31 @@ Polynomial Integer::operator*(Polynomial &a){
         }
     }
 
-    cuyasheint_t *result = CUDAFunctions::callPolynomialOPInteger( MUL,
+    cuyasheint_t *d_result = CUDAFunctions::callPolynomialOPInteger( MUL,
                                                                     a.get_stream(),
                                                                     a.get_device_crt_residues(),
                                                                     this->get_device_crt_residues(),
                                                                     a.get_crt_spacing(),
                                                                     Polynomial::CRTPrimes.size()
                                                                   );
+    cudaError_t result = cudaFree(p.get_device_crt_residues());
+    assert(result == cudaSuccess);
 
-    p->set_device_crt_residues(result);
-    p->set_host_updated(false);
-    p->set_icrt_computed(false);
-    p->set_crt_computed(true);
+    p.set_device_crt_residues(d_result);
+    p.set_host_updated(false);
+    p.set_icrt_computed(false);
+    p.set_crt_computed(true);
       
   }else if (get_icrt_computed()){
-    assert(p->d_bn_coefs);
+    assert(p.d_bn_coefs);
     CUDAFunctions::callPolynomialOPDigit( MUL,
-                                        p->get_stream(),
-                                        p->d_bn_coefs,
+                                        p.get_stream(),
+                                        p.d_bn_coefs,
                                         this->digits,
-                                        p->deg()+1
+                                        p.deg()+1
                                       );
-    p->set_crt_computed(false);
-    p->set_host_updated(false);
+    p.set_crt_computed(false);
+    p.set_host_updated(false);
   }else{
     throw "Don't know how to multiply";
   }

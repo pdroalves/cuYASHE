@@ -51,12 +51,20 @@ Polynomial Polynomial::operator+=(Polynomial &b){
 
 Polynomial Polynomial::operator*(Polynomial &b){
   Polynomial *p = common_multiplication<Polynomial>(this,&b);
-  p->icrt();
-  
+
   cudaError_t result = cudaDeviceSynchronize();
   assert(result == cudaSuccess);
 
   return p;
+}
+
+Polynomial Polynomial::operator*=(Polynomial &b){
+  common_multiplication_inplace<Polynomial>(this,&b);
+
+  cudaError_t result = cudaDeviceSynchronize();
+  assert(result == cudaSuccess);
+
+  return *this;
 }
 
 void Polynomial::operator delete(void *ptr){
@@ -282,16 +290,13 @@ void Polynomial::update_device_data(){
   if(this->get_crt_computed())
     return;
 
-  #ifdef SPEEDCHECK
-  std::cout << "Copying data to GPU." << std::endl;
-  #endif
 
   this->ON_COPY = true;
 
   cuyasheint_t *h_data = 0x0;
   if(!get_icrt_computed()){
     #ifdef SPEEDCHECK
-    std::cout << "Allocating memory and copying bn_t's." << std::endl;
+    std::cout << "Copying data to GPU." << std::endl;
     #endif
     
     // Verifica se o espaçamento é válido. Se não for, ajusta.
@@ -426,7 +431,12 @@ void Polynomial::update_host_data(){
     cuyasheint_t *aux = (cuyasheint_t*)malloc(used_coefs*STD_BNT_WORDS_ALLOC*sizeof(cuyasheint_t));
     result = cudaMemcpy(aux,h_bn_coefs[0].dp,STD_BNT_WORDS_ALLOC*used_coefs*sizeof(cuyasheint_t),cudaMemcpyDeviceToHost);
 
-    this->set_coeffs(used_coefs);
+    /**
+     * We can't use "set_coeffs(int)" here. 
+     * It changes CRT_COMPUTED and ICRT_COMPUTED flags.
+     */
+    this->coefs.clear();
+    this->coefs.resize(used_coefs);
     #pragma omp parallel for
     for(int i = 0; i < used_coefs; i++){
       bn_t bn_coef;
@@ -437,7 +447,11 @@ void Polynomial::update_host_data(){
 
       ZZ coef = get_ZZ(&bn_coef);
       // ZZ coef = get_ZZ(&bn_coef) % Polynomial::CRTProduct;
-      this->set_coeff(i,coef);
+      
+      if((unsigned int)(i) >= this->coefs.size())
+        this->coefs.resize(i+1);
+      
+      this->coefs[i] = coef;
     }
 
     free(aux);

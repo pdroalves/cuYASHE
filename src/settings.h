@@ -30,7 +30,8 @@ extern const uint32_t PRIMES_BUCKET[];
 #define WORD 64
 
 // Standard number of words to allocate
-#define STD_BNT_WORDS_ALLOC 32 // Up to 1024 bits big integers
+// #define STD_BNT_WORDS_ALLOC 32 // Up to 1024 bits big integers
+#define STD_BNT_WORDS_ALLOC 32 // Up to  bits big integers
 
 // We use cuyasheint_t as uint64_t to simplify operations
 typedef uint64_t cuyasheint_t;

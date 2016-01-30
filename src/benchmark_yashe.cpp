@@ -23,6 +23,7 @@ double runEncrypt(Yashe cipher, int d){
   
   Polynomial a(d);
   a.set_coeff(0,rand());
+  a.update_crt_spacing(d);
   a.update_device_data();
       
   clock_gettime( CLOCK_REALTIME, &start);
