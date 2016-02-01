@@ -123,6 +123,7 @@ void Ciphertext::keyswitch(){
    * On Device
    */
   update_device_data();
+  this->reduce();
   if(Yashe::w == to_ZZ("4294967296")){
     // Not used
     bn_t W;

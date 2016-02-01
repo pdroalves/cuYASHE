@@ -1374,9 +1374,9 @@ __host__ void Polynomial::reduce(){
   ZZ q = (Polynomial::global_mod);
   
   // Until we debug reduction on GPU, we need this
-  #warning Polynomial reduction forced to HOST
-  update_host_data();
-  this->set_crt_computed(false);
+  // #warning Polynomial reduction forced to HOST
+  // update_host_data();
+  // this->set_crt_computed(false);
 
   if(!this->get_crt_computed()){
     #ifdef VERBOSE

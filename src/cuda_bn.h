@@ -98,7 +98,7 @@ __host__ __device__ int max_d(int a,int b);
 __host__ __device__ int min_d(int a,int b);
 __host__ __device__ uint64_t lessThan(uint64_t x, uint64_t y);
 __host__ void callTestData(bn_t *coefs,int N);
-__device__ int get_used_index(cuyasheint_t *u,int alloc);
+__device__ int get_used_index(const cuyasheint_t *u,int alloc);
 void callCRT(bn_t *coefs,const int used_coefs,cuyasheint_t *d_polyCRT,const int N, const int NPolis,cudaStream_t stream);
 void callICRT(bn_t *coefs,cuyasheint_t *d_polyCRT,const int N, const int NPolis,cudaStream_t stream);
 

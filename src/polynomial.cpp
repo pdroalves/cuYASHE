@@ -597,9 +597,12 @@ bn_t get_reciprocal(bn_t q){
       return result;
     }
 void compute_reciprocal(ZZ q){
-      ZZ x = power2_ZZ(2*NTL::NumBits(q));
-      ZZ u_ZZ = x/q;
+      ZZ u_ZZ;
+
+      ZZ x = power2_ZZ(4*WORD);
+      u_ZZ = x/q;
       // std::cout << "The reciprocal of " << q << " is " << u_ZZ << std::endl;
+
       bn_t *h_u;
       h_u = (bn_t*) malloc (sizeof(bn_t));
       h_u->alloc = 0;

@@ -1112,62 +1112,87 @@ __device__ void bn_mod_barrt(	bn_t *C, const bn_t *A,const int NCoefs,
 		int sa = A[cid].used;
 		cuyasheint_t *c = C[cid].dp;
 
-		unsigned long mu;
+		int mu;
 		cuyasheint_t q[2*STD_BNT_WORDS_ALLOC],t[2*STD_BNT_WORDS_ALLOC],carry;
+
+		#pragma unroll (2*STD_BNT_WORDS_ALLOC)
+		for(int i = 0; i < 2*STD_BNT_WORDS_ALLOC; i++){
+			q[i] = 0;
+			t[i] = 0;
+		}
 		int sq, st;
 		int i;
 
 		mu = sm;
 		sq = sa - (mu - 1);
+		
+		// bn_rsh
 		for (i = 0; i < sq; i++) 
 			q[i] = a[i + (mu - 1)];
+		//
 		
 		if (sq > su) {
-			bn_muld_low(t, q, sq, u, su, mu, sq + su);
+			// The first mu+1 coeficients are completely useless. 
+			// There is a right shift right after this.
+			bn_muld_low(t, q, sq, u, su, 0, sq + su);
 		} else {
-			bn_muld_low(t, u, su, q, sq, mu - (su - sq) - 1, sq + su);
+			bn_muld_low(t, u, su, q, sq, 0, sq + su);
 		}
 		st = sq + su;
+
+		// bn_trim
 		while (st > 0 && t[st - 1] == 0)
 			--(st);
-		
+		//
 
+		// bn_rsh
 		sq = st - (mu + 1);
 		for (i = 0; i < sq; i++)
 			q[i] = t[i + (mu + 1)];
-
+		//
+		
 		if (sq > sm) 
 			bn_muld_low(t, q, sq, m, sm, 0, sq + 1);
 		else 
 			bn_muld_low(t, m, sm, q, sq, 0, mu + 1);
 		
 		st = mu + 1;
+		// bn_trim
 		while (st > 0 && t[st - 1] == 0)
 			st--;
-
+		//
+		
+		// bn_mod_2b
 		sq = mu + 1;
 		for (i = 0; i < sq; i++) 
 			q[i] = t[i];
+		//
 		
-
+		// bn_mod_2b
 		st = mu + 1;
 		for (i = 0; i < sq; i++)
 			t[i] = a[i];
+		//
 
 		carry = bn_subn_low(t, t, q, sq);
+		// bn_trim
 		while (st > 0 && t[st - 1] == 0)
 			st--;
+		//
 		
+		// If BN_NEG
 		if (carry) {
+			// bn_set_dig + bn_lsh
 			sq = (mu + 1);
 			for (i = 0; i < sq - 1; i++) {
 				q[i] = 0;
 			}
 			q[sq - 1] = 1;
+			//
 			bn_subn_low(t, q, t, sq);
 		}
 
-		while (bn_cmpn_low(t, m, sm) == 1)
+		while (bn_cmpn_low(t, m, sm) != CMP_LT)
 			bn_subn_low(t, t, m, sm);
 
 		for (i = 0; i < st; i++)
@@ -1192,7 +1217,7 @@ __global__ void cuModN(bn_t * c, const bn_t * a, const int NCoefs,
 	 */
 	const unsigned int tid = threadIdx.x + blockIdx.x*blockDim.x;
 	if(tid < NCoefs)
-		bn_mod_barrt(c,a,NCoefs,m,sm,u,su);
+		bn_mod_barrt(c,a,NCoefs,m,get_used_index(m,sm)+1,u,get_used_index(u,su)+1);
 }
 
 /**
@@ -1263,7 +1288,7 @@ __global__ void cuCRT(	cuyasheint_t *d_polyCRT,
 
 }	
 
-__device__ int get_used_index(cuyasheint_t *u,int alloc){
+__device__ int get_used_index(const cuyasheint_t *u,int alloc){
 	int i = 0;
 	// int max = 0;
 

@@ -149,6 +149,7 @@ double runKeyswitch(Yashe cipher, int d){
   Polynomial a;
   a.set_coeff(0,rand());
   Ciphertext c = cipher.encrypt(a);
+  c.reduce();
   c.update_device_data();
 
   clock_gettime( CLOCK_REALTIME, &start);
@@ -324,25 +325,25 @@ int main(int argc, char* argv[]){
     std::cout << "Decrypt) Time measured with memory copy: " << diff << " ms" << std::endl;
     decrypt << d << " " << diff << std::endl;;
     
-    // diff = runAdditionWithMemoryCopy(cipher, d);
-    // std::cout << "Homomorphic Addition) Time measured with memory copy: " << diff << " ms" << std::endl;
-    // add_with_memcopy << d << " " << diff << std::endl;;
+    diff = runAdditionWithMemoryCopy(cipher, d);
+    std::cout << "Homomorphic Addition) Time measured with memory copy: " << diff << " ms" << std::endl;
+    add_with_memcopy << d << " " << diff << std::endl;;
 
-    // diff = runAdditionWithoutMemoryCopy(cipher, d);
-    // std::cout << "Homomorphic Addition) Time measured without memory copy: " << diff << " ms" << std::endl;
-    // add_without_memcopy << d << " " << diff << std::endl;;
+    diff = runAdditionWithoutMemoryCopy(cipher, d);
+    std::cout << "Homomorphic Addition) Time measured without memory copy: " << diff << " ms" << std::endl;
+    add_without_memcopy << d << " " << diff << std::endl;;
 
-    // diff = runMulWithMemoryCopy(cipher, d);
-    // std::cout << "Homomorphic Multiplication) Time measured with memory copy: " << diff << " ms" << std::endl;
-    // mult_with_memcopy << d << " " << diff << std::endl;;
+    diff = runMulWithMemoryCopy(cipher, d);
+    std::cout << "Homomorphic Multiplication) Time measured with memory copy: " << diff << " ms" << std::endl;
+    mult_with_memcopy << d << " " << diff << std::endl;;
     
-    // diff = runMulWithoutMemoryCopy(cipher, d);
-    // std::cout << "Homomorphic Multiplication) Time measured without memory copy: " << diff << " ms" << std::endl;
-    // mult_without_memcopy << d << " " << diff << std::endl;;
+    diff = runMulWithoutMemoryCopy(cipher, d);
+    std::cout << "Homomorphic Multiplication) Time measured without memory copy: " << diff << " ms" << std::endl;
+    mult_without_memcopy << d << " " << diff << std::endl;;
 
-    // diff = runKeyswitch(cipher, d);
-    // std::cout << "KeySwitch) Time measured with memory copy: " << diff << " ms" << std::endl;
-    // keyswitch << d << " " << diff << std::endl;;
+    diff = runKeyswitch(cipher, d);
+    std::cout << "KeySwitch) Time measured with memory copy: " << diff << " ms" << std::endl;
+    keyswitch << d << " " << diff << std::endl;;
   }
   cudaDeviceReset();
 }
