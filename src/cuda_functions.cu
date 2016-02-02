@@ -1285,6 +1285,7 @@ __global__ void cuICRTFix(bn_t *a, const int N, bn_t q,bn_t u_q,bn_t q2){
       // result = q - result
       carry = bn_subn_low(coef.dp,q.dp,coef.dp,max_d(coef.used,q.used));
       coef.used = get_used_index(coef.dp,STD_BNT_WORDS_ALLOC)+1;
+      a[tid] = coef;
       
       // result = result % q
       bn_mod_barrt( a,
@@ -1294,9 +1295,8 @@ __global__ void cuICRTFix(bn_t *a, const int N, bn_t q,bn_t u_q,bn_t q2){
                     q.used,
                     u_q.dp,
                     u_q.used); 
-    }
-  
-    a[tid] = coef;
+    }else    
+      a[tid] = coef;
   }
 }
 

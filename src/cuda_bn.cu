@@ -1197,6 +1197,8 @@ __device__ void bn_mod_barrt(	bn_t *C, const bn_t *A,const int NCoefs,
 
 		for (i = 0; i < st; i++)
 			c[i] = t[i];
+
+		C[cid].used = st;
 	}
 }
 
@@ -1415,7 +1417,6 @@ __global__ void cuICRT(	bn_t *poly,
 						M_used,
 						u,
 						u_used);
-    	poly[cid].used = get_used_index(poly[cid].dp,M_used+1)+1;
     	bn_zero_non_used(&poly[cid]);
 	 }
 
