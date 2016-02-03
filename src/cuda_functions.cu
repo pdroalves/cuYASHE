@@ -1285,18 +1285,17 @@ __global__ void cuICRTFix(bn_t *a, const int N, bn_t q,bn_t u_q,bn_t q2){
       // result = q - result
       carry = bn_subn_low(coef.dp,q.dp,coef.dp,max_d(coef.used,q.used));
       coef.used = get_used_index(coef.dp,STD_BNT_WORDS_ALLOC)+1;
-      a[tid] = coef;
-      
-      // result = result % q
-      bn_mod_barrt( a,
-                    a,
-                    N,
-                    q.dp,
-                    q.used,
-                    u_q.dp,
-                    u_q.used); 
-    }else    
-      a[tid] = coef;
+    }  
+    a[tid] = coef;
+    // result = result % q
+    bn_mod_barrt( a,
+                  a,
+                  N,
+                  q.dp,
+                  q.used,
+                  u_q.dp,
+                  u_q.used); 
+    bn_zero_non_used(&a[tid]);
   }
 }
 
@@ -1418,7 +1417,7 @@ __host__ void Polynomial::reduce(){
     const int half = phi->deg()-1;
     const int N = this->get_crt_spacing();
     const int NPolis = this->CRTPrimes.size();
-    const int size = (N-half)*NPolis;
+    int size = (N-half)*NPolis;
 
     if(size > 0){
       dim3 blockDim(ADDBLOCKXDIM);
@@ -1446,7 +1445,10 @@ __host__ void Polynomial::reduce(){
       get_words(&Q,q);
       bn_t Q2;
       get_words(&Q2,q*q);
-      cuICRTFix<<< gridDim,blockDim,0,get_stream()>>>(d_bn_coefs, N, Q,get_reciprocal(q),Q2);      
+    
+      size = N;
+      dim3 gridDimFix(size/ADDBLOCKXDIM + (size % ADDBLOCKXDIM == 0? 0:1));
+      cuICRTFix<<< gridDimFix,blockDim,0,get_stream()>>>(d_bn_coefs, N, Q,get_reciprocal(q),Q2);      
 
       set_crt_computed(false);
     }
