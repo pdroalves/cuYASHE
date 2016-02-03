@@ -161,4 +161,33 @@ int main(){
   a %= m;
 
   std::cout << "CPU: " <<a.to_string() << std::endl;
+
+
+  // GPU
+  a.set_coeffs();
+  a.set_coeff(0,to_ZZ("61841506593550295")), 
+  a.set_coeff(1,to_ZZ("106916833401539892")), 
+  a.set_coeff(2,to_ZZ("757073061970113119")), 
+  a.set_coeff(3,to_ZZ("3338412596642650852")), 
+  a.set_coeff(4,to_ZZ("5470565564447407791")), 
+  a.set_coeff(5,to_ZZ("5548103536799580232")), 
+  a.set_coeff(6,to_ZZ("6089003692894423880")),
+  a.set_coeff(7,to_ZZ("7733984529407217518")), 
+  a.set_coeff(8,to_ZZ("8022978165266350588")), 
+  a.set_coeff(9,to_ZZ("9170489421306427724")), 
+  a.set_coeff(10,to_ZZ("8993977458886462143")), 
+  a.set_coeff(11,to_ZZ("6882188452282780506")), 
+  a.set_coeff(12,to_ZZ("4376377560524434132")), 
+  a.set_coeff(13,to_ZZ("2285160538342347456")), 
+  a.set_coeff(14,to_ZZ("1122693488336169022"));
+
+  a.set_icrt_computed(false);
+  a.set_crt_computed(false);
+  a.set_host_updated(true);
+
+  a.update_device_data();
+  a.set_host_updated(false);
+  a.modn(m);
+
+
 }

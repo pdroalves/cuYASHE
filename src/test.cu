@@ -839,18 +839,20 @@ BOOST_AUTO_TEST_CASE(severalMultiplications)
   // std::cout << "Iteration "<< 0 << std::endl;
 
   Polynomial c = a*b;
+  std::cout << "c: " << c.to_string() << " degree: " << c.deg() <<std::endl;
   c.reduce(); // %phi %q
     
   ZZ_pEX c_ntl = a_ntl*b_ntl;
+  std::cout << "c_ntl: " << c_ntl << " degree: " << NTL::deg(c_ntl) << std::endl << std::endl;
   c_ntl %= conv<ZZ_pEX>(NTL_Phi);
   
-  #ifdef DEBUG
+  // #ifdef DEBUG
   std::cout << "Iteration 0" << std::endl;
   std::cout << "a: " << a.to_string() << " degree: " << a.deg() <<std::endl;
   std::cout << "b: " << b.to_string() << " degree: " << b.deg() <<std::endl;
   std::cout << "c: " << c.to_string() << " degree: " << c.deg() <<std::endl;
   std::cout << "c_ntl: " << c_ntl << " degree: " << NTL::deg(c_ntl) << std::endl << std::endl;
-  #endif
+  // #endif
    
   BOOST_REQUIRE(NTL::deg(c_ntl) == c.deg());
   for(int i = 0;i <= c.deg();i++){
@@ -865,13 +867,13 @@ BOOST_AUTO_TEST_CASE(severalMultiplications)
     BOOST_REQUIRE(c.get_coeff(i) == ntl_value);
   }
   for(unsigned int i = 1; i < NTESTS; i++){
-    #ifdef DEBUG
+    // #ifdef DEBUG
     std::cout << "Iteration "<< i << std::endl;
     std::cout << "a: " << a.to_string() << " degree: " << a.deg() <<std::endl;
     std::cout << "b: " << b.to_string() << " degree: " << b.deg() <<std::endl;
     std::cout << "c: " << c.to_string() << " degree: " << c.deg() <<std::endl;
     std::cout << "c_ntl: " << c_ntl << " degree: " << NTL::deg(c_ntl) << std::endl << std::endl;
-    #endif
+    // #endif
     c = c*a;
     c.reduce(); // %phi %q
 
@@ -940,17 +942,17 @@ BOOST_AUTO_TEST_CASE(phiReduceGPU)
     ZZ_pEX a_ntl;
     for(int i = 0;i <= a.deg();i++)
       NTL::SetCoeff(a_ntl,i,conv<ZZ_p>(a.get_coeff(i)));
-    // std::cout << "a_ntl = " << a_ntl << std::endl;;
-    // std::cout << "a = " << a.to_string() << std::endl;;
+    std::cout << "a_ntl = " << a_ntl << std::endl;;
+    std::cout << "a = " << a.to_string() << std::endl;;
 
     a.update_device_data();
     a.set_host_updated(false);
 
     a.reduce();
-
     a_ntl %= conv<ZZ_pEX>(ZZ_pE::modulus());
-    // std::cout << "a_ntl = " << a_ntl << std::endl;;
-    // std::cout << "a = " << a.to_string() << std::endl;;
+
+    std::cout << "a_ntl = " << a_ntl << std::endl;;
+    std::cout << "a = " << a.to_string() << std::endl;;
 
     BOOST_REQUIRE(NTL::deg(a_ntl) == a.deg());
     for(int i = 0;i <= a.deg();i++){

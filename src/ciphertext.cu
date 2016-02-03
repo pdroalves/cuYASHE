@@ -153,11 +153,12 @@ void Ciphertext::keyswitch(){
   // else
   //   throw "Unknown Yashe::word";
   
-  for(int i = 0; i < Yashe::lwq; i ++){
-    Polynomial p = (P[i])*(Yashe::gamma[i]);
-    *this += p;
-  }
-  this->reduce();
+  Ciphertext::keyswitch_mul(&P);
+  // for(int i = 0; i < Yashe::lwq; i ++){
+  //   Polynomial p = (P[i])*(Yashe::gamma[i]);
+  //   *this += p;
+  // }
+  // this->reduce();
 
   #ifdef CYCLECOUNTING
   end = get_cycles();
@@ -165,3 +166,35 @@ void Ciphertext::keyswitch(){
   #endif
 }
 
+
+void Ciphertext::keyswitch_mul(std::vector<Polynomial> *P){
+  // It is expected that Yashe::gamma[i] lies in NTT domain
+  // 
+  for(int i = 0; i < Yashe::lwq; i++){
+    // NTT(P[i])
+    P->at(i).crt();
+    CUDAFunctions::applyNTT(P->at(i).get_device_crt_residues(),
+                            P->at(i).get_crt_spacing(),
+                            Polynomial::CRTPrimes.size(),
+                            FORWARD,
+                            get_stream());
+    // P[i] *= Yashe::gamma[i]
+    CUDAFunctions::executePolynomialMul(P->at(i).get_device_crt_residues(),
+                                        P->at(i).get_device_crt_residues(),
+                                        Yashe::gamma[i].get_device_crt_residues(),
+                                        P->at(i).get_crt_spacing(),
+                                        get_stream());
+    CUDAFunctions::executePolynomialAdd(this->get_device_crt_residues(),
+                                        this->get_device_crt_residues(),
+                                        P->at(i).get_device_crt_residues(),
+                                        P->at(i).get_crt_spacing(),
+                                        get_stream());
+  }
+  CUDAFunctions::applyNTT(this->get_device_crt_residues(),
+                          this->get_crt_spacing(),
+                          Polynomial::CRTPrimes.size(),
+                          INVERSE,
+                          get_stream());
+  this->reduce();
+
+}

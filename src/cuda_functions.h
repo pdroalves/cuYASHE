@@ -39,7 +39,11 @@ class CUDAFunctions{
     ///////////
     static cufftHandle plan;
     #endif
-
+    static cuyasheint_t* applyNTT(  cuyasheint_t *d_a,
+                                    const int N,
+                                    const int NPolis,
+                                    int type,
+                                    cudaStream_t stream);
     static void callPolynomialAddSub(cuyasheint_t *c,
                                             cuyasheint_t *a,
                                             cuyasheint_t *b,
@@ -51,6 +55,16 @@ class CUDAFunctions{
                                             cuyasheint_t *b,
                                             int size,
                                             int OP);
+    static void executePolynomialMul(cuyasheint_t *c, 
+                                    cuyasheint_t *a, 
+                                    cuyasheint_t *b, 
+                                    const int size, 
+                                    cudaStream_t stream);
+    static void executePolynomialAdd(cuyasheint_t *c, 
+                                    cuyasheint_t *a, 
+                                    cuyasheint_t *b, 
+                                    const int size, 
+                                    cudaStream_t stream);
     static cuyasheint_t* callPolynomialMul(cuyasheint_t *d_result,
                                             cuyasheint_t *a,
                                             const bool realign_A,

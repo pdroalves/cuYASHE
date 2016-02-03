@@ -219,6 +219,7 @@ class Ciphertext: public Polynomial{
 
   private:
     void keyswitch();
+    void keyswitch_mul(std::vector<Polynomial> *P);
 };
 
 #endif

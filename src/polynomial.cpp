@@ -279,6 +279,12 @@ void Polynomial::crt(){
           Polynomial::CRTPrimes.size(),
           get_stream()
     );
+
+    // CUDAFunctions::applyNTT(this->get_device_crt_residues(),
+                          // this->get_crt_spacing(),
+                          // Polynomial::CRTPrimes.size(),
+                          // INVERSE,
+                          // get_stream());
   set_crt_computed(true);
 }
 
@@ -382,6 +388,12 @@ void Polynomial::icrt(){
   if(get_crt_spacing() > CUDAFunctions::N)
     CUDAFunctions::init(get_crt_spacing());
   
+  // CUDAFunctions::applyNTT(this->get_device_crt_residues(),
+                          // this->get_crt_spacing(),
+                          // Polynomial::CRTPrimes.size(),
+                          // INVERSE,
+                          // get_stream());
+
   callICRT( d_bn_coefs,
         get_device_crt_residues(),
         get_crt_spacing(),

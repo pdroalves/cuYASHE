@@ -683,6 +683,22 @@ __global__ void polynomialNTTMul(cuyasheint_t *a,const cuyasheint_t *b,const int
       // a[tid] = a_value*b_value % 18446744069414584321;
   }
 }
+
+__global__ void polynomialNTTAdd(cuyasheint_t *a,const cuyasheint_t *b,const int size){
+  // We have one thread per polynomial coefficient on 32 threads-block.
+  // For CRT polynomial adding, all representations should be concatenated aligned
+  const int tid = threadIdx.x + blockDim.x*blockIdx.x;
+
+  if(tid < size ){
+      // Coalesced access to global memory. Doing this way we reduce required bandwich.
+      uint64_t a_value = a[tid];
+      uint64_t b_value = b[tid];
+
+      // In-place
+      a[tid] = s_add(a_value,b_value);
+      // a[tid] = a_value*b_value % 18446744069414584321;
+  }
+}
 #endif
 
 __global__ void polynomialOPInteger(const int opcode,
@@ -824,6 +840,90 @@ __host__ void CUDAFunctions::callPolynomialOPDigit( const int opcode,
   return;
 }
 
+__host__ cuyasheint_t* CUDAFunctions::applyNTT( cuyasheint_t *d_a,
+                                                const int N,
+                                                const int NPolis,
+                                                int type,
+                                                cudaStream_t stream){
+  const int size = N*NPolis;
+  cuyasheint_t *aux;
+
+  cudaError_t result;
+  result = cudaMalloc((void**)&aux,size*sizeof(cuyasheint_t));
+  assert(result == cudaSuccess);
+
+  result = cudaMemsetAsync(aux,0,size*sizeof(cuyasheint_t),stream);
+  assert(result == cudaSuccess);
+
+  int RADIX;
+  /*if(N % 8 == 0)
+    RADIX = 8;
+  else*/ if(N % 4 == 0)
+    RADIX = 4;
+  else{
+    assert(N % 2 == 0);
+    RADIX = 2;
+  }
+  // const int RADIX = 2;
+  dim3 blockDim(std::min(N/RADIX,1024));
+  dim3 gridDim(NPolis);
+
+  // Forward
+  for(int Ns=1; Ns<N; Ns*=RADIX){
+    if(type == FORWARD){ 
+      /*if(RADIX == 8)
+        NTT<8,FORWARD><<<gridDim,blockDim,1,stream >>>(CUDAFunctions::d_W,CUDAFunctions::d_WInv,N,Ns,d_a,aux);
+      else*/ if(RADIX == 4)
+        NTT<4,FORWARD><<<gridDim,blockDim,1,stream >>>(CUDAFunctions::d_W,CUDAFunctions::d_WInv,N,Ns,d_a,aux);
+      else{
+        assert(RADIX == 2);
+        NTT<2,FORWARD><<<gridDim,blockDim,1,stream >>>(CUDAFunctions::d_W,CUDAFunctions::d_WInv,N,Ns,d_a,aux);
+      }
+    }else{      
+      /*if(RADIX == 8)
+        NTT<8,FORWARD><<<gridDim,blockDim,1,stream >>>(CUDAFunctions::d_W,CUDAFunctions::d_WInv,N,Ns,d_a,aux);
+      else*/ if(RADIX == 4)
+        NTT<4,INVERSE><<<gridDim,blockDim,1,stream >>>(CUDAFunctions::d_W,CUDAFunctions::d_WInv,N,Ns,d_a,aux);
+      else{
+        assert(RADIX == 2);
+        NTT<2,INVERSE><<<gridDim,blockDim,1,stream >>>(CUDAFunctions::d_W,CUDAFunctions::d_WInv,N,Ns,d_a,aux);
+      }
+    }
+    assert(cudaGetLastError() == cudaSuccess);
+    std::swap(aux,d_a);
+  }
+  if(type == INVERSE){
+    std::swap(aux,d_a);
+
+    dim3 blockDimMul(ADDBLOCKXDIM);
+    dim3 gridDimMul((size)/ADDBLOCKXDIM+1); // We expect that ADDBLOCKXDIM always divide size
+    NTTScale<<< gridDimMul,blockDimMul,1,stream >>>(d_a,size,N);
+    assert(cudaGetLastError() == cudaSuccess);
+  }
+  return d_a;
+}
+
+__host__ void CUDAFunctions::executePolynomialMul(cuyasheint_t *c, 
+                                                  cuyasheint_t *a, 
+                                                  cuyasheint_t *b, 
+                                                  const int size, 
+                                                  cudaStream_t stream){
+  dim3 blockDimMul(ADDBLOCKXDIM);
+  dim3 gridDimMul((size)/ADDBLOCKXDIM+1); // We expect that ADDBLOCKXDIM always divide size
+  polynomialNTTMul<<<gridDimMul,blockDimMul,0,stream>>>(a,b,size);
+  assert(cudaGetLastError() == cudaSuccess);
+}
+
+__host__ void CUDAFunctions::executePolynomialAdd(cuyasheint_t *c, 
+                                                  cuyasheint_t *a, 
+                                                  cuyasheint_t *b, 
+                                                  const int size, 
+                                                  cudaStream_t stream){
+  dim3 blockDimMul(ADDBLOCKXDIM);
+  dim3 gridDimMul((size)/ADDBLOCKXDIM+1); // We expect that ADDBLOCKXDIM always divide size
+  polynomialNTTAdd<<<gridDimMul,blockDimMul,0,stream>>>(a,b,size);
+  assert(cudaGetLastError() == cudaSuccess);
+}
 
 __host__ cuyasheint_t* CUDAFunctions::callPolynomialMul(cuyasheint_t *output,
                                                         cuyasheint_t *a,
@@ -1285,17 +1385,18 @@ __global__ void cuICRTFix(bn_t *a, const int N, bn_t q,bn_t u_q,bn_t q2){
       // result = q - result
       carry = bn_subn_low(coef.dp,q.dp,coef.dp,max_d(coef.used,q.used));
       coef.used = get_used_index(coef.dp,STD_BNT_WORDS_ALLOC)+1;
-    }  
-    a[tid] = coef;
-    // result = result % q
-    bn_mod_barrt( a,
-                  a,
-                  N,
-                  q.dp,
-                  q.used,
-                  u_q.dp,
-                  u_q.used); 
-    bn_zero_non_used(&a[tid]);
+      a[tid] = coef;
+    }else if(bn_cmp_abs(&coef,&q) == CMP_GT){
+      a[tid] = coef;
+      bn_mod_barrt( a,
+                    a,
+                    N,
+                    q.dp,
+                    q.used,
+                    u_q.dp,
+                    u_q.used); 
+      bn_zero_non_used(&a[tid]);
+    }
   }
 }
 
@@ -1314,7 +1415,7 @@ __global__ void polynomialReductionCRT(cuyasheint_t *a,const int half,const int 
 
     bool is_neg = (a[rid*N + cid] < a[rid*N + cid + half + 1]);
     a[rid*N + cid] -= a[rid*N + cid + half + 1];
-    // a[rid*N + cid] += is_neg*CRTPrimesConstant[rid]*CRTPrimesConstant[rid];
+    a[rid*N + cid] += is_neg*CRTPrimesConstant[rid]*CRTPrimesConstant[rid];
     __syncthreads();
     a[rid*N + cid + half + 1] = 0;
     a[rid*N + cid] %= CRTPrimesConstant[rid];
