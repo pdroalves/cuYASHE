@@ -1112,6 +1112,9 @@ __device__ void bn_mod_barrt(	bn_t *C, const bn_t *A,const int NCoefs,
 		int sa = A[cid].used;
 		cuyasheint_t *c = C[cid].dp;
 
+		if(bn_cmpn_low(a, m, sm) == CMP_LT)
+			return;
+		
 		int mu;
 		cuyasheint_t q[2*STD_BNT_WORDS_ALLOC],t[2*STD_BNT_WORDS_ALLOC],carry;
 
@@ -1133,10 +1136,10 @@ __device__ void bn_mod_barrt(	bn_t *C, const bn_t *A,const int NCoefs,
 		
 		if (sq > su) {
 			// The first mu+1 coeficients are completely useless. 
-			// There is a right shift right after this.
-			bn_muld_low(t, q, sq, u, su, 0, sq + su);
+			// There is a right shift after this.
+			bn_muld_low(t, q, sq, u, su, mu, sq + su);
 		} else {
-			bn_muld_low(t, u, su, q, sq, 0, sq + su);
+			bn_muld_low(t, u, su, q, sq, mu - (su-sq), sq + su);
 		}
 		st = sq + su;
 

@@ -1361,7 +1361,7 @@ __host__ void CUDAFunctions::init(int N){
 
 }
 
-__global__ void cuICRTFix(bn_t *a, const int N, bn_t q,bn_t u_q,bn_t q2){
+__global__ void cuReductionFix(bn_t *a, const int N, bn_t q,bn_t u_q,bn_t q2){
   //////////////////////////////////////////////////////
   // This kernel must be executed with N threads //
   //////////////////////////////////////////////////////
@@ -1549,7 +1549,7 @@ __host__ void Polynomial::reduce(){
     
       size = N;
       dim3 gridDimFix(size/ADDBLOCKXDIM + (size % ADDBLOCKXDIM == 0? 0:1));
-      cuICRTFix<<< gridDimFix,blockDim,0,get_stream()>>>(d_bn_coefs, N, Q,get_reciprocal(q),Q2);      
+      cuReductionFix<<< gridDimFix,blockDim,0,get_stream()>>>(d_bn_coefs, N, Q,get_reciprocal(q),Q2);      
 
       set_crt_computed(false);
     }
@@ -1562,7 +1562,7 @@ __host__ void Polynomial::reduce(){
 
     const int half = phi->deg()-1;
     const int N = deg()+1; // Number of coefficients
-    const int size = (N-half);
+    int size = (N-half);
 
     if(size > 0){
       dim3 blockDim(ADDBLOCKXDIM);
@@ -1582,8 +1582,13 @@ __host__ void Polynomial::reduce(){
       this->set_host_updated(false);
       this->set_crt_computed(false);
       this->set_icrt_computed(true);
-
-      *this %= q;
+  
+      bn_t Q2;
+      get_words(&Q2,q*q);
+    
+      size = N;
+      dim3 gridDimFix(size/ADDBLOCKXDIM + (size % ADDBLOCKXDIM == 0? 0:1));
+      cuReductionFix<<< gridDimFix,blockDim,0,get_stream()>>>(d_bn_coefs, N, Q,get_reciprocal(q),Q2); 
     }
     #endif
   }
