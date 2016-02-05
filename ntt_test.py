@@ -1,7 +1,7 @@
 # P = 4294955009
 P = pow(2,64)-pow(2,32)+1
 # P = pow(2,32)-pow(2,20)+1
-N = 32
+N = 16
 assert( (P-1) % N == 0)
 # wN = pow(7,(P-1)/N,P)
 wN = pow(7,(P-1)/N,P)
@@ -19,8 +19,6 @@ for i in range(N):
 	for j in range(N):
 		WInv[i].append(pow(W[i][j],P-2,P))
 
-a = range((N/2)) + [0]*(N/2)
-b = [1]*(N/2) + [0]*(N/2)
 
 def NTT(a,W):
 	value = []
@@ -29,7 +27,10 @@ def NTT(a,W):
 	return value
 
 def mul(a,b):
-	return [x[0]*x[1] for x in zip(a,b)]
+	return [x[0]*x[1] % P for x in zip(a,b)]
+
+a = range((N/2)) + [0]*(N/2)
+b = [1]*(N/2) + [0]*(N/2)
 
 assert [x/N for x in NTT(NTT(a,W),WInv)] == a
 assert [x/N for x in NTT(NTT(b,W),WInv)] == b

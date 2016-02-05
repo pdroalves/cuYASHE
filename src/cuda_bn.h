@@ -89,7 +89,7 @@ __host__ __device__ uint32_t bn_mul1_low(uint32_t *c, const uint32_t *a, uint32_
 __host__ __device__ cuyasheint_t bn_mod1_low(const cuyasheint_t *a,
 									const int size,
 									const uint32_t b);
-__host__ void callCuModN(bn_t * c, const bn_t * a,int NCoefs,
+__host__ void callCuModN(bn_t * c, bn_t * a,int NCoefs,
 		const cuyasheint_t * m, int sm, const cuyasheint_t * u, int su,
 		cudaStream_t stream);
 __host__ int callBNGetDeg(bn_t *coefs, int N);

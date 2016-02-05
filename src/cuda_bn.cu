@@ -328,7 +328,8 @@ __host__ __device__ void bn_copy(bn_t *a, bn_t *b){
 }
 __host__ __device__ void bn_2_compl(bn_t *a){
 	for(int i = 0; i < a->used; i++)
-		a->dp[i] = (a->dp[i]^UINT64_MAX)+1; 
+		a->dp[i] = (a->dp[i]^UINT64_MAX);
+	a->dp[0] += 1; 
 }
 
 __host__ __device__ void bn_bitwise_and(bn_t *a, bn_t *b){
@@ -1215,14 +1216,16 @@ __device__ void bn_mod_barrt(	bn_t *C, const bn_t *A,const int NCoefs,
  * @param u      [description]
  * @param su     [description]
  */
-__global__ void cuModN(bn_t * c, const bn_t * a, const int NCoefs,
+__global__ void cuModN(bn_t * c, bn_t * a, const int NCoefs,
 		const cuyasheint_t * m, int sm, const cuyasheint_t * u, int su){
 	/**
 	 * This function should be executed with NCoefs threads
 	 */
 	const unsigned int tid = threadIdx.x + blockIdx.x*blockDim.x;
-	if(tid < NCoefs)
+	if(tid < NCoefs){
 		bn_mod_barrt(c,a,NCoefs,m,get_used_index(m,sm)+1,u,get_used_index(u,su)+1);
+		bn_zero_non_used(&a[tid]);
+	}
 }
 
 /**
@@ -1236,7 +1239,7 @@ __global__ void cuModN(bn_t * c, const bn_t * a, const int NCoefs,
  * @param su     [description]
  * @param stream [description]
  */
-__host__ void callCuModN(bn_t * c, const bn_t * a,int NCoefs,
+__host__ void callCuModN(bn_t * c, bn_t * a,int NCoefs,
 		const cuyasheint_t * m, int sm, const cuyasheint_t * u, int su,
 		cudaStream_t stream){
 
@@ -1260,7 +1263,7 @@ __host__ void callCuModN(bn_t * c, const bn_t * a,int NCoefs,
  * @NPolis - input: qty of primes/residual polynomials
  */
 __global__ void cuCRT(	cuyasheint_t *d_polyCRT,
-						const bn_t *x,
+						bn_t *x,
 						const int used_coefs,
 						const unsigned int N,
 						const unsigned int NPolis
@@ -1279,12 +1282,12 @@ __global__ void cuCRT(	cuyasheint_t *d_polyCRT,
 	 * rid: residue id
 	 */
 	const unsigned int tid = threadIdx.x + blockIdx.x*blockDim.x;
-	const unsigned int cid = tid % (used_coefs);
-	const unsigned int rid = tid / (used_coefs);
+	const unsigned int cid = tid % (N);
+	const unsigned int rid = tid / (N);
 
 	// x can be copied to shared memory!
 	// 
-	if(tid < used_coefs*NPolis)
+	if(tid < N*NPolis)
 		// Computes x mod pi
 		d_polyCRT[cid + rid*N] = bn_mod1_low(	x[cid].dp,
 												x[cid].used,
@@ -1426,12 +1429,17 @@ __global__ void cuICRT(	bn_t *poly,
 }
 	
 void callCRT(bn_t *coefs,const int used_coefs,cuyasheint_t *d_polyCRT,const int N, const int NPolis,cudaStream_t stream){
-	const int size = used_coefs*NPolis;
+	const int size = N*NPolis;
 
 	if(size <= 0)
 		return;
-	
+
 	cudaError_t result;
+
+	// Set all positions to 0
+	result = cudaMemsetAsync(d_polyCRT,0,size*sizeof(cuyasheint_t),stream);
+    assert(result == cudaSuccess);
+	
 	int blockSize;   // The launch configurator returned block size 
 	// int minGridSize; // The minimum grid size needed to achieve the 
            			 // maximum occupancy for a full device launch 

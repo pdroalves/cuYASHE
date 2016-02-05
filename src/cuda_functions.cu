@@ -952,22 +952,7 @@ __host__ cuyasheint_t* CUDAFunctions::callPolynomialMul(cuyasheint_t *output,
   assert(N == CUDAFunctions::N);
   cuyasheint_t *d_result = output;
 
-  #ifdef PLAINMUL
-    // #ifdef VERBOSE
-    //     std::cout << "Plain multiplication" << std::endl;
-    // #endif
-    // cudaError_t result = cudaMalloc((void**)&d_result,(N)*NPolis*sizeof(cuyasheint_t));
-    // assert(result == cudaSuccess);
-    // result = cudaMemset((void*)d_result,0,(N)*NPolis*sizeof(cuyasheint_t));
-    // assert(result == cudaSuccess);
-
-    // dim3 blockDim(ADDBLOCKXDIM,ADDBLOCKXDIM);
-    // // int blocks = ((2*N*NPolis) % ADDBLOCKXDIM == 0? (2*N*NPolis)/ADDBLOCKXDIM : (2*N*NPolis)/ADDBLOCKXDIM+1);
-    // // dim3 gridDim(blocks,blocks);
-    // dim3 gridDim(N*NPolis,1);
-    // polynomialPlainMul<<<gridDim,blockDim>>>(a,b,d_result,N,NPolis);
-    // assert(cudaGetLastError() == cudaSuccess);
-  #elif defined(NTTMUL)
+  #ifdef NTTMUL
 
   const int size = N*NPolis;
   cuyasheint_t *d_a;
@@ -1361,7 +1346,7 @@ __host__ void CUDAFunctions::init(int N){
 
 }
 
-__global__ void cuReductionFix(bn_t *a, const int N, bn_t q,bn_t u_q,bn_t q2){
+__global__ void cuICRTFix(bn_t *a, const int N, bn_t q,bn_t u_q,bn_t q2){
   //////////////////////////////////////////////////////
   // This kernel must be executed with N threads //
   //////////////////////////////////////////////////////
@@ -1385,18 +1370,17 @@ __global__ void cuReductionFix(bn_t *a, const int N, bn_t q,bn_t u_q,bn_t q2){
       // result = q - result
       carry = bn_subn_low(coef.dp,q.dp,coef.dp,max_d(coef.used,q.used));
       coef.used = get_used_index(coef.dp,STD_BNT_WORDS_ALLOC)+1;
-      a[tid] = coef;
-    }else if(bn_cmp_abs(&coef,&q) == CMP_GT){
-      a[tid] = coef;
-      bn_mod_barrt( a,
-                    a,
-                    N,
-                    q.dp,
-                    q.used,
-                    u_q.dp,
-                    u_q.used); 
-      bn_zero_non_used(&a[tid]);
-    }
+    }  
+    a[tid] = coef;
+    // result = result % q
+    bn_mod_barrt( a,
+                  a,
+                  N,
+                  q.dp,
+                  q.used,
+                  u_q.dp,
+                  u_q.used); 
+    bn_zero_non_used(&a[tid]);
   }
 }
 
@@ -1415,7 +1399,7 @@ __global__ void polynomialReductionCRT(cuyasheint_t *a,const int half,const int 
 
     bool is_neg = (a[rid*N + cid] < a[rid*N + cid + half + 1]);
     a[rid*N + cid] -= a[rid*N + cid + half + 1];
-    a[rid*N + cid] += is_neg*CRTPrimesConstant[rid]*CRTPrimesConstant[rid];
+    // a[rid*N + cid] += is_neg*CRTPrimesConstant[rid]*CRTPrimesConstant[rid];
     __syncthreads();
     a[rid*N + cid + half + 1] = 0;
     a[rid*N + cid] %= CRTPrimesConstant[rid];
@@ -1432,34 +1416,33 @@ __global__ void polynomialReductionCoefs(bn_t *a,const int half,const int N,cons
   const int cid = tid % (N-half);
 
   if(cid + half + 1 < N){
-    bn_t coef = a[cid];
-    bn_t coefPlusHalf = a[cid+half+1];
-
-    coef.used = get_used_index(coef.dp,STD_BNT_WORDS_ALLOC)+1;
-    coefPlusHalf.used = get_used_index(coefPlusHalf.dp,STD_BNT_WORDS_ALLOC)+1;
 
     // a[i] = a[i] - a[i+half]
-    int carry = bn_subn_low(coef.dp, coef.dp, a[cid + half + 1].dp, min_d(a[cid].used,a[cid + half + 1].used));
-    coef.used = min_d(a[cid].used,a[cid + half + 1].used);
+    int carry = bn_subn_low(a[cid].dp, a[cid].dp, a[cid + half + 1].dp, min_d(a[cid].used,a[cid + half + 1].used));
+    a[cid].used = min_d(a[cid].used,a[cid + half + 1].used);
     
     if(carry == BN_NEG){
       // q - (UINT64_MAX - c)
       // compl2 == UINT64_MAX -C
-      // 
+      
       // SOMAR Q
-      carry = bn_addn_low(coef.dp,q.dp,coef.dp,q.used);
-      coef.used = max_d(coef.used,q.used);
-      coef.dp[coef.used] = carry;
-      coef.used += (carry > 0);
-      bn_zero_non_used(&coef);
+      // carry = bn_addn_low(a[cid].dp,q.dp,a[cid].dp,q.used);
+      // a[cid].used = max_d(a[cid].used,q.used);
+      // a[cid].dp[a[cid].used] = carry;
+      // a[cid].used += (carry > 0);
+      // bn_zero_non_used(&a[cid]);
+      
+      
+      bn_2_compl(&a[cid]);
+      carry = bn_subn_low(a[cid].dp,q.dp,a[cid].dp,q.used);
+      assert(carry == BN_POS);
+      a[cid].used = q.used;
+      bn_zero_non_used(&a[cid]);
     }
     
 
     __syncthreads();
     bn_zero(&a[cid + half + 1]);
-
-    a[cid] = coef;
-    a[cid+half+1] = coefPlusHalf;
   }
 }
 
@@ -1549,8 +1532,9 @@ __host__ void Polynomial::reduce(){
     
       size = N;
       dim3 gridDimFix(size/ADDBLOCKXDIM + (size % ADDBLOCKXDIM == 0? 0:1));
-      cuReductionFix<<< gridDimFix,blockDim,0,get_stream()>>>(d_bn_coefs, N, Q,get_reciprocal(q),Q2);      
+      cuICRTFix<<< gridDimFix,blockDim,0,get_stream()>>>(d_bn_coefs, N, Q,get_reciprocal(q),Q2);      
 
+      set_icrt_computed(true);
       set_crt_computed(false);
     }
     #else
@@ -1562,7 +1546,7 @@ __host__ void Polynomial::reduce(){
 
     const int half = phi->deg()-1;
     const int N = deg()+1; // Number of coefficients
-    int size = (N-half);
+    const int size = (N-half);
 
     if(size > 0){
       dim3 blockDim(ADDBLOCKXDIM);
@@ -1582,13 +1566,12 @@ __host__ void Polynomial::reduce(){
       this->set_host_updated(false);
       this->set_crt_computed(false);
       this->set_icrt_computed(true);
-  
-      bn_t Q2;
-      get_words(&Q2,q*q);
-    
-      size = N;
-      dim3 gridDimFix(size/ADDBLOCKXDIM + (size % ADDBLOCKXDIM == 0? 0:1));
-      cuReductionFix<<< gridDimFix,blockDim,0,get_stream()>>>(d_bn_coefs, N, Q,get_reciprocal(q),Q2); 
+
+      result = cudaDeviceSynchronize();
+      assert(result == cudaSuccess);
+
+      this->set_crt_computed(false);
+      modn(q);
     }
     #endif
   }
