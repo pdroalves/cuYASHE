@@ -124,8 +124,8 @@ int main(int argc,char* argv[]){
 
 
 
-  // for(int d = 1024;d <= 4096;d *= 2){
-  for(int d = 4096;d <= 4096;d *= 2){
+  for(int d = 1024;d <= 4096;d *= 2){
+  //for(int d = 4096;d <= 4096;d *= 2){
 
     std::cout << "d: " << d << std::endl;
 
@@ -208,7 +208,7 @@ int main(int argc,char* argv[]){
     clock_gettime( CLOCK_REALTIME, &stop);
     diff = compute_time_ms(start,stop)/N;
     std::cout << "update_crt_spacing: " << diff << " ms" << std::endl;
-    crt << d << " " << diff  << std::endl;
+    //ucs << d << " " << diff  << std::endl;
 
     // update_device_data
     Polynomial::random(&a,d-1);
@@ -224,7 +224,7 @@ int main(int argc,char* argv[]){
     clock_gettime( CLOCK_REALTIME, &stop);
     diff = compute_time_ms(start,stop)/N;
     std::cout << "update_device_data: " << diff << " ms" << std::endl;
-    crt << d << " " << diff  << std::endl;
+    //crt << d << " " << diff  << std::endl;
 
     // update_host_data
     Polynomial::random(&a,d-1);
@@ -242,7 +242,7 @@ int main(int argc,char* argv[]){
     clock_gettime( CLOCK_REALTIME, &stop);
     diff = compute_time_ms(start,stop)/N;
     std::cout << "update_host_data: " << diff << " ms" << std::endl;
-    crt << d << " " << diff  << std::endl;
+    //crt << d << " " << diff  << std::endl;
     // /////////////////////////////////////////////
 
 
