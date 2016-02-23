@@ -113,6 +113,10 @@ double runMulWithMemoryCopy(Yashe cipher, int d){
   Ciphertext ct_a = cipher.encrypt(a);
   Ciphertext ct_b = cipher.encrypt(b);    
 
+  ct_a.update_host_data();
+  ct_a.set_crt_computed(false);
+  ct_b.update_host_data();
+  ct_b.set_crt_computed(false);
   clock_gettime( CLOCK_REALTIME, &start);
   for(int i = 0; i < N;i++){
     Ciphertext c =  (ct_a*ct_b);
@@ -131,8 +135,8 @@ double runMulWithoutMemoryCopy(Yashe cipher, int d){
   Ciphertext ct_a = cipher.encrypt(a);
   Ciphertext ct_b = cipher.encrypt(b);
 
-  ct_a.update_device_data();
-  ct_b.update_device_data();
+  ct_a.crt();
+  ct_b.crt();
         
   clock_gettime( CLOCK_REALTIME, &start);
   for(int i = 0; i < N;i++){

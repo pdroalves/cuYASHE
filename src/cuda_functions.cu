@@ -26,6 +26,9 @@ cuyasheint_t *CUDAFunctions::d_W = NULL;//W and WInv doesn't fit constant memory
 cuyasheint_t *CUDAFunctions::d_WInv = NULL;
 cuyasheint_t *CUDAFunctions::d_inner_results = NULL;
 cuyasheint_t *CUDAFunctions::d_inner_results_used = NULL;
+cuyasheint_t *CUDAFunctions::d_mulA = NULL;
+cuyasheint_t *CUDAFunctions::d_mulB = NULL;
+cuyasheint_t *CUDAFunctions::d_mulAux = NULL;
 extern __constant__ cuyasheint_t M[STD_BNT_WORDS_ALLOC];
 extern __constant__ int M_used;
 extern __constant__ cuyasheint_t u[STD_BNT_WORDS_ALLOC];
@@ -955,17 +958,12 @@ __host__ cuyasheint_t* CUDAFunctions::callPolynomialMul(cuyasheint_t *output,
   #ifdef NTTMUL
 
   const int size = N*NPolis;
-  cuyasheint_t *d_a;
-  cuyasheint_t *d_b;
-  cuyasheint_t *aux;
+  cuyasheint_t *d_a = CUDAFunctions::d_mulA;
+  cuyasheint_t *d_b = CUDAFunctions::d_mulB;
+  cuyasheint_t *aux = CUDAFunctions::d_mulAux;
 
   cudaError_t result;
-  result = cudaMalloc((void**)&d_a,size*sizeof(cuyasheint_t));
-  assert(result == cudaSuccess);
-  result = cudaMalloc((void**)&d_b,size*sizeof(cuyasheint_t));
-  assert(result == cudaSuccess);
-  result = cudaMalloc((void**)&aux,size*sizeof(cuyasheint_t));
-  assert(result == cudaSuccess);
+
    
   // cuyasheint_t *mem;
   // result = cudaMalloc((void**)&mem,(4*size)*sizeof(cuyasheint_t));
@@ -1007,10 +1005,10 @@ __host__ cuyasheint_t* CUDAFunctions::callPolynomialMul(cuyasheint_t *output,
     /*if(RADIX == 8)
       NTT<8,FORWARD><<<gridDim,blockDim,1,stream >>>(CUDAFunctions::d_W,CUDAFunctions::d_WInv,N,Ns,d_a,aux);
     else*/ if(RADIX == 4)
-      NTT<4,FORWARD><<<gridDim,blockDim,1,stream >>>(CUDAFunctions::d_W,CUDAFunctions::d_WInv,N,Ns,d_a,aux);
+      NTT<4,FORWARD><<<gridDim,blockDim,0,stream >>>(CUDAFunctions::d_W,CUDAFunctions::d_WInv,N,Ns,d_a,aux);
     else{
       assert(RADIX == 2);
-      NTT<2,FORWARD><<<gridDim,blockDim,1,stream >>>(CUDAFunctions::d_W,CUDAFunctions::d_WInv,N,Ns,d_a,aux);
+      NTT<2,FORWARD><<<gridDim,blockDim,0,stream >>>(CUDAFunctions::d_W,CUDAFunctions::d_WInv,N,Ns,d_a,aux);
     }
     assert(cudaGetLastError() == cudaSuccess);
     std::swap(aux,d_a);
@@ -1022,12 +1020,12 @@ __host__ cuyasheint_t* CUDAFunctions::callPolynomialMul(cuyasheint_t *output,
 
   for(int Ns=1; Ns<N; Ns*=RADIX){
     /*if(RADIX == 8) 
-      NTT<8,FORWARD><<<gridDim,blockDim,1,stream >>>(CUDAFunctions::d_W,CUDAFunctions::d_WInv,N,Ns,d_b,aux);
+      NTT<8,FORWARD><<<gridDim,blockDim,0,stream >>>(CUDAFunctions::d_W,CUDAFunctions::d_WInv,N,Ns,d_b,aux);
     else*/ if(RADIX == 4)
-      NTT<4,FORWARD><<<gridDim,blockDim,1,stream >>>(CUDAFunctions::d_W,CUDAFunctions::d_WInv,N,Ns,d_b,aux);
+      NTT<4,FORWARD><<<gridDim,blockDim,0,stream >>>(CUDAFunctions::d_W,CUDAFunctions::d_WInv,N,Ns,d_b,aux);
     else{
       assert(RADIX == 2);
-      NTT<2,FORWARD><<<gridDim,blockDim,1,stream >>>(CUDAFunctions::d_W,CUDAFunctions::d_WInv,N,Ns,d_b,aux);
+      NTT<2,FORWARD><<<gridDim,blockDim,0,stream >>>(CUDAFunctions::d_W,CUDAFunctions::d_WInv,N,Ns,d_b,aux);
     }
     assert(cudaGetLastError() == cudaSuccess);
     std::swap(aux,d_b);
@@ -1036,18 +1034,18 @@ __host__ cuyasheint_t* CUDAFunctions::callPolynomialMul(cuyasheint_t *output,
   // Multiply
   dim3 blockDimMul(ADDBLOCKXDIM);
   dim3 gridDimMul((size)/ADDBLOCKXDIM+1); // We expect that ADDBLOCKXDIM always divide size
-  polynomialNTTMul<<<gridDimMul,blockDimMul,1,stream>>>(d_a,d_b,size);
+  polynomialNTTMul<<<gridDimMul,blockDimMul,0,stream>>>(d_a,d_b,size);
   assert(cudaGetLastError() == cudaSuccess);
 
   // Inverse
   for(int Ns=1; Ns<N; Ns*=RADIX){
     /*if(RADIX == 8) 
-      NTT<8,INVERSE><<<gridDim,blockDim,1,stream >>>(CUDAFunctions::d_W,CUDAFunctions::d_WInv,N,Ns,d_a,d_result);
+      NTT<8,INVERSE><<<gridDim,blockDim,0,stream >>>(CUDAFunctions::d_W,CUDAFunctions::d_WInv,N,Ns,d_a,d_result);
     else*/ if(RADIX == 4)
-      NTT<4,INVERSE><<<gridDim,blockDim,1,stream >>>(CUDAFunctions::d_W,CUDAFunctions::d_WInv,N,Ns,d_a,d_result);
+      NTT<4,INVERSE><<<gridDim,blockDim,0,stream >>>(CUDAFunctions::d_W,CUDAFunctions::d_WInv,N,Ns,d_a,d_result);
     else{
       assert(RADIX == 2);
-      NTT<2,INVERSE><<<gridDim,blockDim,1,stream >>>(CUDAFunctions::d_W,CUDAFunctions::d_WInv,N,Ns,d_a,d_result);
+      NTT<2,INVERSE><<<gridDim,blockDim,0,stream >>>(CUDAFunctions::d_W,CUDAFunctions::d_WInv,N,Ns,d_a,d_result);
     }
     assert(cudaGetLastError() == cudaSuccess);
     std::swap(d_a,d_result);
@@ -1055,7 +1053,7 @@ __host__ cuyasheint_t* CUDAFunctions::callPolynomialMul(cuyasheint_t *output,
 
   std::swap(d_a,d_result);
 
-  NTTScale<<< gridDimMul,blockDimMul,1,stream >>>(d_result,size,N);
+  NTTScale<<< gridDimMul,blockDimMul,0,stream >>>(d_result,size,N);
   
   // cudaFree(d_a);
   // cudaFree(d_b);
@@ -1205,10 +1203,10 @@ __host__ void CUDAFunctions::init(int N){
 
   #ifdef NTTMUL
   // W used on NTT
-  // #ifdef VERBOSE
+  #ifdef VERBOSE
   std::cout << "Will compute W -- N = " << N << std::endl;
   std::cout << "P " << PZZ << std::endl;
-  // #endif
+  #endif
 
   cuyasheint_t *h_W;
   cuyasheint_t *h_WInv;
@@ -1343,6 +1341,18 @@ __host__ void CUDAFunctions::init(int N){
     assert(result == cudaSuccess);
     result = cudaMalloc((void**)&CUDAFunctions::d_inner_results_used, size*sizeof(cuyasheint_t));
     assert(result == cudaSuccess);
+
+
+    /**
+     * Pre-allocated arrays for NTT multiplication
+     */
+    
+  result = cudaMalloc((void**)&CUDAFunctions::d_mulA,size*sizeof(cuyasheint_t));
+  assert(result == cudaSuccess);
+  result = cudaMalloc((void**)&CUDAFunctions::d_mulB,size*sizeof(cuyasheint_t));
+  assert(result == cudaSuccess);
+  result = cudaMalloc((void**)&CUDAFunctions::d_mulAux,size*sizeof(cuyasheint_t));
+  assert(result == cudaSuccess);
 
 }
 
@@ -1573,6 +1583,7 @@ __host__ void Polynomial::reduce(){
       this->set_crt_computed(false);
       modn(q);
     }
+
     #endif
   }
 }

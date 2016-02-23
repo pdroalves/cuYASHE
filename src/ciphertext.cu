@@ -61,11 +61,11 @@ Ciphertext Ciphertext::operator*(Ciphertext &b){
                         g.deg()+1, 
                         get_stream());
   
-  // p.aftermul = true;
-  // p.level = std::max(this->level,b.level)+1;
-  // p.set_crt_computed(false);
-  // p.set_icrt_computed(true);
-  // p.set_host_updated(false);
+  p.aftermul = true;
+  p.level = std::max(this->level,b.level)+1;
+  p.set_crt_computed(false);
+  p.set_icrt_computed(true);
+  p.set_host_updated(false);
 
   // g.release();
   return p;

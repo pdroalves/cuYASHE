@@ -33,6 +33,10 @@ class CUDAFunctions{
     static cuyasheint_t wN;
     static cuyasheint_t *d_W;
     static cuyasheint_t *d_WInv;
+    static cuyasheint_t *d_mulA;
+    static cuyasheint_t *d_mulB;
+    static cuyasheint_t *d_mulAux;
+    ///////////
     #elif defined(CUFFTMUL)
     ///////////
     // cuFFT //
