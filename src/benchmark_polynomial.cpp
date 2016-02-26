@@ -1,6 +1,8 @@
 #include "benchmark_polynomial.h"
 #include "polynomial.h"
 #include "settings.h"
+#include "common.h"
+#include "cuda_functions.h"
 #include <iostream>
 #include <fstream>
 #include <iterator>
@@ -11,7 +13,6 @@
 #include <NTL/ZZ_pEX.h>
 #include <iomanip>
  #include <stdint.h>
-#include "common.h"
 
 #define BILLION  1000000000L
 #define MILLION  1000000L
@@ -37,6 +38,8 @@ int main(int argc,char* argv[]){
   ofstream gpu_mult_with_memcopy;
   ofstream gpu_reduce;
   ofstream cpu_reduce;
+  ofstream ntt2;
+  ofstream ntt4;
   ofstream modq;
   std::string copyHtD_filename;
   std::string copyDtH_filename;
@@ -49,6 +52,8 @@ int main(int argc,char* argv[]){
   std::string gpu_reduce_filename;
   std::string cpu_reduce_filename;
   std::string modq_filename;
+  std::string ntt2_filename;
+  std::string ntt4_filename;
 
   cudaError_t result;
 
@@ -66,6 +71,8 @@ int main(int argc,char* argv[]){
     gpu_reduce_filename = "gpu_reduce_"+current_date_time()+"_"+suffix+".dat";
     cpu_reduce_filename = "cpu_reduce_"+current_date_time()+"_"+suffix+".dat";
     modq_filename = "modq_"+current_date_time()+"_"+suffix+".dat";
+    ntt2_filename = "ntt2_"+current_date_time()+"_"+suffix+".dat";
+    ntt4_filename = "ntt4_"+current_date_time()+"_"+suffix+".dat";
   }else{
 
     copyHtD_filename = "copyHtD_"+current_date_time()+".dat";
@@ -79,6 +86,8 @@ int main(int argc,char* argv[]){
     gpu_reduce_filename = "gpu_reduce_"+current_date_time()+".dat";
     cpu_reduce_filename = "cpu_reduce_"+current_date_time()+".dat";
     modq_filename = "modq_"+current_date_time()+".dat";
+    ntt2_filename = "ntt2_"+current_date_time()+".dat";
+    ntt4_filename = "ntt4_"+current_date_time()+".dat";
   }
   copyHtD.open (copyHtD_filename);
   copyDtH.open (copyDtH_filename);
@@ -91,6 +100,8 @@ int main(int argc,char* argv[]){
   gpu_reduce.open (gpu_reduce_filename);
   cpu_reduce.open (cpu_reduce_filename);
   modq.open (modq_filename);
+  ntt2.open (ntt2_filename);
+  ntt4.open (ntt4_filename);
 
   std::cout << "Writing copyHtD data to " << copyHtD_filename << std::endl;
   std::cout << "Writing copyDtH data to " << copyDtH_filename << std::endl;
@@ -103,6 +114,8 @@ int main(int argc,char* argv[]){
   std::cout << "Writing gpu_reduce data to " << gpu_reduce_filename << std::endl;
   std::cout << "Writing cpu_reduce data to " << cpu_reduce_filename << std::endl;
   std::cout << "Writing modq data to " << modq_filename << std::endl;
+  std::cout << "Writing ntt2 data to " << ntt2_filename << std::endl;
+  std::cout << "Writing ntt4 data to " << ntt4_filename << std::endl;
 
   ZZ_pX NTL_Phi;
   ZZ q;
@@ -124,7 +137,7 @@ int main(int argc,char* argv[]){
 
 
 
-  for(int d = 1024;d <= 4096;d *= 2){
+  for(int d = 1024;d <= 8192;d *= 2){
   //for(int d = 4096;d <= 4096;d *= 2){
 
     std::cout << "d: " << d << std::endl;
@@ -428,7 +441,29 @@ int main(int argc,char* argv[]){
     // // std::cout << "Press Enter to Continue" << std::endl;
     // //cin.ignore();
 
-    
+
+    for(int RADIX = 2; RADIX <= 4; RADIX*=2){
+      clock_gettime( CLOCK_REALTIME, &start);
+      for(int Ns=1; Ns<N; Ns*=RADIX){
+        CUDAFunctions::callNTT( 2*d, 
+                                Polynomial::CRTPrimes.size(),
+                                RADIX,
+                                CUDAFunctions::d_mulA,
+                                CUDAFunctions::d_mulAux,
+                                FORWARD);
+      result = cudaDeviceSynchronize();
+      assert(result == cudaSuccess);
+      }
+      clock_gettime( CLOCK_REALTIME, &stop);
+
+      float diff = compute_time_ms(start,stop);
+      std::cout << RADIX << "NTT) Time measured: " << diff/N << " ms" << std::endl;
+      if(RADIX == 2)
+        ntt2 << d << " " << diff  << std::endl;
+      else if(RADIX == 4)
+        ntt4 << d << " " << diff  << std::endl;
+    }    
+
   }
 
   result = cudaDeviceReset();

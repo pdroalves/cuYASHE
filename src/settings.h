@@ -32,6 +32,7 @@ extern const uint32_t PRIMES_BUCKET[];
 // Standard number of words to allocate
 // #define STD_BNT_WORDS_ALLOC 32 // Up to 1024 bits big integers
 #define STD_BNT_WORDS_ALLOC 10 // Up to  bits big integers
+#define DSTD_BNT_WORDS_ALLOC 2*STD_BNT_WORDS_ALLOC // Up to  bits big integers
 
 // We use cuyasheint_t as uint64_t to simplify operations
 typedef uint64_t cuyasheint_t;
@@ -46,5 +47,4 @@ enum ntt_mode_t {INVERSE,FORWARD};
 #define PREDUCTION RESIDUES
 
 #define asm	__asm__ volatile
-
 #endif

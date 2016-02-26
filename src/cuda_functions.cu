@@ -9,7 +9,6 @@
 #include "settings.h"
 #include "polynomial.h"
 
-
 #ifdef NTTMUL
 // #define PRIMEP (int)2147483647
 // #define PRIMITIVE_ROOT (int)7;//2^31-1 fails the test(P-1)%N
@@ -658,18 +657,29 @@ __global__ void NTT(cuyasheint_t *d_W,cuyasheint_t *d_WInv,const int N, const in
   }
 }
 
-// __host__ void CUDAFunctions::callNTT(const int N, const int NPolis,cuyasheint_t* dataI, cuyasheint_t* dataO,const int type){
+__host__ void CUDAFunctions::callNTT(const int N, const int NPolis,int RADIX, cuyasheint_t* dataI, cuyasheint_t* dataO,const int type){
 
-//   const int RADIX = 4;
-//   dim3 blockDim(std::min(N/RADIX,1024));
-//   dim3 gridDim(NPolis);
+  dim3 blockDim(std::min(N/RADIX,1024));
+  dim3 gridDim(NPolis);
 
-//   for(int Ns=1; Ns<N; Ns*=RADIX){
-//     NTT<4,type><<<gridDim,blockDim>>>(CUDAFunctions::d_W,CUDAFunctions::d_WInv,N,Ns,dataI,dataO);
-//     assert(cudaGetLastError() == cudaSuccess);
-//     std::swap(dataI,dataO);
-//   }
-// }
+  for(int Ns=1; Ns<N; Ns*=RADIX){
+    if(RADIX == 4){
+      if(type == FORWARD)
+        NTT<4,FORWARD><<<gridDim,blockDim>>>(CUDAFunctions::d_W,CUDAFunctions::d_WInv,N,Ns,dataI,dataO);
+      else
+        NTT<4,INVERSE><<<gridDim,blockDim>>>(CUDAFunctions::d_W,CUDAFunctions::d_WInv,N,Ns,dataI,dataO);
+    }
+    else{
+      assert(RADIX == 2);
+      if(type == FORWARD)
+        NTT<2,FORWARD><<<gridDim,blockDim>>>(CUDAFunctions::d_W,CUDAFunctions::d_WInv,N,Ns,dataI,dataO);
+      else
+        NTT<2,INVERSE><<<gridDim,blockDim>>>(CUDAFunctions::d_W,CUDAFunctions::d_WInv,N,Ns,dataI,dataO);
+    }
+    assert(cudaGetLastError() == cudaSuccess);
+    std::swap(dataI,dataO);
+  }
+}
 
 __global__ void polynomialNTTMul(cuyasheint_t *a,const cuyasheint_t *b,const int size){
   // We have one thread per polynomial coefficient on 32 threads-block.
@@ -1013,7 +1023,6 @@ __host__ cuyasheint_t* CUDAFunctions::callPolynomialMul(cuyasheint_t *output,
     assert(cudaGetLastError() == cudaSuccess);
     std::swap(aux,d_a);
   }
-  
 
   result = cudaMemsetAsync(aux,0,size*sizeof(cuyasheint_t),stream);
   assert(result == cudaSuccess);
