@@ -91,10 +91,10 @@ void common_addition_inplace(P *a,P *b){
 	#endif
 
 	// Check align
-	if(a->get_crt_spacing() != b->get_crt_spacing()){
-		int new_spacing = std::max(a->get_crt_spacing(),b->get_crt_spacing());
-		a->update_crt_spacing(new_spacing);
-		b->update_crt_spacing(new_spacing);
+	int new_spacing = std::max(a->CRTSPACING,b->CRTSPACING);
+	if(a->CRTSPACING != b->CRTSPACING){
+	  a->update_crt_spacing(new_spacing);
+	  b->update_crt_spacing(new_spacing);
 	}
 
 	#ifdef VERBOSE
@@ -126,7 +126,7 @@ void common_addition_inplace(P *a,P *b){
 	CUDAFunctions::callPolynomialAddSubInPlace( a->get_stream(),
 												a->get_device_crt_residues(),
 												b->get_device_crt_residues(),
-												(int)(a->get_crt_spacing()*P::CRTPrimes.size()),
+												(int)(a->CRTSPACING*P::CRTPrimes.size()),
 												ADD);
 
 	a->set_host_updated(false);

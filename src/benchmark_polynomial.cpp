@@ -21,7 +21,7 @@
 #define CUHEA 0
 #define CUHEB 1
 #define CUHEC 2
-#define CUHEBENCHMARK CUHEA
+// #define CUHEBENCHMARK CUHEA
 
 
 int main(int argc,char* argv[]){
@@ -377,22 +377,23 @@ int main(int argc,char* argv[]){
       Polynomial::random(&b,d-1);
       // std::cout << a.to_string() << std::endl;       
    
-      clock_gettime( CLOCK_REALTIME, &start);
-      for(int i = 0; i < N;i++){
+      // clock_gettime( CLOCK_REALTIME, &start);
+      // for(int i = 0; i < N;i++){
 
-        Polynomial c = (a+b);
-        a.set_crt_computed(false);
-        a.set_icrt_computed(false);
-        b.set_crt_computed(false);
-        b.set_icrt_computed(false);
-        result = cudaDeviceSynchronize();
-        assert(result == cudaSuccess);
-        // c.release();
-      }
-      clock_gettime( CLOCK_REALTIME, &stop);
-      diff = compute_time_ms(start,stop)/N;
-      std::cout << "ADD) Time measured with memory copy: " << diff << " ms" << std::endl;
-      gpu_add_with_memcopy << d << " " << diff  << std::endl;
+      //   a += b;
+
+      //   a.set_crt_computed(false);
+      //   a.set_icrt_computed(false);
+      //   b.set_crt_computed(false);
+      //   b.set_icrt_computed(false);
+      //   result = cudaDeviceSynchronize();
+      //   assert(result == cudaSuccess);
+      //   // c.release();
+      // }
+      // clock_gettime( CLOCK_REALTIME, &stop);
+      // diff = compute_time_ms(start,stop)/N;
+      // std::cout << "ADD) Time measured with memory copy: " << diff << " ms" << std::endl;
+      // gpu_add_with_memcopy << d << " " << diff  << std::endl;
 
       ///////////////////////////////////////
       // Time measured without memory copy //
@@ -411,7 +412,14 @@ int main(int argc,char* argv[]){
 
       clock_gettime( CLOCK_REALTIME, &start);
       for(int i = 0; i < N;i++){
-        Polynomial c = (a+b);
+
+        CUDAFunctions::callPolynomialAddSub(a.get_device_crt_residues(),
+                                            a.get_device_crt_residues(),
+                                            b.get_device_crt_residues(),
+                                            (int)(a.CRTSPACING*Polynomial::CRTPrimes.size()),
+                                            ADD,
+                                            a.get_stream());
+
         result = cudaDeviceSynchronize();
         assert(result == cudaSuccess);
         // c.release();
@@ -429,23 +437,23 @@ int main(int argc,char* argv[]){
       Polynomial::random(&b,d-1);
       a.update_crt_spacing(2*d);
       b.update_crt_spacing(2*d);
-      clock_gettime( CLOCK_REALTIME, &start);
-      for(int i = 0; i < N;i++){
+      // clock_gettime( CLOCK_REALTIME, &start);
+      // for(int i = 0; i < N;i++){
 
-        Polynomial c = (a*b);
+      //   a *= b;
 
-        a.set_crt_computed(false);
-        a.set_icrt_computed(false);
-        b.set_crt_computed(false);
-        b.set_icrt_computed(false);
-        result = cudaDeviceSynchronize();
-        assert(result == cudaSuccess);
-        // c.release();
-      }
-      clock_gettime( CLOCK_REALTIME, &stop);
-      diff = compute_time_ms(start,stop)/N;
-      std::cout << "MUL) Time measured with memory copy: " << diff << " ms" << std::endl;
-      gpu_mult_with_memcopy << d << " " << diff  << std::endl;
+      //   a.set_crt_computed(false);
+      //   a.set_icrt_computed(false);
+      //   b.set_crt_computed(false);
+      //   b.set_icrt_computed(false);
+      //   result = cudaDeviceSynchronize();
+      //   assert(result == cudaSuccess);
+      //   // c.release();
+      // }
+      // clock_gettime( CLOCK_REALTIME, &stop);
+      // diff = compute_time_ms(start,stop)/N;
+      // std::cout << "MUL) Time measured with memory copy: " << diff << " ms" << std::endl;
+      // gpu_mult_with_memcopy << d << " " << diff  << std::endl;
       
       //     cudaMemGetInfo(&f, &t);
 
@@ -460,10 +468,23 @@ int main(int argc,char* argv[]){
       a.update_device_data();
       b.update_crt_spacing(2*d);
       b.update_device_data();
+      int needed_spacing = pow(2,ceil(log2(a.deg() + b.deg())));
 
       clock_gettime( CLOCK_REALTIME, &start);
       for(int i = 0; i < N;i++){
-        Polynomial c = (a*b);
+
+        CUDAFunctions::callPolynomialMul(   a.get_device_crt_residues(),
+                                            a.get_device_crt_residues(),
+                                            false,
+                                            a.get_crt_spacing(),
+                                            b.get_device_crt_residues(),
+                                            false,
+                                            b.get_crt_spacing(),
+                                            b.get_crt_spacing(),
+                                            Polynomial::CRTPrimes.size(),
+                                            a.get_stream()
+                                        );
+
         result = cudaDeviceSynchronize();
         assert(result == cudaSuccess);
         // c.release();

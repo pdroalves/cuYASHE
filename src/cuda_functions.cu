@@ -1069,39 +1069,6 @@ __host__ cuyasheint_t* CUDAFunctions::callPolynomialMul(cuyasheint_t *output,
   // cudaFree(aux);
   result = cudaDeviceSynchronize();
 
-  #elif defined(FFTMUL)
-
-  // Allocates memory for temporary arrays on device
-  // Each polynomial's degree gets doubled
-  const int size = N*NPolis;
-  cudaError_t result = cudaMalloc((void**)&d_result,size*sizeof(cuyasheint_t));
-  assert(result == cudaSuccess);
-
-  Complex *d_A;
-  Complex *d_B;
-  result = cudaMalloc((void**)&d_A,size*sizeof(Complex));
-  assert(result == cudaSuccess);
-  result = cudaMalloc((void**)&d_B,size*sizeof(Complex));
-  assert(result == cudaSuccess);
-
-  dim3 blockDim(ADDBLOCKXDIM);
-  dim3 gridDim((size)/ADDBLOCKXDIM+1); // We expect that ADDBLOCKXDIM always divice size
-
-  assert(blockDim.x*gridDim.x >= N);
-  // Forward
-  fft_radix16<<<gridDim,blockDim>>>(a,d_result,N);
-  assert(cudaGetLastError() == cudaSuccess);
-
-  // Multiply
-  // polynomialFFTMul<<<gridDim,blockDim>>>(d_A,d_B,N*NPolis);
-
-  // Inverse
-  // fft_radix16<<<gridDim,blockDim>>>(d_A,d_result,N,NPolis,INVERSE);
-  // assert(cudaGetLastError() == cudaSuccess);
-
-  cudaFree(d_A);
-  cudaFree(d_B);
-
   #elif defined(CUFFTMUL)
   
   const int size = N*NPolis;
