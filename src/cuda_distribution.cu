@@ -28,6 +28,18 @@ __global__ void generate_random_numbers(bn_t* coefs, curandState *states, int N,
     }
 }
 
+__global__ void generate_random_numbers_CRT(cuyasheint_t* coefs, curandState *states, int N, int total, int mod) {
+
+    const int tid = threadIdx.x + blockIdx.x * blockDim.x;
+
+    if (tid < N) {
+        coefs[tid] = curand_uniform(&states[tid])*mod;
+    }else{
+    	if(tid < total)
+	    	coefs[tid] = 0;
+    }
+}
+
 __global__ void cuSetBNT(bn_t *a, cuyasheint_t *random,int N, int mod){
 	const int tid = threadIdx.x + blockIdx.x*blockDim.x;
 
@@ -49,12 +61,12 @@ __host__  void Distribution::callCuGetUniformSample(cuyasheint_t* array, bn_t *c
 	// 										(unsigned int*)(random), 
 	// 										N);
 	// assert(cuRandResult == CURAND_STATUS_SUCCESS);
-  	/**
-   	 * Sync
-   	 */
+ //  	/**
+ //   	 * Sync
+ //   	 */
 	// cudaError_t result;
-   	// result = cudaDeviceSynchronize();// cuRAND doesn't use the same synchronization mechanism as others CUDAs APIs
-  	// assert(result == cudaSuccess);
+ //   	result = cudaDeviceSynchronize();// cuRAND doesn't use the same synchronization mechanism as others CUDAs APIs
+ //  	assert(result == cudaSuccess);
 
   	/**
   	 * Adjust "used" attribute of each coefficient
@@ -75,6 +87,20 @@ __host__  void Distribution::callCuGetUniformSample(cuyasheint_t* array, bn_t *c
 	 */
 	assert(N <= MAX_DEGREE);
 	generate_random_numbers<<<gridDim,blockDim,0,0x0>>>(coefs,states,N,mod);
+	assert(cudaGetLastError() == cudaSuccess);
+}
+
+__host__  void Distribution::callCuGetUniformSampleCRT(cuyasheint_t* array, int N, int NPolis, int mod){
+	const int ADDGRIDXDIM = (N%128 == 0? N/128 : N/128 + 1);
+	const dim3 gridDim(ADDGRIDXDIM);
+	const dim3 blockDim(128);
+	/** 
+	 * Generate values
+	 */
+	assert(N <= MAX_DEGREE);
+	cudaError_t result = cudaMemsetAsync(array,0,N*NPolis*sizeof(cuyasheint_t),0x0);
+	assert(result == cudaSuccess);	
+	generate_random_numbers_CRT<<<gridDim,blockDim,0,0x0>>>(array,states,N,N*NPolis,mod);
 	assert(cudaGetLastError() == cudaSuccess);
 }
 

@@ -258,8 +258,8 @@ int main(int argc, char* argv[]){
     std::cout << "Writing keyswitch data to " << keyswitch_filename << std::endl;
     ZZ_p::init(q); // Defines GF(q)
        
-    // for(int d = 1024;d <= 4096;d *= 2){
-    for(int d = 4096;d <= 4096;d *= 2){
+    for(int d = 1024;d <= 8192;d *= 2){
+    // for(int d = 4096;d <= 4096;d *= 2){
 
     //////////////////////
     // Polynomial setup //
@@ -345,9 +345,9 @@ int main(int argc, char* argv[]){
     std::cout << "Homomorphic Multiplication) Time measured without memory copy: " << diff << " ms" << std::endl;
     mult_without_memcopy << d << " " << diff << std::endl;;
 
-    diff = runKeyswitch(cipher, d);
-    std::cout << "KeySwitch) Time measured with memory copy: " << diff << " ms" << std::endl;
-    keyswitch << d << " " << diff << std::endl;;
+    // diff = runKeyswitch(cipher, d);
+    // std::cout << "KeySwitch) Time measured with memory copy: " << diff << " ms" << std::endl;
+    // keyswitch << d << " " << diff << std::endl;;
   }
   cudaDeviceReset();
 }

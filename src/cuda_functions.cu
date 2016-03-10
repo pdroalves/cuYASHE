@@ -9,7 +9,7 @@
 #include "settings.h"
 #include "polynomial.h"
 
-#ifdef NTTMUL
+// #ifdef NTTMUL
 // #define PRIMEP (int)2147483647
 // #define PRIMITIVE_ROOT (int)7;//2^31-1 fails the test(P-1)%N
 // #define PRIMEP (uint32_t)4294955009
@@ -28,6 +28,9 @@ cuyasheint_t *CUDAFunctions::d_inner_results_used = NULL;
 cuyasheint_t *CUDAFunctions::d_mulA = NULL;
 cuyasheint_t *CUDAFunctions::d_mulB = NULL;
 cuyasheint_t *CUDAFunctions::d_mulAux = NULL;
+Complex *CUDAFunctions::d_mulComplexA = NULL;
+Complex *CUDAFunctions::d_mulComplexB = NULL;
+Complex *CUDAFunctions::d_mulComplexC = NULL;
 extern __constant__ cuyasheint_t M[STD_BNT_WORDS_ALLOC];
 extern __constant__ int M_used;
 extern __constant__ cuyasheint_t u[STD_BNT_WORDS_ALLOC];
@@ -38,10 +41,9 @@ __constant__ cuyasheint_t WInv16[225];
 __constant__ cuyasheint_t W8[50]; 
 __constant__ cuyasheint_t WInv8[50]; 
 
-#elif defined(CUFFTMUL)
+// #elif defined(CUFFTMUL)
 cufftHandle CUDAFunctions::plan;
-typedef double2 Complex;
-#endif
+// #endif
 int CUDAFunctions::N = 0;
 
 ///////////////////////
@@ -148,8 +150,8 @@ __global__ void polynomialAddSubInPlace(const int OP, cuyasheint_t *a,const cuya
 
       if(OP == ADD){
         a_value += b_value;
-        if(a_value < a[tid])
-          printf("Overflow!\n");
+        // if(a_value < a[tid])
+          // printf("Overflow!\n");
       }else
         a_value -= b_value;
 
@@ -175,45 +177,7 @@ __host__ void CUDAFunctions::callPolynomialAddSubInPlace(cudaStream_t stream,cuy
 ///////////////////////////////////////
 /// MUL
 
-#ifdef PLAINMUL
-__global__ void polynomialPlainMul(const cuyasheint_t *a,const cuyasheint_t *b,cuyasheint_t *c,const int N,const int NPolis){
-  // Each block computes one coefficient of c
-  // We need 2*N blocks for each residue!
-  // 2D-blocks
-
-  // const int tidX = threadIdx.x + blockDim.x*blockIdx.x;
-  // const int tidY = threadIdx.y + blockDim.y*blockIdx.y;
-
-  // blockDim.x == blockDim.y
-  // We suppose that TILEDIM divides 2*N
-  const int TILEDIM = blockDim.x;
-  const int coefficient = blockIdx.x % (2*N);
-  const int residueID = blockIdx.x / (2*N);
-  const int residueOffset = residueID*(2*N);
-  __shared__ cuyasheint_t value;
-  value = 0;
-
-  // blockDim.x == blockDim.y
-  // if(tidX < N && tidY < N){
-    for(int tileY = 0;tileY < N/TILEDIM; tileY++)
-      for(int tileX = 0;tileX < N/TILEDIM; tileX++){
-        //      (           coefficient    ) + residue
-        int i = (threadIdx.x + tileX*TILEDIM);
-        int j = (threadIdx.y + tileY*TILEDIM);
-
-        if(i + j == coefficient)
-          atomicAdd((unsigned long long int *)(&value),(unsigned long long int)(a[i+residueOffset]*b[j+residueOffset]));
-      }
-    __syncthreads();
-
-    if(threadIdx.x == 0 && threadIdx.y == 0)
-      c[coefficient+residueOffset] = value;
-      // There are 2N threads in Y axis computing this coefficient
-      // atomicAdd((unsigned cuyasheint_t cuyasheint_t int*)(&(c[coefficient+residueOffset])),(unsigned cuyasheint_t cuyasheint_t int)(value));
-
-  // }
-}
-#elif defined(CUFFTMUL)
+// #if defined(CUFFTMUL)
 
 __global__ void copyIntegerToComplex(Complex *a,cuyasheint_t *b,int size){
   const int tid = threadIdx.x + blockDim.x*blockIdx.x;
@@ -278,7 +242,7 @@ static __global__ void polynomialcuFFTMul(const Complex *a, const Complex *b,Com
       c[tid].y = 0;
     }
 }
-#elif defined(NTTMUL)
+// #elif defined(NTTMUL)
 
 __host__ __device__ bool overflow(const uint64_t a, const uint64_t b){
   // True if a+b will result in a integer overflow.
@@ -712,7 +676,7 @@ __global__ void polynomialNTTAdd(cuyasheint_t *a,const cuyasheint_t *b,const int
       // a[tid] = a_value*b_value % 18446744069414584321;
   }
 }
-#endif
+// #endif
 
 __global__ void polynomialOPInteger(const int opcode,
                                       const cuyasheint_t *a,
@@ -859,12 +823,9 @@ __host__ cuyasheint_t* CUDAFunctions::applyNTT( cuyasheint_t *d_a,
                                                 int type,
                                                 cudaStream_t stream){
   const int size = N*NPolis;
-  cuyasheint_t *aux;
+  cuyasheint_t *aux = CUDAFunctions::d_mulAux;
 
   cudaError_t result;
-  result = cudaMalloc((void**)&aux,size*sizeof(cuyasheint_t));
-  assert(result == cudaSuccess);
-
   result = cudaMemsetAsync(aux,0,size*sizeof(cuyasheint_t),stream);
   assert(result == cudaSuccess);
 
@@ -916,6 +877,59 @@ __host__ cuyasheint_t* CUDAFunctions::applyNTT( cuyasheint_t *d_a,
   return d_a;
 }
 
+__host__ void CUDAFunctions::executeCopyIntegerToComplex(   Complex *d_a, 
+                                                            cuyasheint_t *a,
+                                                            const int size,
+                                                            cudaStream_t stream){
+  dim3 blockDim(32);
+  dim3 gridDim(size/32 + (size % 32 == 0? 0:1));
+
+  copyIntegerToComplex<<< gridDim,blockDim,0,stream >>>(d_a,a,size);
+
+  assert(cudaGetLastError() == cudaSuccess);
+}
+
+__host__ void CUDAFunctions::executeCopyAndNormalizeComplexRealPartToInteger(   cuyasheint_t *d_a, 
+                                                                                cufftDoubleComplex *a,
+                                                                                const int size,
+                                                                                int signal_size,
+                                                                                int N,
+                                                                                cudaStream_t stream){
+  dim3 blockDim(32);
+  dim3 gridDim(size/32 + (size % 32 == 0? 0:1));
+
+  copyAndNormalizeComplexRealPartToInteger<<< gridDim,blockDim,0,stream >>>( d_a,
+                                                                            a,
+                                                                            size,
+                                                                            1.0f/signal_size,
+                                                                            N);
+
+  assert(cudaGetLastError() == cudaSuccess);
+}
+
+__host__ void CUDAFunctions::executeNTTScale(   cuyasheint_t *d_result, 
+                                                const int size, 
+                                                const int N,
+                                                cudaStream_t stream){
+  dim3 blockDimMul(ADDBLOCKXDIM);
+  dim3 gridDimMul((size)/ADDBLOCKXDIM+1); // We expect that ADDBLOCKXDIM always divide size
+  NTTScale<<< gridDimMul,blockDimMul,0,stream >>>(d_result,size,N);
+  assert(cudaGetLastError() == cudaSuccess);
+}
+
+__host__ void CUDAFunctions::executeCuFFTPolynomialMul( Complex *a, 
+                                                        Complex *b, 
+                                                        Complex *c, 
+                                                        int size_c, 
+                                                        int size, 
+                                                        cudaStream_t stream){
+  dim3 blockDim(32);
+  dim3 gridDim(size/32 + (size % 32 == 0? 0:1));
+
+  polynomialcuFFTMul<<<gridDim,blockDim,0,stream>>>(a,b,c,size_c,size);
+
+  assert(cudaGetLastError() == cudaSuccess);
+}
 __host__ void CUDAFunctions::executePolynomialMul(cuyasheint_t *c, 
                                                   cuyasheint_t *a, 
                                                   cuyasheint_t *b, 
@@ -964,6 +978,7 @@ __host__ cuyasheint_t* CUDAFunctions::callPolynomialMul(cuyasheint_t *output,
   assert((N>0)&&((N & (N - 1)) == 0));//Check if N is power of 2
   assert(N == CUDAFunctions::N);
   cuyasheint_t *d_result = output;
+  cudaError_t result;
 
   #ifdef NTTMUL
 
@@ -972,7 +987,6 @@ __host__ cuyasheint_t* CUDAFunctions::callPolynomialMul(cuyasheint_t *output,
   cuyasheint_t *d_b = CUDAFunctions::d_mulB;
   cuyasheint_t *aux = CUDAFunctions::d_mulAux;
 
-  cudaError_t result;
 
    
   // cuyasheint_t *mem;
@@ -1071,25 +1085,16 @@ __host__ cuyasheint_t* CUDAFunctions::callPolynomialMul(cuyasheint_t *output,
 
   #elif defined(CUFFTMUL)
   
+  //////////////////////
+  // cuFFT Setup init //
+  //////////////////////
   const int size = N*NPolis;
   const int size_c = N;
   const int signal_size = N;
-  Complex *d_a;
-  Complex *d_b;
-  Complex *d_c;
-  cudaError_t result;
 
-  result = cudaMalloc((void**)&d_result,size*sizeof(cuyasheint_t));
-  assert(result == cudaSuccess);
-
-  result = cudaMalloc((void **)&d_a, size*sizeof(Complex));
-  assert(result == cudaSuccess);
-
-  result = cudaMalloc((void **)&d_b, size*sizeof(Complex));
-  assert(result == cudaSuccess);
-
-  result = cudaMalloc((void **)&d_c, size*sizeof(Complex));
-  assert(result == cudaSuccess);
+  Complex *d_a = CUDAFunctions::d_mulComplexA;
+  Complex *d_b = CUDAFunctions::d_mulComplexB;
+  Complex *d_c = CUDAFunctions::d_mulComplexC;
   
   result = cudaMemsetAsync(d_a,0,size*sizeof(Complex),stream);
   assert(result == cudaSuccess);
@@ -1101,6 +1106,9 @@ __host__ cuyasheint_t* CUDAFunctions::callPolynomialMul(cuyasheint_t *output,
   dim3 blockDim(32);
   dim3 gridDim(size/32 + (size % 32 == 0? 0:1));
 
+  /**
+   * Realign operands
+   */
   if(realign_A){
     int size;
     const int newSpacing = N;
@@ -1138,36 +1146,43 @@ __host__ cuyasheint_t* CUDAFunctions::callPolynomialMul(cuyasheint_t *output,
     copyIntegerToComplex<<< gridDim,blockDim,1,stream >>>(d_b,b,size);
   assert(cudaGetLastError() == cudaSuccess);
 
-  
-
-  // Stream set
+  /**
+   * Stream set
+   */
   cufftResult fftResult;
   fftResult = cufftSetStream(CUDAFunctions::plan, stream);
   assert(fftResult == CUFFT_SUCCESS);
 
-  // Apply FFT
+  /////////////////////
+  // cuFFT Setup end //
+  /////////////////////
+  ///
+  /**
+   * FFT
+   */
   fftResult = cufftExecZ2Z(CUDAFunctions::plan, (cufftDoubleComplex *)(d_a), (cufftDoubleComplex *)(d_a), CUFFT_FORWARD);
   assert(fftResult == CUFFT_SUCCESS);
 
   fftResult = cufftExecZ2Z(CUDAFunctions::plan, (cufftDoubleComplex *)(d_b), (cufftDoubleComplex *)(d_b), CUFFT_FORWARD);
   assert(fftResult == CUFFT_SUCCESS);
 
+  /**
+   * MUL
+   */
   polynomialcuFFTMul<<<gridDim,blockDim,1,stream>>>(d_a,d_b,d_c,size_c,size);
   assert(cudaGetLastError() == cudaSuccess);
 
-  // Apply inverse FFT
+  /**
+   * IFFT
+   */
   fftResult = cufftExecZ2Z(CUDAFunctions::plan, (cufftDoubleComplex *)(d_c), (cufftDoubleComplex *)(d_c), CUFFT_INVERSE);
   assert(fftResult == CUFFT_SUCCESS);
 
+  /**
+   * Normalize
+   */
   copyAndNormalizeComplexRealPartToInteger<<< gridDim,blockDim,1,stream >>>(d_result,(cufftDoubleComplex *)d_c,size,1.0f/signal_size,N);
   assert(cudaGetLastError() == cudaSuccess);
-
-
-  //Destroy CUFFT context
-  cudaFree(d_a);
-  cudaFree(d_b);
-  cudaFree(d_c);
-
 
   #endif
 
@@ -1176,8 +1191,9 @@ __host__ cuyasheint_t* CUDAFunctions::callPolynomialMul(cuyasheint_t *output,
 
 __host__ void CUDAFunctions::init(int N){
   CUDAFunctions::N = N;
+  cudaError_t result;
 
-  #ifdef NTTMUL
+  // #ifdef NTTMUL
   // W used on NTT
   #ifdef VERBOSE
   std::cout << "Will compute W -- N = " << N << std::endl;
@@ -1193,7 +1209,6 @@ __host__ void CUDAFunctions::init(int N){
   ZZ wNZZ = NTL::PowerMod(ZZ(PRIMITIVE_ROOT),k,PZZ);
 
   wN = conv<cuyasheint_t>(wNZZ);
-  cudaError_t result;
   h_W = (cuyasheint_t*)malloc(N*sizeof(cuyasheint_t));
   result = cudaMalloc((void**)&d_W,N*sizeof(cuyasheint_t));
   assert(result == cudaSuccess);
@@ -1282,7 +1297,7 @@ __host__ void CUDAFunctions::init(int N){
   free(h_W);
   free(h_WInv);
 
-  #elif defined(CUFFTMUL)
+  #if defined(CUFFTMUL)
     cufftResult fftResult;
 
     // # of CRT residues
@@ -1305,18 +1320,16 @@ __host__ void CUDAFunctions::init(int N){
 
     assert(fftResult == CUFFT_SUCCESS);
     std::cout << "Plan created with signal size " << N << std::endl;
-    #ifdef VERBOSE
-    #endif
   #endif
     /**
      * Alloc memory for d_inner_results
      */
     const unsigned int size = N*Polynomial::CRTPrimes.size();
 
-    result = cudaMalloc((void**)&CUDAFunctions::d_inner_results, size*STD_BNT_WORDS_ALLOC*sizeof(cuyasheint_t));
-    assert(result == cudaSuccess);
-    result = cudaMalloc((void**)&CUDAFunctions::d_inner_results_used, size*sizeof(cuyasheint_t));
-    assert(result == cudaSuccess);
+  result = cudaMalloc((void**)&CUDAFunctions::d_inner_results, size*STD_BNT_WORDS_ALLOC*sizeof(cuyasheint_t));
+  assert(result == cudaSuccess);
+  result = cudaMalloc((void**)&CUDAFunctions::d_inner_results_used, size*sizeof(cuyasheint_t));
+  assert(result == cudaSuccess);
 
 
     /**
@@ -1330,6 +1343,17 @@ __host__ void CUDAFunctions::init(int N){
   result = cudaMalloc((void**)&CUDAFunctions::d_mulAux,size*sizeof(cuyasheint_t));
   assert(result == cudaSuccess);
 
+
+    /**
+     * Pre-allocated arrays for FFT multiplication
+     */
+    
+  result = cudaMalloc((void**)&CUDAFunctions::d_mulComplexA,size*sizeof(Complex));
+  assert(result == cudaSuccess);
+  result = cudaMalloc((void**)&CUDAFunctions::d_mulComplexB,size*sizeof(Complex));
+  assert(result == cudaSuccess);
+  result = cudaMalloc((void**)&CUDAFunctions::d_mulComplexC,size*sizeof(Complex));
+  assert(result == cudaSuccess);
 }
 
 __global__ void cuICRTFix(bn_t *a, const int N, bn_t q,bn_t u_q,bn_t q2){

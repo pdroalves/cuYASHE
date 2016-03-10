@@ -446,14 +446,14 @@ BOOST_AUTO_TEST_CASE(simpleMultiplyByPolynomial)
   ZZ_pEX c_ntl = a_ntl*b_ntl;
   c_ntl %= conv<ZZ_pEX>(NTL_Phi);
 
-  #ifdef DEBUG
+  // #ifdef DEBUG
   std::cout << "degree = " << degree << std::endl;
   std::cout << "CUDAFunctions::N = " << CUDAFunctions::N << std::endl;
     std::cout << "a: " << a.to_string() << " degree: " << a.deg() <<std::endl;
     std::cout << "b: " << b.to_string() << " degree: " << b.deg() <<std::endl;
     std::cout << "c: " << c.to_string() << " degree: " << c.deg() <<std::endl;
     std::cout << "c_ntl: " << c_ntl << " degree: " << NTL::deg(c_ntl) << std::endl << std::endl;
-  #endif
+  // #endif
 
   BOOST_REQUIRE(NTL::deg(c_ntl) == c.deg());
   for(int i = 0;i <= c.deg();i++){

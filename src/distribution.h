@@ -96,6 +96,7 @@ class Distribution{
   Polynomial get_sample(int degree, int spacing);
 private:
   void callCuGetUniformSample(cuyasheint_t *array, bn_t *coefs, int N, int mod);
+  void callCuGetUniformSampleCRT(cuyasheint_t* array, int N, int NPolis, int mod);
   void callCuGetNormalSample(cuyasheint_t *array, int N, float mean, float stddev);
   void generate_sample(Polynomial *p,int mod,int degree);
 __host__ void call_setup_kernel();

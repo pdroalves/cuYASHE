@@ -31,6 +31,10 @@ std::map<ZZ, std::pair<cuyasheint_t*,int>> reciprocals;
     // 10 bits
     #if CRTPRIMESIZE == 10
      const uint32_t PRIMES_BUCKET[] = {1021, 1019, 1013, 1009, 997, 991, 983, 977, 971, 967, 953, 947, 941, 937, 929, 919, 911, 907, 887, 883, 881, 877, 863, 859, 857, 853, 839, 829, 827, 823, 821, 811, 809, 797, 787, 773, 769, 761, 757, 751, 743, 739, 733, 727, 719, 709, 701, 691, 683, 677, 673, 661, 659, 653, 647, 643, 641, 631, 619, 617, 613, 607, 601, 599, 593, 587, 577, 571, 569, 563, 557, 547, 541, 523, 521}; ///
+    #else
+      #if CRTPRIMESIZE == 9
+        const uint32_t PRIMES_BUCKET[] = {67, 71, 73, 79, 83, 89, 97, 101, 103, 107, 109, 113, 127, 257, 263, 269, 271, 277, 281, 283, 293, 307, 311, 313, 317, 331, 337, 347, 349, 353, 359, 367, 373, 379, 383, 389, 397, 401, 409, 419, 421, 431, 433, 439, 443, 449, 457, 461, 463, 467, 479, 487, 491, 499, 503, 509};
+      #endif
     #endif
   #endif
 #endif
@@ -67,9 +71,94 @@ Polynomial Polynomial::operator*(Polynomial &b){
 Polynomial Polynomial::operator*=(Polynomial &b){
   common_multiplication_inplace<Polynomial>(this,&b);
 
-  cudaError_t result = cudaDeviceSynchronize();
-  assert(result == cudaSuccess);
+  // cudaError_t result = cudaDeviceSynchronize();
+  // assert(result == cudaSuccess);
 
+ //////////////////////////////////
+  // Store result in polynomial a //
+  //////////////////////////////////
+  // Check align
+  // int needed_spacing = pow(2,ceil(log2(this->deg() + b.deg())));
+  // int needed_spacing = pow(2,ceil(log2(std::max(this->get_crt_spacing(),b.get_crt_spacing()))));
+    
+  // if(needed_spacing < CUDAFunctions::N)
+  // needed_spacing = CUDAFunctions::N;
+  // else if(needed_spacing != CUDAFunctions::N)
+  // // Re-compute W matrix
+  // CUDAFunctions::init(needed_spacing);
+  
+  // bool update_A_spacing = false; 
+  // bool update_B_spacing = false;
+  // #ifdef NTTMUL
+  // if(this->CRTSPACING != needed_spacing)
+  //   this->update_crt_spacing(needed_spacing);
+  // if(b.CRTSPACING != needed_spacing)
+  //   b.update_crt_spacing(needed_spacing);
+  // #elif defined(CUFFTMUL)
+  // if(this->get_crt_spacing() != needed_spacing){
+  //   // if(!this->get_crt_computed())
+  //     // this->update_crt_spacing(needed_spacing);
+  //   // else
+  //     update_A_spacing = true;    
+  // }
+  // if(b.get_crt_spacing() != needed_spacing){
+  //   // if(!b.get_crt_computed())
+  //     // b.update_crt_spacing(needed_spacing);
+  //   // else
+  //     update_B_spacing = true;
+  // }
+  // #endif
+
+  // #ifdef VERBOSE
+  // std::cout << "Mul with CRTSPACING " << needed_spacing << std::endl;
+  // // std::cout << "this: " << this->to_string() << std::endl;
+  // // std::cout << "other " << b.to_string() << std::endl;
+  // #endif
+
+  // // Apply CRT and copy data to global memory, if needed
+  // // #pragma omp sections
+  // {
+  //     // #pragma omp section
+  //     { 
+  //   #ifdef VERBOSE
+  //   std::cout << "a" << std::endl;
+  //   #endif
+  //   if(!this->get_crt_computed()){
+  //     this->update_device_data();
+  //   }
+
+  //     }
+  //     // #pragma omp section
+  //     {
+  //   #ifdef VERBOSE
+  //   std::cout << "b" << std::endl;
+  //   #endif
+  //   if(!b.get_crt_computed()){
+  //     b.update_device_data();
+  //   }
+  //     }
+  // }
+  // // start = get_cycles();
+  // cuyasheint_t *d_result = this->get_device_crt_residues();
+  // if(this->get_crt_spacing() > 0 && b.get_crt_spacing() > 0)
+  //   d_result = CUDAFunctions::callPolynomialMul(  this->get_device_crt_residues(),
+  //                   this->get_device_crt_residues(),
+  //                   update_A_spacing,
+  //                   this->get_crt_spacing(),
+  //                   b.get_device_crt_residues(),
+  //                   update_B_spacing,
+  //                   b.get_crt_spacing(),
+  //                   needed_spacing,
+  //                   this->CRTPrimes.size(),
+  //                     this->get_stream()
+  //                 );
+  // this->set_device_crt_residues(d_result);
+  // this->set_host_updated(false);
+  // this->set_icrt_computed(false);
+  // this->set_crt_computed(true);
+
+  // cudaError_t result = cudaDeviceSynchronize();
+  // assert(result == cudaSuccess);
   return *this;
 }
 

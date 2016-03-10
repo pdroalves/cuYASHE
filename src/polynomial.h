@@ -956,6 +956,62 @@ class Polynomial{
         CUDAFunctions::write_crt_primes();
     }
 
+
+
+    static void gen_crt_primes(ZZ q,cuyasheint_t degree, int primes_size){
+        // We will use 63bit primes to fit cuyasheint_t data type (64 bits raises "GenPrime: length too large")
+        ZZ M = ZZ(1);
+        std::vector<cuyasheint_t> P;
+        std::vector<ZZ> Mpi;
+        std::vector<cuyasheint_t> InvMpi;
+
+        cuyasheint_t n;
+
+        // Get primes
+        // std::cout << "Primes: " << std::endl;
+        unsigned int count = 0;
+
+        while( (M < (2*degree)*q*q) ){
+            
+            // #ifdef CUFFTMUL
+            n = NTL::GenPrime_long(primes_size);
+            // #else
+            // n = PRIMES_BUCKET[count];
+            // count++;
+            // #endif
+
+            if( std::find(P.begin(), P.end(), n) == P.end()){
+              // Does not contains
+              // std::cout << n << std::endl;
+              P.push_back(n);
+              M *=(n);
+            }
+        }
+        // std::cout << std::endl;
+        // Compute M/pi and it's inverse
+        for(unsigned int i = 0; i < P.size();i++){
+          ZZ pi = to_ZZ(P[i]);
+          Mpi.push_back(M/pi);
+          InvMpi.push_back(conv<cuyasheint_t>(NTL::InvMod(Mpi[i]%pi,pi)));
+        }
+
+        compute_reciprocal(M);
+
+        Polynomial::CRTProduct = M;
+        Polynomial::CRTPrimes = P;
+        Polynomial::CRTMpi = Mpi;
+        Polynomial::CRTInvMpi = InvMpi;
+
+        #ifdef VERBOSE
+        std::cout << "Primes size: " << primes_size << std::endl;
+        std::cout << "Primes set - M:" << Polynomial::CRTProduct << std::endl;
+        std::cout << P.size() << " primes generated." << std::endl;
+        #endif
+
+        // Send primes to GPU
+        CUDAFunctions::write_crt_primes();
+    }
+
     void update_device_data();
     void update_host_data();
     void set_host_updated(bool b){

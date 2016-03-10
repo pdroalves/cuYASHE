@@ -115,7 +115,7 @@ inline void rand_sse( int  *result )
 }
 
 void Distribution::generate_sample(Polynomial *p,int mod,int degree){
-    /////////
+  /////////
   // NTL //
   /////////
   // for(int i = 0; i <= degree; i++){
@@ -155,9 +155,13 @@ void Distribution::generate_sample(Polynomial *p,int mod,int degree){
   * a single cudaMalloc call 
   */
  // if(kind != DISCRETE_GAUSSIAN){
-  callCuGetUniformSample(p->h_bn_coefs[0].dp, p->d_bn_coefs, degree+1, mod);
-  p->set_icrt_computed(true);
-  p->set_crt_computed(false);
+  // callCuGetUniformSample(p->h_bn_coefs[0].dp, p->d_bn_coefs, degree+1, mod);
+  // p->set_icrt_computed(true);
+  // p->set_crt_computed(false);
+  // p->set_host_updated(false);
+  callCuGetUniformSampleCRT(p->get_device_crt_residues(), degree +1,Polynomial::CRTPrimes.size(), mod);
+  p->set_icrt_computed(false);
+  p->set_crt_computed(true);
   p->set_host_updated(false);
   
   ///////////////////////////////////////

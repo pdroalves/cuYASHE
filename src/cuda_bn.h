@@ -42,6 +42,7 @@ __host__ void bn_grow(bn_t *a,const unsigned int new_size);
 __host__ __device__ void bn_copy(bn_t *a, bn_t *b);
 __host__ __device__ void bn_2_compl(bn_t *a);
 __host__ __device__ void bn_bitwise_and(bn_t *a, bn_t *b);
+__host__ __device__ void bn_truncate(bn_t *a, int bits);
 __host__ __device__ uint64_t bn_rshb_low(uint64_t *c, const uint64_t *a, int size, int bits);
 __host__ __device__ uint32_t bn_rshb_low_32(uint32_t *c, const uint32_t *a, int size, int bits);
 __host__ __device__ void bn_rshd_low(cuyasheint_t *c, const cuyasheint_t *a, int size, int digits);

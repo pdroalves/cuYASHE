@@ -153,12 +153,15 @@ void Ciphertext::keyswitch(){
   // else
   //   throw "Unknown Yashe::word";
   
+  #ifdef NTTMUL
   Ciphertext::keyswitch_mul(&P);
-  // for(int i = 0; i < Yashe::lwq; i ++){
-  //   Polynomial p = (P[i])*(Yashe::gamma[i]);
-  //   *this += p;
-  // }
-  // this->reduce();
+  #else
+  for(int i = 0; i < Yashe::lwq; i ++){
+    Polynomial p = (P[i])*(Yashe::gamma[i]);
+    *this += p;
+  }
+  #endif
+  this->reduce();
 
   #ifdef CYCLECOUNTING
   end = get_cycles();
@@ -178,7 +181,8 @@ void Ciphertext::keyswitch_mul(std::vector<Polynomial> *P){
                             Polynomial::CRTPrimes.size(),
                             FORWARD,
                             get_stream());
-    // P[i] *= Yashe::gamma[i]
+    // P[i] *= Yashe::gamma[i];
+    // *this += P[i];
     CUDAFunctions::executePolynomialMul(P->at(i).get_device_crt_residues(),
                                         P->at(i).get_device_crt_residues(),
                                         Yashe::gamma[i].get_device_crt_residues(),
@@ -195,6 +199,4 @@ void Ciphertext::keyswitch_mul(std::vector<Polynomial> *P){
                           Polynomial::CRTPrimes.size(),
                           INVERSE,
                           get_stream());
-  this->reduce();
-
 }

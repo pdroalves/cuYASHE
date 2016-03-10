@@ -121,27 +121,15 @@ Ciphertext Yashe::encrypt(Polynomial m){
   #endif
  
   Polynomial mdelta = delta*m;
-  Polynomial hps = (h*ps);
+  ps *= h;
+  e += mdelta;
+  e += ps;
+  e.reduce();
 
-  Polynomial p = (e + mdelta);
-  p += hps;
-  // p = (h*ps);
-  p.reduce();
-  // p = e + mdelta;
-
-  // std::cout << "phi.deg() " << phi.deg() << std::endl;
-  // std::cout << "h " << h.to_string() << std::endl;
-  // std::cout << "ps " << ps.to_string() << std::endl;
-  // std::cout << "e " << e.to_string() << std::endl;
-  // std::cout << "mdelta " << mdelta.to_string() << std::endl;
-  // std::cout << "p " << p.to_string() << std::endl;
-
-  Ciphertext c = p;
-  // mdelta.release();
-  // ps.release();
-  // e.release();
+  Ciphertext c = e;
   return c;
 }
+
 Polynomial Yashe::decrypt(Ciphertext c){
   #ifdef VERBOSE
   std::cout << "Yashe decrypt" << std::endl;
@@ -150,13 +138,13 @@ Polynomial Yashe::decrypt(Ciphertext c){
   // std::cout << "c " << c.to_string() << std::endl;
   // uint64_t start,end;
 
-  Polynomial g;
+  Polynomial m;
 
   if(c.aftermul){
     #ifdef VERBOSE
     std::cout << "aftermul" << std::endl;
     #endif
-    g = ff*c;    
+    m = ff*c;    
     // std::cout << "f*f:" << g.to_string() << std::endl;
     // std::cout << "f*f*c:" << g.to_string() << std::endl;
 
@@ -165,50 +153,18 @@ Polynomial Yashe::decrypt(Ciphertext c){
     std::cout << "not  aftermul" << std::endl;
     #endif
     // f.set_crt_residues_computed(false);
-    g = f*c;
-
+    m = f*c;
   }
-  g.reduce();
+  m.reduce();
 
-  Polynomial m(g.deg()+1);
-  
-  g.icrt();
-  callCiphertextMulAux( m.d_bn_coefs, 
-                        g.d_bn_coefs, 
-                        Yashe::q, 
-                        g.deg()+1, 
-                        g.get_stream());
+  // m *= Yashe::t;
+  m.icrt();
+  callCiphertextMulAuxMersenne( m.d_bn_coefs, 
+                                Yashe::q, 
+                                m.get_crt_spacing(), 
+                                m.get_stream());
   m.set_crt_computed(false);
   m.set_icrt_computed(true);
   m.set_host_updated(false);
-
-
-  // ZZ g_value = g.get_coeff(0);
-
-  // ZZ coeff = g_value*t.get_value();
-  // ZZ quot;
-  // ZZ rem;
-  // NTL::DivRem(quot,rem,coeff,q);
-
-  // quot %= q;
-  // #ifdef VERBOSE
-  // std::cout << "g_value: " << g_value << std::endl;
-  // std::cout << "rem: " << rem << std::endl;
-  // std::cout << "coeff: " << coeff << std::endl;
-  // std::cout << "q: " << q << std::endl;
-  // std::cout << "2*rem: " << 2*rem << std::endl;
-  // #endif
-  
-  // if(2*rem > q){
-  //   if(coeff == t.get_value()-1){
-  //     m.set_coeff(0,0);
-  //   }else{
-  //     m.set_coeff(0,(quot+1)%t.get_value());
-  //   }
-  // }else{
-  //   m.set_coeff(0,(quot)%t.get_value());
-  // }
-
-  // std::cout << (end-start) << " cycles to decrypt I" << std::endl;
   return m;
 }

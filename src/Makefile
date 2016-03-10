@@ -23,7 +23,7 @@ BENCHMARKYASHEBIN= $(INSTALL)/benchmark_yashe
 
 all: tests benchmarks
 
-tests:  polynomial.o cuda_functions.o cuda_bn.o cuda_distribution.o cuda_ciphertext.o test.o test_ctpt.o test_ct_mul.o test_ntt.o test_mul.o test_crt.o test_reduce.o test_bnt.o ciphertext.o distribution.o yashe.o common.o integer.o
+tests:  polynomial.o cuda_functions.o cuda_bn.o cuda_distribution.o cuda_ciphertext.o test.o test_ctpt.o test_ntt.o test_mul.o test_crt.o test_reduce.o test_bnt.o ciphertext.o distribution.o yashe.o common.o integer.o
 	$(CUDA_CC) $(CUDA_ARCH) $(LCUDA) $(ICUDA) -o $(TESTBIN) test.o polynomial.o cuda_functions.o cuda_bn.o cuda_distribution.o cuda_ciphertext.o ciphertext.o distribution.o yashe.o common.o integer.o -lcufft -lcurand  --relocatable-device-code true -Xcompiler $(OPENMP) $(NTL) -lboost_unit_test_framework
 	# $(CUDA_CC) $(CUDA_ARCH) $(LCUDA) $(ICUDA) -o $(TESTBIN)_ctpt test_ctpt.o polynomial.o cuda_functions.o cuda_bn.o cuda_distribution.o cuda_ciphertext.o ciphertext.o distribution.o yashe.o common.o integer.o -lcufft -lcurand -Xcompiler $(OPENMP) $(NTL)
 	# $(CUDA_CC) $(CUDA_ARCH) $(LCUDA) $(ICUDA) -o $(TESTBIN)_crt test_crt.o polynomial.o cuda_functions.o cuda_bn.o cuda_distribution.o cuda_ciphertext.o ciphertext.o distribution.o yashe.o common.o integer.o -lcufft -lcurand -Xcompiler $(OPENMP) $(NTL)
@@ -88,10 +88,6 @@ test_mul.o: test_mul.cu
 test_reduce.o: test_reduce.cu
 	$(CUDA_CC) -c test_reduce.cu -o test_reduce.o  $(NTL)
 
-test_ct_mul.o: test_ct_mul.cu
-	# $(CUDA_CC) -c test_ct_mul.cu -o test_ct_mul.o  $(NTL)
-
-
 test_ntt.o:test_ntt.cu
 	# $(CUDA_CC) -c test_ntt.cu -o test_ntt.o  $(NTL)
 
@@ -102,4 +98,4 @@ test.o:test.cu
 	$(CUDA_CC) -c test.cu -o test.o  -lboost_unit_test_framework $(NTL)
 
 clean:
-	rm -f $(BIN) $(TESTBIN) $(BENCHMARKPOLYBIN) $(BENCHMARKYASHEBIN) test_bnt test_mul test_ntt test_reduce integer.o test_ntt.o test_crt.o  test_ct_mul.o  test_ctpt.o  test_mul.o cuda_distribution.o common.o benchmark_polynomial.o benchmark_yashe.o polynomial.o tests.o test_reduce.o ciphertext.o cuda_functions.o cuda_bn.o distribution.o yashe.o test.o test_bnt.o
+	rm -f $(BIN) $(TESTBIN) $(BENCHMARKPOLYBIN) $(BENCHMARKYASHEBIN) test_bnt test_mul test_ntt test_reduce integer.o test_ntt.o test_crt.o  test_ct_mul.o  test_ctpt.o  test_mul.o cuda_distribution.o common.o benchmark_polynomial.o benchmark_yashe.o polynomial.o tests.o test_reduce.o ciphertext.o cuda_functions.o cuda_bn.o distribution.o yashe.o test.o test_bnt.o cuda_ciphertext.o

@@ -160,7 +160,7 @@ int main(int argc,char* argv[]){
 
   #ifndef CUHEBENCHMARK
     for(int d = 1024;d <= 8192;d *= 2){
-    //for(int d = 4096;d <= 4096;d *= 2){
+    // for(int d = 4096;d <= 4096;d *= 2){
   #else
     #if CUHEBENCHMARK == CUHEA
       for(int d = 8192;d <= 8192;d *= 2){
@@ -432,66 +432,25 @@ int main(int argc,char* argv[]){
 
       // ///////////////////////////////////////////////
       // // MUL
-      // // Time measured with memory copy
       Polynomial::random(&a,d-1);
       Polynomial::random(&b,d-1);
-      a.update_crt_spacing(2*d);
-      b.update_crt_spacing(2*d);
-      // clock_gettime( CLOCK_REALTIME, &start);
-      // for(int i = 0; i < N;i++){
-
-      //   a *= b;
-
-      //   a.set_crt_computed(false);
-      //   a.set_icrt_computed(false);
-      //   b.set_crt_computed(false);
-      //   b.set_icrt_computed(false);
-      //   result = cudaDeviceSynchronize();
-      //   assert(result == cudaSuccess);
-      //   // c.release();
-      // }
-      // clock_gettime( CLOCK_REALTIME, &stop);
-      // diff = compute_time_ms(start,stop)/N;
-      // std::cout << "MUL) Time measured with memory copy: " << diff << " ms" << std::endl;
-      // gpu_mult_with_memcopy << d << " " << diff  << std::endl;
-      
-      //     cudaMemGetInfo(&f, &t);
-
-      // cout << "Free memory: " << f/(1024*1024) << std::endl;
-      // // std::cout << "Press Enter to Continue" << std::endl;
-      // //cin.ignore();
-
-      // Time measured without memory copy
-      Polynomial::random(&a,d-1);
-      Polynomial::random(&b,d-1);
-      a.update_crt_spacing(2*d);
+      a.update_crt_spacing(d);
       a.update_device_data();
-      b.update_crt_spacing(2*d);
+      b.update_crt_spacing(d);
       b.update_device_data();
       int needed_spacing = pow(2,ceil(log2(a.deg() + b.deg())));
 
       clock_gettime( CLOCK_REALTIME, &start);
       for(int i = 0; i < N;i++){
-
-        CUDAFunctions::callPolynomialMul(   a.get_device_crt_residues(),
-                                            a.get_device_crt_residues(),
-                                            false,
-                                            a.get_crt_spacing(),
-                                            b.get_device_crt_residues(),
-                                            false,
-                                            b.get_crt_spacing(),
-                                            b.get_crt_spacing(),
-                                            Polynomial::CRTPrimes.size(),
-                                            a.get_stream()
-                                        );
-
+        a *= b;
+        a.CRTSPACING = b.CRTSPACING;
         result = cudaDeviceSynchronize();
         assert(result == cudaSuccess);
         // c.release();
       }
       clock_gettime( CLOCK_REALTIME, &stop);
       diff = compute_time_ms(start,stop)/N;
-      std::cout << "MUL) Time measured without memory copy: " << diff << " ms" << std::endl;
+      std::cout << "MUL) Time measured: " << diff << " ms" << std::endl;
       gpu_mult_without_memcopy << d << " " << diff  << std::endl;
 
       cudaMemGetInfo(&f, &t);

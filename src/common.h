@@ -1,4 +1,4 @@
-#ifndef COMMON_H
+	#ifndef COMMON_H
 #define COMMON_H
 
 #include <algorithm>
@@ -230,7 +230,7 @@ void common_multiplication_inplace(P *a, P *b){
   // Store result in polynomial a //
   //////////////////////////////////
   // Check align
-  int needed_spacing = pow(2,ceil(log2(a->deg() + b->deg())));
+  int needed_spacing = pow(2,ceil(log2(std::max(a->get_crt_spacing(),b->get_crt_spacing()))));
   
   if(needed_spacing < CUDAFunctions::N)
 	needed_spacing = CUDAFunctions::N;

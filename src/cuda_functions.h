@@ -5,9 +5,9 @@
 #include <assert.h>
 #include "settings.h"
 #include <NTL/ZZ.h>
-#ifdef CUFFTMUL
+// #ifdef CUFFTMUL
 #include <cufft.h>
-#endif
+// #endif
 #include "cuda_bn.h"
 
 NTL_CLIENT
@@ -15,6 +15,7 @@ NTL_CLIENT
 // __constant__ int PrimesL;
 #define MAX_PRIMES_ON_C_MEMORY 4096
 // cuyasheint_t *CRTPrimesGlobal;
+typedef double2 Complex;
 
 class CUDAFunctions{
   public:
@@ -26,7 +27,7 @@ class CUDAFunctions{
     static cuyasheint_t *d_inner_results;
     static cuyasheint_t *d_inner_results_used;
 
-    #ifdef NTTMUL
+    // #ifdef NTTMUL
     /////////
     // NTT //
     /////////
@@ -37,12 +38,15 @@ class CUDAFunctions{
     static cuyasheint_t *d_mulB;
     static cuyasheint_t *d_mulAux;
     ///////////
-    #elif defined(CUFFTMUL)
+    // #elif defined(CUFFTMUL)
     ///////////
     // cuFFT //
     ///////////
     static cufftHandle plan;
-    #endif
+    static Complex *d_mulComplexA;
+    static Complex *d_mulComplexB;
+    static Complex *d_mulComplexC;
+    // #endif
     static cuyasheint_t* applyNTT(  cuyasheint_t *d_a,
                                     const int N,
                                     const int NPolis,
@@ -59,16 +63,37 @@ class CUDAFunctions{
                                             cuyasheint_t *b,
                                             int size,
                                             int OP);
+
+    static void executeNTTScale(    cuyasheint_t *a, 
+                                    const int size, 
+                                    const int N,
+                                    cudaStream_t stream);
     static void executePolynomialMul(cuyasheint_t *c, 
                                     cuyasheint_t *a, 
                                     cuyasheint_t *b, 
                                     const int size, 
                                     cudaStream_t stream);
+    static void executeCuFFTPolynomialMul( Complex *a, 
+                                                    Complex *b, 
+                                                    Complex *c, 
+                                                    int size_c, 
+                                                    int size, 
+                                                    cudaStream_t stream);
     static void executePolynomialAdd(cuyasheint_t *c, 
                                     cuyasheint_t *a, 
                                     cuyasheint_t *b, 
                                     const int size, 
                                     cudaStream_t stream);
+    static void executeCopyIntegerToComplex(   Complex *d_a, 
+                                                            cuyasheint_t *a,
+                                                            const int size,
+                                                            cudaStream_t stream);
+    static void executeCopyAndNormalizeComplexRealPartToInteger(   cuyasheint_t *d_a, 
+                                                                                cufftDoubleComplex *a,
+                                                                                const int size,
+                                                                                int signal_size,
+                                                                                int N,
+                                                                                cudaStream_t stream);
     static cuyasheint_t* callPolynomialMul(cuyasheint_t *d_result,
                                             cuyasheint_t *a,
                                             const bool realign_A,

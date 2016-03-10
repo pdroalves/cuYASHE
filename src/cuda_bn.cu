@@ -338,6 +338,16 @@ __host__ __device__ void bn_bitwise_and(bn_t *a, bn_t *b){
 		a->dp[i] = (a->dp[i] & b->dp[i]);
 }
 
+__host__ __device__ void bn_truncate(bn_t *a, int bits){
+	//
+	// Set a = a & (2^bits - 1)
+	// 
+	int index = (a->used*WORD) / bits;
+	a->dp[index] = (a->dp[index] << (WORD - bits));  
+	a->dp[index] = (a->dp[index] >> (WORD - bits));
+	a->used = index+1;
+}
+
 /**
  * Shifts a digit vector to the right by some digits. 
  * Computes c = a >> (digits * DIGIT).
@@ -428,7 +438,6 @@ __host__ __device__ uint32_t bn_rshb_low_32(uint32_t *c, const uint32_t *a, int 
 }
 
 
-
 /**
  * Shifts a digit vector to the left by some digits. 
  * Computes c = a << (digits * DIGIT). 
@@ -517,6 +526,7 @@ __host__ __device__  uint32_t bn_lshb_low<uint32_t>(uint32_t *c, const uint32_t 
 	}
 	return carry;
 }
+
 
 ////////////////
 // Operators //
