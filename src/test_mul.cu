@@ -75,6 +75,7 @@ int main(){
                              to_ZZ("4376377560524434132L"),
                              to_ZZ("2285160538342347456L"),
                              to_ZZ("1122693488336169022L")};
+  c.normalize();
   assert(c.get_coeffs().size() == 15);
 
   for(int i = 0; i < c.get_coeffs().size();i++)
@@ -127,8 +128,9 @@ int main(){
                             to_ZZ("127386722625350085506673181613116824226"),
                             to_ZZ("162154161142687163774421077602378932930"),
                             to_ZZ("132969771469154360046681933849550863396")};
+  c.normalize();
   assert(c.get_coeffs().size() == 15);
-
+  
   for(int i = 0; i < c.get_coeffs().size();i++)
       assert(c.get_coeff(i) == expected_result2[i]);
   std::cout << "It works!\n" << std::endl;;
