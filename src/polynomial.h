@@ -908,14 +908,14 @@ class Polynomial{
 
         // Get primes
         // std::cout << "Primes: " << std::endl;
-        #ifdef CUFFTMUL
+        #ifdef CUFFTMUL_TRANSFORM
         int primes_size = CRTPRIMESIZE;
         #else
         unsigned int count = 0;
         #endif
         while( (M < (2*degree)*q*q) ){
             
-            #ifdef CUFFTMUL
+            #ifdef CUFFTMUL_TRANSFORM
             n = NTL::GenPrime_long(primes_size);
             #else
             n = PRIMES_BUCKET[count];
@@ -937,7 +937,7 @@ class Polynomial{
           InvMpi.push_back(conv<cuyasheint_t>(NTL::InvMod(Mpi[i]%pi,pi)));
         }
 
-        #ifndef CUFFTMUL
+        #ifndef CUFFTMUL_TRANSFORM
         compute_reciprocal(M);
         #endif
 
@@ -973,7 +973,7 @@ class Polynomial{
 
         while( (M < (2*degree)*q*q) ){
             
-            // #ifdef CUFFTMUL
+            // #ifdef CUFFTMUL_TRANSFORM
             n = NTL::GenPrime_long(primes_size);
             // #else
             // n = PRIMES_BUCKET[count];

@@ -21,13 +21,13 @@ class CUDAFunctions{
   public:
   	static int N;
     static int std_bn_t_alloc;
+    static int transform;
     //////////////////////////
     // CRT global variables //
     //////////////////////////
     static cuyasheint_t *d_inner_results;
     static cuyasheint_t *d_inner_results_used;
 
-    // #ifdef NTTMUL
     /////////
     // NTT //
     /////////
@@ -38,7 +38,6 @@ class CUDAFunctions{
     static cuyasheint_t *d_mulB;
     static cuyasheint_t *d_mulAux;
     ///////////
-    // #elif defined(CUFFTMUL)
     ///////////
     // cuFFT //
     ///////////
@@ -46,7 +45,6 @@ class CUDAFunctions{
     static Complex *d_mulComplexA;
     static Complex *d_mulComplexB;
     static Complex *d_mulComplexC;
-    // #endif
     static cuyasheint_t* applyNTT(  cuyasheint_t *d_a,
                                     const int N,
                                     const int NPolis,
@@ -94,7 +92,7 @@ class CUDAFunctions{
                                                                                 int signal_size,
                                                                                 int N,
                                                                                 cudaStream_t stream);
-    static cuyasheint_t* callPolynomialMul(cuyasheint_t *d_result,
+    static cuyasheint_t* callPolynomialMul( cuyasheint_t *d_result,
                                             cuyasheint_t *a,
                                             const bool realign_A,
                                             const int A_N,
@@ -126,11 +124,7 @@ class CUDAFunctions{
     static void write_crt_primes();
   private:
 };
-#ifdef NTTMUL
 __device__ __host__ inline uint64_t s_rem (uint64_t a);
 __device__ __host__  uint64_t s_mul(uint64_t a,
                                     uint64_t b);
 #endif
-
-#endif
-

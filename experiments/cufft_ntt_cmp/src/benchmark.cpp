@@ -234,7 +234,7 @@ int main(void){
 		 */
     	Polynomial::BuildNthCyclotomic(&phi, N); // generate an cyclotomic polynomial
 	    Polynomial::gen_crt_primes(Polynomial::global_mod,N);
-		CUDAFunctions::init(2*N);
+		  CUDAFunctions::init(2*N);
 	
 	    std::cout << "Generating " << phi.deg() << " degree polynomials." << std::endl;
     	std::cout << "O CRT usa " << Polynomial::CRTPrimes.size() << " primos de " << CRTPRIMESIZE << " bits"<< std::endl;
@@ -280,10 +280,10 @@ int main(void){
 		/////////
 		// FFT //
 		/////////
-	    Polynomial::gen_crt_primes(Polynomial::global_mod,N,9);
+	    Polynomial::gen_crt_primes(Polynomial::global_mod,N,19);
 		CUDAFunctions::init(2*N);
 		fft_setup(2*N);
-    	std::cout << "O CRT usa " << Polynomial::CRTPrimes.size() << " primos de " << 9 << " bits"<< std::endl;
+    	std::cout << "O CRT usa " << Polynomial::CRTPrimes.size() << " primos de " << 19 << " bits"<< std::endl;
 		
 
 	    Polynomial::random(&a,N);

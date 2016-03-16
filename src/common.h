@@ -136,7 +136,6 @@ void common_addition_inplace(P *a,P *b){
 
 template <class P>
 P* common_multiplication(P *a, P *b){
-  
   // Check align
   int needed_spacing = pow(2,ceil(log2(a->deg() + b->deg())));
   
@@ -149,26 +148,18 @@ P* common_multiplication(P *a, P *b){
   
   bool update_A_spacing = false; 
   bool update_B_spacing = false;
-  #ifdef NTTMUL
+  if(CUDAFunctions::transform == NTTMUL){
 	if(a->CRTSPACING != needed_spacing)
 	  a->update_crt_spacing(needed_spacing);
 	if(b->CRTSPACING != needed_spacing)
 	  b->update_crt_spacing(needed_spacing);
-  #elif defined(CUFFTMUL)
-  if(a->get_crt_spacing() != needed_spacing){
-  	// if(!a->get_crt_computed())
-  		// a->update_crt_spacing(needed_spacing);
-  	// else
+  }else{
+  if(a->get_crt_spacing() != needed_spacing)
 	  	update_A_spacing = true;  	
-  }
-  if(b->get_crt_spacing() != needed_spacing){
-  	// if(!b->get_crt_computed())
-  		// b->update_crt_spacing(needed_spacing);
-  	// else
+  
+  if(b->get_crt_spacing() != needed_spacing)
 	  	update_B_spacing = true;
   }
-  #endif
-
   #ifdef VERBOSE
   std::cout << "Mul with CRTSPACING " << needed_spacing << std::endl;
   // std::cout << "this: " << a->to_string() << std::endl;
@@ -204,15 +195,15 @@ P* common_multiplication(P *a, P *b){
   cuyasheint_t *d_result = c->get_device_crt_residues();
   if(a->get_crt_spacing() > 0 && b->get_crt_spacing() > 0)
 	  d_result = CUDAFunctions::callPolynomialMul(	d_result,
-										a->get_device_crt_residues(),
-										update_A_spacing,
-										a->get_crt_spacing(),
-										b->get_device_crt_residues(),
-										update_B_spacing,
-										b->get_crt_spacing(),
-										needed_spacing,
-										a->CRTPrimes.size(),
-	  									a->get_stream()
+													a->get_device_crt_residues(),
+													update_A_spacing,
+													a->get_crt_spacing(),
+													b->get_device_crt_residues(),
+													update_B_spacing,
+													b->get_crt_spacing(),
+													needed_spacing,
+													a->CRTPrimes.size(),
+				  									a->get_stream()
 									);
   c->set_device_crt_residues(d_result);
   c->set_host_updated(false);
@@ -226,6 +217,7 @@ P* common_multiplication(P *a, P *b){
 
 template <class P>
 void common_multiplication_inplace(P *a, P *b){
+
   //////////////////////////////////
   // Store result in polynomial a //
   //////////////////////////////////
@@ -241,25 +233,18 @@ void common_multiplication_inplace(P *a, P *b){
   
   bool update_A_spacing = false; 
   bool update_B_spacing = false;
-  #ifdef NTTMUL
+  if(CUDAFunctions::transform == NTTMUL){
 	if(a->CRTSPACING != needed_spacing)
 	  a->update_crt_spacing(needed_spacing);
 	if(b->CRTSPACING != needed_spacing)
 	  b->update_crt_spacing(needed_spacing);
-  #elif defined(CUFFTMUL)
-  if(a->get_crt_spacing() != needed_spacing){
-  	// if(!a->get_crt_computed())
-  		// a->update_crt_spacing(needed_spacing);
-  	// else
+  }else{
+  if(a->get_crt_spacing() != needed_spacing)
 	  	update_A_spacing = true;  	
-  }
-  if(b->get_crt_spacing() != needed_spacing){
-  	// if(!b->get_crt_computed())
-  		// b->update_crt_spacing(needed_spacing);
-  	// else
+  
+  if(b->get_crt_spacing() != needed_spacing)
 	  	update_B_spacing = true;
   }
-  #endif
 
   #ifdef VERBOSE
   std::cout << "Mul with CRTSPACING " << needed_spacing << std::endl;
@@ -293,17 +278,17 @@ void common_multiplication_inplace(P *a, P *b){
   // start = get_cycles();
   cuyasheint_t *d_result = a->get_device_crt_residues();
   if(a->get_crt_spacing() > 0 && b->get_crt_spacing() > 0)
-	  d_result = CUDAFunctions::callPolynomialMul(	a->get_device_crt_residues(),
-										a->get_device_crt_residues(),
-										update_A_spacing,
-										a->get_crt_spacing(),
-										b->get_device_crt_residues(),
-										update_B_spacing,
-										b->get_crt_spacing(),
-										needed_spacing,
-										a->CRTPrimes.size(),
-	  									a->get_stream()
-									);
+	  d_result = CUDAFunctions::callPolynomialMul(  a->get_device_crt_residues(),
+													a->get_device_crt_residues(),
+													update_A_spacing,
+													a->get_crt_spacing(),
+													b->get_device_crt_residues(),
+													update_B_spacing,
+													b->get_crt_spacing(),
+													needed_spacing,
+													a->CRTPrimes.size(),
+				  									a->get_stream()
+												);
   a->set_device_crt_residues(d_result);
   a->set_host_updated(false);
   a->set_icrt_computed(false);

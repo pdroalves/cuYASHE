@@ -3,15 +3,17 @@
 
 #include <cstdint>
 
-// #define PLAINMUL
-// #define NTTMUL
-// #define FFTMUL
-#define CUFFTMUL
+// This define the default transform for polynomial multiplication
+// #define NTTMUL_TRANSFORM
+#define CUFFTMUL_TRANSFORM
+
+enum transforms {NTTMUL, CUFFTMUL};
 
 #define ADDBLOCKXDIM 32
-#ifdef CUFFTMUL
-#define CRTPRIMESIZE 9
-#define PRIMES_BUCKET_SIZE 56
+#ifdef CUFFTMUL_TRANSFORM
+#define CRTPRIMESIZE 19 
+#define PRIMES_BUCKET_SIZE 56                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     //
+extern const uint32_t PRIMES_BUCKET[];
 #else
 #define CRTPRIMESIZE 29
 #define PRIMES_BUCKET_SIZE 200                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           //

@@ -152,15 +152,20 @@ void Ciphertext::keyswitch(){
   //   worddecomp<32>(this,&P);
   // else
   //   throw "Unknown Yashe::word";
-  
-  #ifdef NTTMUL
-  Ciphertext::keyswitch_mul(&P);
+  #ifdef NTTMUL_TRANSFORM
+    int transform = NTTMUL;
   #else
-  for(int i = 0; i < Yashe::lwq; i ++){
-    Polynomial p = (P[i])*(Yashe::gamma[i]);
-    *this += p;
-  }
+    int transform = CUFFTMUL;
   #endif
+
+  if(transform == NTTMUL)
+    Ciphertext::keyswitch_mul(&P);
+  else  
+    for(int i = 0; i < Yashe::lwq; i ++){
+      Polynomial p = (P[i])*(Yashe::gamma[i]);
+      *this += p;
+    }
+
   this->reduce();
 
   #ifdef CYCLECOUNTING

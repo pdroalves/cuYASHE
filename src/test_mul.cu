@@ -15,6 +15,7 @@ int main(){
   ////////////////
   // First test //
   ////////////////
+  std::cout << "Prime size: " << CRTPRIMESIZE << std::endl;
   std::cout << "First test: " << std::endl;
   degree = 8;
 
