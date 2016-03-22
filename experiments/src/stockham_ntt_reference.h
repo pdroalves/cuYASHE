@@ -2,7 +2,6 @@
 #define STOCKHAM_REFERENCE_H
 #include <assert.h>
 #include <iostream>
-#include <cuda_runtime_api.h>
 
 #define RADIX 2
 #define BILLION  1000000000L

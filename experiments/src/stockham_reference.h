@@ -2,7 +2,6 @@
 #define STOCKHAM_REFERENCE_H
 #include <assert.h>
 #include <iostream>
-#include <cuda_runtime_api.h>
 
 #define RADIX 2
 #define BILLION  1000000000L
@@ -19,20 +18,20 @@ typedef struct complex{
 	float imag;
 
 
-	__host__ __device__  complex operator+(const complex b){
+	complex operator+(const complex b){
 		complex aux;
 		aux.real = this->real + b.real;
 		aux.imag = this->imag + b.imag;
 		return aux;
 	}
 
-	__host__ __device__  complex operator-(const complex b){
+	complex operator-(const complex b){
 		complex aux;
 		aux.real = this->real - b.real;
 		aux.imag = this->imag - b.imag;
 		return aux;
 	}
-	__host__ __device__  complex operator/(const float b){
+	complex operator/(const float b){
 		complex aux;
 		aux.real = this->real / b;
 		aux.imag = this->imag / b;
@@ -40,8 +39,8 @@ typedef struct complex{
 
 	}
 
-	__host__ __device__ bool operator==(const complex b){
-		return (this->real == b.real) && (this->imag == b.imag);
+	bool operator==(const complex b){
+		return (abs(this->real - b.real) <= 0.01) && (abs(this->imag - b.imag) <= 0.01);
 	}
 	// complex operator*=(const complex b){
 	// 	//this has better precision
@@ -54,7 +53,7 @@ typedef struct complex{
 
 	// 	return aux;
 	// }
-	__host__ __device__ complex operator*=(const complex b){
+	complex operator*=(const complex b){
 		complex aux;
 
 		aux.real = this->real*b.real - this->imag*b.imag;
@@ -65,7 +64,7 @@ typedef struct complex{
 		return *this;
 
 	}
-	__host__ __device__ complex operator/=(const float b){
+	complex operator/=(const float b){
 		this->real /= b;
 		this->imag /= b;
 		return *this;
@@ -73,13 +72,7 @@ typedef struct complex{
 	}
 } complex;
 
-
-#ifdef __CUDA_ARCH__
-typedef float2 Complex;
-#else
 typedef complex Complex ;
-#endif
-
 
 enum {FORWARD,INVERSE};
 
