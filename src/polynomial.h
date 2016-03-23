@@ -898,7 +898,6 @@ class Polynomial{
     }
 
     static void gen_crt_primes(ZZ q,cuyasheint_t degree){
-        // We will use 63bit primes to fit cuyasheint_t data type (64 bits raises "GenPrime: length too large")
         ZZ M = ZZ(1);
         std::vector<cuyasheint_t> P;
         std::vector<ZZ> Mpi;

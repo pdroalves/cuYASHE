@@ -428,153 +428,153 @@ __device__ void butterfly<4,INVERSE>(uint64_t *v){
 ///////////////////
 // Doesn't work! //
 ///////////////////
-template<>
-__device__ void butterfly<8,FORWARD>(uint64_t *v){
-  ///////////////////////
-  // Radix-4 Butterfly //
-  ///////////////////////
-  const uint64_t v0 = s_rem(v[0]);
-  const uint64_t v1 = s_rem(v[1]);
-  const uint64_t v2 = s_rem(v[2]);
-  const uint64_t v3 = s_rem(v[3]);
-  const uint64_t v4 = s_rem(v[4]);
-  const uint64_t v5 = s_rem(v[5]);
-  const uint64_t v6 = s_rem(v[6]);
-  const uint64_t v7 = s_rem(v[7]);
+// template<>
+// __device__ void butterfly<8,FORWARD>(uint64_t *v){
+//   ///////////////////////
+//   // Radix-4 Butterfly //
+//   ///////////////////////
+//   const uint64_t v0 = s_rem(v[0]);
+//   const uint64_t v1 = s_rem(v[1]);
+//   const uint64_t v2 = s_rem(v[2]);
+//   const uint64_t v3 = s_rem(v[3]);
+//   const uint64_t v4 = s_rem(v[4]);
+//   const uint64_t v5 = s_rem(v[5]);
+//   const uint64_t v6 = s_rem(v[6]);
+//   const uint64_t v7 = s_rem(v[7]);
   
 
-  v[0] = s_add(s_add(s_add(s_add(s_add(s_add(s_add(v0,v1),v2),v3),v4),v5),v6),v7);
-  v[1] = s_add(s_add(s_add(s_add(s_add(s_add(s_add( v0,
-                                                    s_mul(v1,W8[1])),
-                                                    s_mul(v2,W8[2])),
-                                                    s_mul(v3,W8[3])),
-                                                    s_mul(v4,W8[4])),
-                                                    s_mul(v5,W8[5])),
-                                                    s_mul(v6,W8[6])),
-                                                    s_mul(v7,W8[7]));
-  v[2] = s_add(s_add(s_add(s_add(s_add(s_add(s_add( v0,
-                                                    s_mul(v1,W8[2])),
-                                                    s_mul(v2,W8[4])),
-                                                    s_mul(v3,W8[6])),
-                                                    s_mul(v4,W8[8])),
-                                                    s_mul(v5,W8[10])),
-                                                    s_mul(v6,W8[12])),
-                                                    s_mul(v7,W8[14]));
-  v[3] = s_add(s_add(s_add(s_add(s_add(s_add(s_add( v0,
-                                                    s_mul(v1,W8[3])),
-                                                    s_mul(v2,W8[6])),
-                                                    s_mul(v3,W8[9])),
-                                                    s_mul(v4,W8[12])),
-                                                    s_mul(v5,W8[15])),
-                                                    s_mul(v6,W8[18])),
-                                                    s_mul(v7,W8[21]));
-  v[4] = s_add(s_add(s_add(s_add(s_add(s_add(s_add( v0,
-                                                    s_mul(v1,W8[4])),
-                                                    s_mul(v2,W8[8])),
-                                                    s_mul(v3,W8[12])),
-                                                    s_mul(v4,W8[16])),
-                                                    s_mul(v5,W8[20])),
-                                                    s_mul(v6,W8[24])),
-                                                    s_mul(v7,W8[28]));
-  v[5] = s_add(s_add(s_add(s_add(s_add(s_add(s_add( v0,
-                                                    s_mul(v1,W8[5])),
-                                                    s_mul(v2,W8[10])),
-                                                    s_mul(v3,W8[15])),
-                                                    s_mul(v4,W8[20])),
-                                                    s_mul(v5,W8[25])),
-                                                    s_mul(v6,W8[30])),
-                                                    s_mul(v7,W8[35]));
-  v[6] = s_add(s_add(s_add(s_add(s_add(s_add(s_add( v0,
-                                                    s_mul(v1,W8[6])),
-                                                    s_mul(v2,W8[12])),
-                                                    s_mul(v3,W8[18])),
-                                                    s_mul(v4,W8[24])),
-                                                    s_mul(v5,W8[30])),
-                                                    s_mul(v6,W8[36])),
-                                                    s_mul(v7,W8[42]));
-  v[7] = s_add(s_add(s_add(s_add(s_add(s_add(s_add( v0,
-                                                    s_mul(v1,W8[7])),
-                                                    s_mul(v2,W8[14])),
-                                                    s_mul(v3,W8[21])),
-                                                    s_mul(v4,W8[28])),
-                                                    s_mul(v5,W8[35])),
-                                                    s_mul(v6,W8[42])),
-                                                    s_mul(v7,W8[49]));
-}
+//   v[0] = s_add(s_add(s_add(s_add(s_add(s_add(s_add(v0,v1),v2),v3),v4),v5),v6),v7);
+//   v[1] = s_add(s_add(s_add(s_add(s_add(s_add(s_add( v0,
+//                                                     s_mul(v1,W8[1])),
+//                                                     s_mul(v2,W8[2])),
+//                                                     s_mul(v3,W8[3])),
+//                                                     s_mul(v4,W8[4])),
+//                                                     s_mul(v5,W8[5])),
+//                                                     s_mul(v6,W8[6])),
+//                                                     s_mul(v7,W8[7]));
+//   v[2] = s_add(s_add(s_add(s_add(s_add(s_add(s_add( v0,
+//                                                     s_mul(v1,W8[2])),
+//                                                     s_mul(v2,W8[4])),
+//                                                     s_mul(v3,W8[6])),
+//                                                     s_mul(v4,W8[8])),
+//                                                     s_mul(v5,W8[10])),
+//                                                     s_mul(v6,W8[12])),
+//                                                     s_mul(v7,W8[14]));
+//   v[3] = s_add(s_add(s_add(s_add(s_add(s_add(s_add( v0,
+//                                                     s_mul(v1,W8[3])),
+//                                                     s_mul(v2,W8[6])),
+//                                                     s_mul(v3,W8[9])),
+//                                                     s_mul(v4,W8[12])),
+//                                                     s_mul(v5,W8[15])),
+//                                                     s_mul(v6,W8[18])),
+//                                                     s_mul(v7,W8[21]));
+//   v[4] = s_add(s_add(s_add(s_add(s_add(s_add(s_add( v0,
+//                                                     s_mul(v1,W8[4])),
+//                                                     s_mul(v2,W8[8])),
+//                                                     s_mul(v3,W8[12])),
+//                                                     s_mul(v4,W8[16])),
+//                                                     s_mul(v5,W8[20])),
+//                                                     s_mul(v6,W8[24])),
+//                                                     s_mul(v7,W8[28]));
+//   v[5] = s_add(s_add(s_add(s_add(s_add(s_add(s_add( v0,
+//                                                     s_mul(v1,W8[5])),
+//                                                     s_mul(v2,W8[10])),
+//                                                     s_mul(v3,W8[15])),
+//                                                     s_mul(v4,W8[20])),
+//                                                     s_mul(v5,W8[25])),
+//                                                     s_mul(v6,W8[30])),
+//                                                     s_mul(v7,W8[35]));
+//   v[6] = s_add(s_add(s_add(s_add(s_add(s_add(s_add( v0,
+//                                                     s_mul(v1,W8[6])),
+//                                                     s_mul(v2,W8[12])),
+//                                                     s_mul(v3,W8[18])),
+//                                                     s_mul(v4,W8[24])),
+//                                                     s_mul(v5,W8[30])),
+//                                                     s_mul(v6,W8[36])),
+//                                                     s_mul(v7,W8[42]));
+//   v[7] = s_add(s_add(s_add(s_add(s_add(s_add(s_add( v0,
+//                                                     s_mul(v1,W8[7])),
+//                                                     s_mul(v2,W8[14])),
+//                                                     s_mul(v3,W8[21])),
+//                                                     s_mul(v4,W8[28])),
+//                                                     s_mul(v5,W8[35])),
+//                                                     s_mul(v6,W8[42])),
+//                                                     s_mul(v7,W8[49]));
+// }
 
-template<>
-__device__ void butterfly<8,INVERSE>(uint64_t *v){
-  ///////////////////////
-  // Radix-4 Butterfly //
-  ///////////////////////
-  const uint64_t v0 = s_rem(v[0]);
-  const uint64_t v1 = s_rem(v[1]);
-  const uint64_t v2 = s_rem(v[2]);
-  const uint64_t v3 = s_rem(v[3]);
-  const uint64_t v4 = s_rem(v[4]);
-  const uint64_t v5 = s_rem(v[5]);
-  const uint64_t v6 = s_rem(v[6]);
-  const uint64_t v7 = s_rem(v[7]);
+// template<>
+// __device__ void butterfly<8,INVERSE>(uint64_t *v){
+//   ///////////////////////
+//   // Radix-4 Butterfly //
+//   ///////////////////////
+//   const uint64_t v0 = s_rem(v[0]);
+//   const uint64_t v1 = s_rem(v[1]);
+//   const uint64_t v2 = s_rem(v[2]);
+//   const uint64_t v3 = s_rem(v[3]);
+//   const uint64_t v4 = s_rem(v[4]);
+//   const uint64_t v5 = s_rem(v[5]);
+//   const uint64_t v6 = s_rem(v[6]);
+//   const uint64_t v7 = s_rem(v[7]);
   
 
-  v[0] = s_add(s_add(s_add(s_add(s_add(s_add(s_add(v0,v1),v2),v3),v4),v5),v6),v7);
-  v[1] = s_add(s_add(s_add(s_add(s_add(s_add(s_add( v0,
-                                                    s_mul(v1,WInv8[1])),
-                                                    s_mul(v2,WInv8[2])),
-                                                    s_mul(v3,WInv8[3])),
-                                                    s_mul(v4,WInv8[4])),
-                                                    s_mul(v5,WInv8[5])),
-                                                    s_mul(v6,WInv8[6])),
-                                                    s_mul(v7,WInv8[7]));
-  v[2] = s_add(s_add(s_add(s_add(s_add(s_add(s_add( v0,
-                                                    s_mul(v1,WInv8[2])),
-                                                    s_mul(v2,WInv8[4])),
-                                                    s_mul(v3,WInv8[6])),
-                                                    s_mul(v4,WInv8[8])),
-                                                    s_mul(v5,WInv8[10])),
-                                                    s_mul(v6,WInv8[12])),
-                                                    s_mul(v7,WInv8[14]));
-  v[3] = s_add(s_add(s_add(s_add(s_add(s_add(s_add( v0,
-                                                    s_mul(v1,WInv8[3])),
-                                                    s_mul(v2,WInv8[6])),
-                                                    s_mul(v3,WInv8[9])),
-                                                    s_mul(v4,WInv8[12])),
-                                                    s_mul(v5,WInv8[15])),
-                                                    s_mul(v6,WInv8[18])),
-                                                    s_mul(v7,WInv8[21]));
-  v[4] = s_add(s_add(s_add(s_add(s_add(s_add(s_add( v0,
-                                                    s_mul(v1,WInv8[4])),
-                                                    s_mul(v2,WInv8[8])),
-                                                    s_mul(v3,WInv8[12])),
-                                                    s_mul(v4,WInv8[16])),
-                                                    s_mul(v5,WInv8[20])),
-                                                    s_mul(v6,WInv8[24])),
-                                                    s_mul(v7,WInv8[28]));
-  v[5] = s_add(s_add(s_add(s_add(s_add(s_add(s_add( v0,
-                                                    s_mul(v1,WInv8[5])),
-                                                    s_mul(v2,WInv8[10])),
-                                                    s_mul(v3,WInv8[15])),
-                                                    s_mul(v4,WInv8[20])),
-                                                    s_mul(v5,WInv8[25])),
-                                                    s_mul(v6,WInv8[30])),
-                                                    s_mul(v7,WInv8[35]));
-  v[6] = s_add(s_add(s_add(s_add(s_add(s_add(s_add( v0,
-                                                    s_mul(v1,WInv8[6])),
-                                                    s_mul(v2,WInv8[12])),
-                                                    s_mul(v3,WInv8[18])),
-                                                    s_mul(v4,WInv8[24])),
-                                                    s_mul(v5,WInv8[30])),
-                                                    s_mul(v6,WInv8[36])),
-                                                    s_mul(v7,WInv8[42]));
-  v[7] = s_add(s_add(s_add(s_add(s_add(s_add(s_add( v0,
-                                                    s_mul(v1,WInv8[7])),
-                                                    s_mul(v2,WInv8[14])),
-                                                    s_mul(v3,WInv8[21])),
-                                                    s_mul(v4,WInv8[28])),
-                                                    s_mul(v5,WInv8[35])),
-                                                    s_mul(v6,WInv8[42])),
-                                                    s_mul(v7,WInv8[49]));
-}
+//   v[0] = s_add(s_add(s_add(s_add(s_add(s_add(s_add(v0,v1),v2),v3),v4),v5),v6),v7);
+//   v[1] = s_add(s_add(s_add(s_add(s_add(s_add(s_add( v0,
+//                                                     s_mul(v1,WInv8[1])),
+//                                                     s_mul(v2,WInv8[2])),
+//                                                     s_mul(v3,WInv8[3])),
+//                                                     s_mul(v4,WInv8[4])),
+//                                                     s_mul(v5,WInv8[5])),
+//                                                     s_mul(v6,WInv8[6])),
+//                                                     s_mul(v7,WInv8[7]));
+//   v[2] = s_add(s_add(s_add(s_add(s_add(s_add(s_add( v0,
+//                                                     s_mul(v1,WInv8[2])),
+//                                                     s_mul(v2,WInv8[4])),
+//                                                     s_mul(v3,WInv8[6])),
+//                                                     s_mul(v4,WInv8[8])),
+//                                                     s_mul(v5,WInv8[10])),
+//                                                     s_mul(v6,WInv8[12])),
+//                                                     s_mul(v7,WInv8[14]));
+//   v[3] = s_add(s_add(s_add(s_add(s_add(s_add(s_add( v0,
+//                                                     s_mul(v1,WInv8[3])),
+//                                                     s_mul(v2,WInv8[6])),
+//                                                     s_mul(v3,WInv8[9])),
+//                                                     s_mul(v4,WInv8[12])),
+//                                                     s_mul(v5,WInv8[15])),
+//                                                     s_mul(v6,WInv8[18])),
+//                                                     s_mul(v7,WInv8[21]));
+//   v[4] = s_add(s_add(s_add(s_add(s_add(s_add(s_add( v0,
+//                                                     s_mul(v1,WInv8[4])),
+//                                                     s_mul(v2,WInv8[8])),
+//                                                     s_mul(v3,WInv8[12])),
+//                                                     s_mul(v4,WInv8[16])),
+//                                                     s_mul(v5,WInv8[20])),
+//                                                     s_mul(v6,WInv8[24])),
+//                                                     s_mul(v7,WInv8[28]));
+//   v[5] = s_add(s_add(s_add(s_add(s_add(s_add(s_add( v0,
+//                                                     s_mul(v1,WInv8[5])),
+//                                                     s_mul(v2,WInv8[10])),
+//                                                     s_mul(v3,WInv8[15])),
+//                                                     s_mul(v4,WInv8[20])),
+//                                                     s_mul(v5,WInv8[25])),
+//                                                     s_mul(v6,WInv8[30])),
+//                                                     s_mul(v7,WInv8[35]));
+//   v[6] = s_add(s_add(s_add(s_add(s_add(s_add(s_add( v0,
+//                                                     s_mul(v1,WInv8[6])),
+//                                                     s_mul(v2,WInv8[12])),
+//                                                     s_mul(v3,WInv8[18])),
+//                                                     s_mul(v4,WInv8[24])),
+//                                                     s_mul(v5,WInv8[30])),
+//                                                     s_mul(v6,WInv8[36])),
+//                                                     s_mul(v7,WInv8[42]));
+//   v[7] = s_add(s_add(s_add(s_add(s_add(s_add(s_add( v0,
+//                                                     s_mul(v1,WInv8[7])),
+//                                                     s_mul(v2,WInv8[14])),
+//                                                     s_mul(v3,WInv8[21])),
+//                                                     s_mul(v4,WInv8[28])),
+//                                                     s_mul(v5,WInv8[35])),
+//                                                     s_mul(v6,WInv8[42])),
+//                                                     s_mul(v7,WInv8[49]));
+// }
 
 __host__ __device__ int expand(int idxL, int N1, int N2){
 	return (idxL/N1)*N1*N2 + (idxL%N1);
@@ -1022,12 +1022,13 @@ __host__ cuyasheint_t* CUDAFunctions::callPolynomialMul(cuyasheint_t *output,
     int RADIX;
     /*if(N % 8 == 0)
       RADIX = 8;
-    else*/ if(N % 4 == 0)
-      RADIX = 4;
-    else{
+    else*/ 
+    // if(N % 4 == 0)
+      // RADIX = 4;
+    // else{
       assert(N % 2 == 0);
       RADIX = 2;
-    }
+    // }
     // const int RADIX = 2;
     dim3 blockDim(std::min(N/RADIX,1024));
     dim3 gridDim(NPolis);
@@ -1304,7 +1305,7 @@ __host__ void CUDAFunctions::init(int N){
   free(h_W);
   free(h_WInv);
 
-    cufftResult fftResult;
+  cufftResult fftResult;
 
     // # of CRT residues
   const int batch = Polynomial::CRTPrimes.size();
@@ -1473,8 +1474,8 @@ __host__ void Polynomial::reduce(){
   
   // Until we debug reduction on GPU, we need this
   // #warning Polynomial reduction forced to HOST
-  // update_host_data();
-  // this->set_crt_computed(false);
+  update_host_data();
+  this->set_crt_computed(false);
 
   if(!this->get_crt_computed()){
     #ifdef VERBOSE
@@ -1491,7 +1492,7 @@ __host__ void Polynomial::reduce(){
       const unsigned int half = phi->deg()-1;     
 
       // #pragma omp parallel for
-      for(unsigned int i = 0;i <= half;i++){
+      for(unsigned int i = 0;(i <= half) && (i + half + 1 <= deg());i++){
         this->set_coeff(i,this->get_coeff(i)-this->get_coeff(i+half+1));
         this->set_coeff(i+half+1,0);
       }

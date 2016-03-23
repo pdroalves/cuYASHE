@@ -39,8 +39,9 @@ struct PolySuite
 
     PolySuite(){
         BOOST_TEST_MESSAGE("setup PolySuite");
+	std::cout << "CRT Primes of " << CRTPRIMESIZE << " bits" << std::endl;
 
-        degree = 8;
+        degree = 16;
 
         q = conv<ZZ>("77287149995192912462927307869L");
         Polynomial::global_mod = q; // Defines default GF(q)
@@ -491,17 +492,18 @@ BOOST_AUTO_TEST_CASE(multiplyByPolynomial)
       NTL::SetCoeff(b_ntl,i,conv<ZZ_p>(b.get_coeff(i)));
 
     Polynomial c = a*b;
+      std::cout << "c: " << (c.to_string()) <<std::endl;
     c.reduce();
 
     ZZ_pEX c_ntl = a_ntl*b_ntl;
     c_ntl %= conv<ZZ_pEX>(NTL_Phi);
 
+      std::cout << "a: " << (a.to_string()) <<std::endl;
+      std::cout << "b: " << (b.to_string()) <<std::endl;
+      std::cout << "c: " << (c.to_string()) <<std::endl;
+      std::cout << "c_ntl: " << c_ntl << " degree: " << NTL::deg(c_ntl) << std::endl << std::endl;
     #ifdef DEBUG
     if(c_ntl != c){
-      std::cout << "a: " << a << " degree: " << NTL::deg(a) <<std::endl;
-      std::cout << "b: " << b << " degree: " << NTL::deg(b) <<std::endl;
-      std::cout << "c: " << c << " degree: " << NTL::deg(c) <<std::endl;
-      std::cout << "c_ntl: " << c_ntl << " degree: " << NTL::deg(c_ntl) << std::endl << std::endl;
     }
     std::cout << "count: " << count << std::endl;
     #endif
