@@ -1,6 +1,6 @@
 BIN=../bin
 
-all: stockham stockham_ntt
+all: stockham stockham_ntt cufft
 
 addmul64:
 	nvcc -O2 -g -G addmul64.cu -o ../bin/addmul64 -lntl -lgmp -Xcompiler -O2 -m64
@@ -13,3 +13,6 @@ stockham:
 
 stockham_ntt:
 	g++ -O3 -g ./stockham_ntt.cpp ./stockham_ntt_reference.cpp -o $(BIN)/stockham_ntt -lm -std=c++11 -lntl -lgmp
+
+cufft:cufft.cu
+	nvcc -O3 cufft.cu -o $(BIN)/cufft -lcufft
