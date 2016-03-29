@@ -54,7 +54,7 @@ Ciphertext Ciphertext::operator*(Ciphertext &b){
 
   Ciphertext p;
   p.update_crt_spacing(g.get_crt_spacing());
-  g.icrt();
+  g.icrt(); 
   callCiphertextMulAux( p.d_bn_coefs, 
                         g.d_bn_coefs, 
                         Yashe::q, 
@@ -158,13 +158,13 @@ void Ciphertext::keyswitch(){
     int transform = CUFFTMUL;
   #endif
 
-  if(transform == NTTMUL)
+  // if(transform == NTTMUL)
     Ciphertext::keyswitch_mul(&P);
-  else  
-    for(int i = 0; i < Yashe::lwq; i ++){
-      Polynomial p = (P[i])*(Yashe::gamma[i]);
-      *this += p;
-    }
+  // else  
+  //   for(int i = 0; i < Yashe::lwq; i ++){
+  //     Polynomial p = (P[i])*(Yashe::gamma[i]);
+  //     *this += p;
+  //   }
 
   this->reduce();
 

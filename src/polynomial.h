@@ -968,7 +968,7 @@ class Polynomial{
 
         // Get primes
         // std::cout << "Primes: " << std::endl;
-        unsigned int count = 0;
+        // unsigned int count = 0;
 
         while( (M < (2*degree)*q*q) ){
             
@@ -1141,7 +1141,7 @@ class Polynomial{
        * n must be a hosts variable with a pointer to device memory
        */
 
-      cudaError_t result;
+      // cudaError_t result;
 
       bn_t u = get_reciprocal(n);
 

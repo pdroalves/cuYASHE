@@ -45,9 +45,9 @@ void Yashe::generate_keys(){
     std::cout << "f: " << f.to_string() << std::endl;
     #endif
     try{
-      // fInv = Polynomial::InvMod(f,phi);
+      fInv = Polynomial::InvMod(f,phi);
       // fInv.normalize();
-      fInv = f;
+      // fInv = f;
 
       break;
     } catch (exception& e)

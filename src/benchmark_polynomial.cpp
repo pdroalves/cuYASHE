@@ -21,7 +21,8 @@
 #define CUHEA 0
 #define CUHEB 1
 #define CUHEC 2
-// #define CUHEBENCHMARK CUHEA
+#define CUHED 3
+ // #define CUHEBENCHMARK CUHEA
 
 
 int main(int argc,char* argv[]){
@@ -136,6 +137,10 @@ int main(int argc,char* argv[]){
       #else
         #if CUHEBENCHMARK == CUHEC
           q = to_ZZ("21554205777836932311257790222775820395941902542645617275843070438676498155961571817910808995272187433051497282433670297800520799691688083743793L");
+        #else
+          #if CUHEBENCHMARK == CUHED
+	         q = to_ZZ("10791551");
+          #endif
         #endif
       #endif
     #endif
@@ -159,16 +164,18 @@ int main(int argc,char* argv[]){
 
 
   #ifndef CUHEBENCHMARK
-    for(int d = 1024;d <= 8192;d *= 2){
-    // for(int d = 4096;d <= 4096;d *= 2){
+    //for(int d = 1024;d <= 8192;d *= 2){
+     for(int d = 4096;d <= 4096;d *= 2){
   #else
     #if CUHEBENCHMARK == CUHEA
-      for(int d = 8192;d <= 8192;d *= 2){
+      for(int d = 4096;d <= 4096;d *= 2){
     #else
       #if CUHEBENCHMARK == CUHEB
-        for(int d = 16384;d <= 16384;d *= 2){
+        for(int d = 8192;d <= 8192;d *= 2){
       #else
         #if CUHEBENCHMARK == CUHEC
+          for(int d = 16384;d <= 32768;d *= 2){
+        #else
           for(int d = 32768;d <= 32768;d *= 2){
         #endif
       #endif
@@ -209,42 +216,42 @@ int main(int argc,char* argv[]){
     // /////////////////////////////////////////////
     // CRT/ICRT
     
-    Polynomial::random(&a,d-1);
-    a.update_device_data();
-    result = cudaDeviceSynchronize();
-    assert(result == cudaSuccess);
+    // Polynomial::random(&a,d-1);
+    // a.update_device_data();
+    // result = cudaDeviceSynchronize();
+    // assert(result == cudaSuccess);
 
-    clock_gettime( CLOCK_REALTIME, &start);
-    for(int i = 0; i < N;i++){
-      a.set_crt_computed(false);
-      a.crt();
-      result = cudaDeviceSynchronize();
-      assert(result == cudaSuccess);
-    }
-    clock_gettime( CLOCK_REALTIME, &stop);
-    diff = compute_time_ms(start,stop)/N;
-    std::cout << "CRT) Foward: " << diff << " ms" << std::endl;
-    crt << d << " " << diff  << std::endl;
+    // clock_gettime( CLOCK_REALTIME, &start);
+    // for(int i = 0; i < N;i++){
+    //   a.set_crt_computed(false);
+    //   a.crt();
+    //   result = cudaDeviceSynchronize();
+    //   assert(result == cudaSuccess);
+    // }
+    // clock_gettime( CLOCK_REALTIME, &stop);
+    // diff = compute_time_ms(start,stop)/N;
+    // std::cout << "CRT) Foward: " << diff << " ms" << std::endl;
+    // crt << d << " " << diff  << std::endl;
 
-    cudaMemGetInfo(&f, &t);
+    // cudaMemGetInfo(&f, &t);
 
-    Polynomial::random(&a,d-1);
-    a.update_device_data();
-    a.icrt();
-    result = cudaDeviceSynchronize();
-    assert(result == cudaSuccess);
+    // Polynomial::random(&a,d-1);
+    // a.update_device_data();
+    // a.icrt();
+    // result = cudaDeviceSynchronize();
+    // assert(result == cudaSuccess);
 
-    clock_gettime( CLOCK_REALTIME, &start);
-    for(int i = 0; i < N;i++){
-      a.set_icrt_computed(false);
-      a.icrt();
-      result = cudaDeviceSynchronize();
-      assert(result == cudaSuccess);
-    }
-    clock_gettime( CLOCK_REALTIME, &stop);
-    diff = compute_time_ms(start,stop)/N;
-    std::cout << "CRT) Inverse: " << diff << " ms" << std::endl;
-    icrt << d << " " << diff  << std::endl;
+    // clock_gettime( CLOCK_REALTIME, &start);
+    // for(int i = 0; i < N;i++){
+    //   a.set_icrt_computed(false);
+    //   a.icrt();
+    //   result = cudaDeviceSynchronize();
+    //   assert(result == cudaSuccess);
+    // }
+    // clock_gettime( CLOCK_REALTIME, &stop);
+    // diff = compute_time_ms(start,stop)/N;
+    // std::cout << "CRT) Inverse: " << diff << " ms" << std::endl;
+    // icrt << d << " " << diff  << std::endl;
 
     #ifndef CUHEBENCHMARK
       // /////////////////////////////////////////////
@@ -380,20 +387,20 @@ int main(int argc,char* argv[]){
       // clock_gettime( CLOCK_REALTIME, &start);
       // for(int i = 0; i < N;i++){
 
-      //   a += b;
+      //    a += b;
 
-      //   a.set_crt_computed(false);
-      //   a.set_icrt_computed(false);
-      //   b.set_crt_computed(false);
-      //   b.set_icrt_computed(false);
-      //   result = cudaDeviceSynchronize();
-      //   assert(result == cudaSuccess);
-      //   // c.release();
-      // }
-      // clock_gettime( CLOCK_REALTIME, &stop);
-      // diff = compute_time_ms(start,stop)/N;
-      // std::cout << "ADD) Time measured with memory copy: " << diff << " ms" << std::endl;
-      // gpu_add_with_memcopy << d << " " << diff  << std::endl;
+      //    a.set_crt_computed(false);
+      //    a.set_icrt_computed(false);
+      //    b.set_crt_computed(false);
+      //    b.set_icrt_computed(false);
+      //    result = cudaDeviceSynchronize();
+      //    assert(result == cudaSuccess);
+      //    // c.release();
+      //  }
+      //  clock_gettime( CLOCK_REALTIME, &stop);
+      //  diff = compute_time_ms(start,stop)/N;
+      //  std::cout << "ADD) Time measured with memory copy: " << diff << " ms" << std::endl;
+      //  gpu_add_with_memcopy << d << " " << diff  << std::endl;
 
       ///////////////////////////////////////
       // Time measured without memory copy //
@@ -434,16 +441,26 @@ int main(int argc,char* argv[]){
       // // MUL
       Polynomial::random(&a,d-1);
       Polynomial::random(&b,d-1);
-      a.update_crt_spacing(d);
+      a.update_crt_spacing(2*d);
       a.update_device_data();
-      b.update_crt_spacing(d);
+      b.update_crt_spacing(2*d);
       b.update_device_data();
       int needed_spacing = pow(2,ceil(log2(a.deg() + b.deg())));
 
       clock_gettime( CLOCK_REALTIME, &start);
       for(int i = 0; i < N;i++){
-        a *= b;
-        a.CRTSPACING = b.CRTSPACING;
+        CUDAFunctions::callPolynomialMul( a.get_device_crt_residues(),
+                                          a.get_device_crt_residues(),
+                                          false,
+                                          a.get_crt_spacing(),
+                                          b.get_device_crt_residues(),
+                                          false,
+                                          b.get_crt_spacing(),
+                                          needed_spacing,
+                                          Polynomial::CRTPrimes.size(),
+                                          a.get_stream()
+                                          );
+
         result = cudaDeviceSynchronize();
         assert(result == cudaSuccess);
         // c.release();
@@ -463,7 +480,7 @@ int main(int argc,char* argv[]){
         clock_gettime( CLOCK_REALTIME, &start);
         for(int Ns=1; Ns<N; Ns*=RADIX){
           CUDAFunctions::callNTT( 2*d, 
-                                  Polynomial::CRTPrimes.size(),
+                                  1,
                                   RADIX,
                                   CUDAFunctions::d_mulA,
                                   CUDAFunctions::d_mulAux,

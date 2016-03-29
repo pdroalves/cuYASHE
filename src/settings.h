@@ -4,8 +4,8 @@
 #include <cstdint>
 
 // This define the default transform for polynomial multiplication
- #define NTTMUL_TRANSFORM
-//#define CUFFTMUL_TRANSFORM
+// #define NTTMUL_TRANSFORM
+#define CUFFTMUL_TRANSFORM
 
 enum transforms {NTTMUL, CUFFTMUL};
 
@@ -15,7 +15,7 @@ enum transforms {NTTMUL, CUFFTMUL};
 #define PRIMES_BUCKET_SIZE 56                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     //
 extern const uint32_t PRIMES_BUCKET[];
 #else
-#define CRTPRIMESIZE 15 
+#define CRTPRIMESIZE 29 
 #define PRIMES_BUCKET_SIZE 200                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           //
 extern const uint32_t PRIMES_BUCKET[];
 #endif
