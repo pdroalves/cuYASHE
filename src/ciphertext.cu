@@ -53,13 +53,13 @@ Ciphertext Ciphertext::operator*(Ciphertext &b){
   g = Yashe::t*g;
 
   Ciphertext p;
-  p.update_crt_spacing(g.get_crt_spacing());
-  g.icrt(); 
-  callCiphertextMulAux( p.d_bn_coefs, 
-                        g.d_bn_coefs, 
-                        Yashe::q, 
-                        g.deg()+1, 
-                        get_stream());
+  // p.update_crt_spacing(g.get_crt_spacing());
+  // g.icrt(); 
+  // callCiphertextMulAux( p.d_bn_coefs, 
+  //                       g.d_bn_coefs, 
+  //                       Yashe::q, 
+  //                       g.deg()+1, 
+  //                       get_stream());
   
   p.aftermul = true;
   p.level = std::max(this->level,b.level)+1;

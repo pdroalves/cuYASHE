@@ -281,7 +281,7 @@ int main(int argc, char* argv[]){
     ZZ_pE::init(NTL_Phi);
 
     Polynomial::gen_crt_primes(Polynomial::global_mod,d);
-    CUDAFunctions::init(2*d);
+    CUDAFunctions::init(d);
     
     std::cout << "CRT primes generated in " << diff << " ms." << std::endl;
     std::cout << "q: " << NTL::NumBytes(q)*8 << " bits" << std::endl;

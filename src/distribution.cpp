@@ -162,6 +162,8 @@ void Distribution::generate_sample(Polynomial *p,int mod,int degree){
   callCuGetUniformSampleCRT(p->get_device_crt_residues(), degree +1,Polynomial::CRTPrimes.size(), mod);
   p->set_icrt_computed(false);
   p->set_crt_computed(true);
+  p->set_itransf_computed(false);
+  p->set_transf_computed(false);
   p->set_host_updated(false);
   
   ///////////////////////////////////////
@@ -196,6 +198,7 @@ Polynomial Distribution::get_sample(int degree,int spacing){
   }
 
   p.set_coeffs(degree+1);
+  // p.update_crt_spacing(2*(degree+1));
   generate_sample(&p,mod,degree);
   return p;
 }
@@ -220,6 +223,13 @@ Polynomial Distribution::get_sample(Polynomial *p, int degree){
     break;
   }
 
+
+  p->set_icrt_computed(false);
+  p->set_crt_computed(false);
+  p->set_itransf_computed(false);
+  p->set_transf_computed(false);
+  p->set_host_updated(true);
+  p->update_crt_spacing(2*(degree+1));
   p->set_coeffs(degree+1);
   generate_sample(p,mod,degree);
   return p;

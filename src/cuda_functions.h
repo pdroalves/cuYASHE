@@ -17,6 +17,8 @@ NTL_CLIENT
 // cuyasheint_t *CRTPrimesGlobal;
 typedef double2 Complex;
 
+
+__host__ bool is_power_of(uint64_t a, uint64_t b);
 class CUDAFunctions{
   public:
   	static int N;
@@ -92,16 +94,11 @@ class CUDAFunctions{
                                                                                 int signal_size,
                                                                                 int N,
                                                                                 cudaStream_t stream);
-    static cuyasheint_t* callPolynomialMul( cuyasheint_t *d_result,
-                                            cuyasheint_t *a,
-                                            const bool realign_A,
-                                            const int A_N,
-                                            cuyasheint_t *b,
-                                            const bool realign_B,
-                                            const int B_N,
-                                            const int N,
-                                            const int NPolis,
-                                            cudaStream_t stream);
+    static cuyasheint_t* callPolynomialMul(cuyasheint_t *output,
+                                                        cuyasheint_t *a,
+                                                        cuyasheint_t *b,
+                                                        const int size,
+                                                        cudaStream_t stream);
     static cuyasheint_t* callPolynomialOPInteger( const int opcode,
                                             cudaStream_t stream,
                                             cuyasheint_t *a,

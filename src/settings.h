@@ -4,8 +4,8 @@
 #include <cstdint>
 
 // This define the default transform for polynomial multiplication
-// #define NTTMUL_TRANSFORM
-#define CUFFTMUL_TRANSFORM
+#define NTTMUL_TRANSFORM
+// #define CUFFTMUL_TRANSFORM
 
 enum transforms {NTTMUL, CUFFTMUL};
 

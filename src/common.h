@@ -48,7 +48,7 @@ P common_addition(P *a,P *b){
 	      #ifdef VERBOSE
       	  std::cout << "a: " << std::endl;
       	  #endif
-	      if(!a->get_crt_computed()){
+	      if(!a->get_transf_computed()){
 	        a->update_device_data();
 	      }
 
@@ -58,7 +58,7 @@ P common_addition(P *a,P *b){
 	      #ifdef VERBOSE
        	  std::cout << "b: " << std::endl;
       	  #endif
-       	  if(!b->get_crt_computed()){
+       	  if(!b->get_transf_computed()){
 	        b->update_device_data();
 	      }
 	    }
@@ -74,9 +74,11 @@ P common_addition(P *a,P *b){
 
 	c.set_host_updated(false);
 	c.set_icrt_computed(false);
-	c.set_crt_computed(true);
-	return c;
+	c.set_crt_computed(false);
+	c.set_itransf_computed(false);
+	c.set_transf_computed(true);
 
+	return c;
 }
 
 template <class P>
@@ -109,14 +111,14 @@ void common_addition_inplace(P *a,P *b){
 		// #pragma omp section
 		{
 
-			if(!a->get_crt_computed()){
+			if(!a->get_transf_computed()){
 				a->update_device_data();
 			}
 
 		}
 		// #pragma omp section
 		{
-			if(!b->get_crt_computed()){
+			if(!b->get_transf_computed()){
 				b->update_device_data();
 			}
 		}
@@ -131,171 +133,124 @@ void common_addition_inplace(P *a,P *b){
 
 	a->set_host_updated(false);
 	a->set_icrt_computed(false);
-	a->set_crt_computed(true);
+	a->set_crt_computed(false);
+	a->set_itransf_computed(false);
+	a->set_transf_computed(true);
 }
 
 template <class P>
 P* common_multiplication(P *a, P *b){
-  // Check align
-  int needed_spacing = pow(2,ceil(log2(a->deg() + b->deg())));
-  
-  if(needed_spacing < CUDAFunctions::N)
-	needed_spacing = CUDAFunctions::N;
-  else if(needed_spacing != CUDAFunctions::N)
-	// Re-compute W matrix
-	CUDAFunctions::init(needed_spacing);
-  
-  
-  bool update_A_spacing = false; 
-  bool update_B_spacing = false;
-  if(CUDAFunctions::transform == NTTMUL){
-	if(a->CRTSPACING != needed_spacing)
-	  a->update_crt_spacing(needed_spacing);
-	if(b->CRTSPACING != needed_spacing)
-	  b->update_crt_spacing(needed_spacing);
-  }else{
-  if(a->get_crt_spacing() != needed_spacing)
-	  	update_A_spacing = true;  	
-  
-  if(b->get_crt_spacing() != needed_spacing)
-	  	update_B_spacing = true;
-  }
-  #ifdef VERBOSE
-  std::cout << "Mul with CRTSPACING " << needed_spacing << std::endl;
-  // std::cout << "this: " << a->to_string() << std::endl;
-  // std::cout << "other " << b->to_string() << std::endl;
-  #endif
+	// P should be Polynomial or Ciphertext
+	#ifdef VERBOSE
+	std::cout << "Operator+ on GPU" << std::endl;
+	#endif
+		// Check align
+	int new_spacing = std::max(a->CRTSPACING,b->CRTSPACING);
+	if(a->CRTSPACING != b->CRTSPACING){
+	  a->update_crt_spacing(new_spacing);
+	  b->update_crt_spacing(new_spacing);
+	}
 
-  // Apply CRT and copy data to global memory, if needed
-  // #pragma omp sections
-  {
-      // #pragma omp section
-      {	
-		#ifdef VERBOSE
-		std::cout << "a" << std::endl;
-		#endif
-		if(!a->get_crt_computed()){
-			a->update_device_data();
-		}
+	#ifdef VERBOSE
+	std::cout << "Add with CRTSPACING" << a->get_crt_spacing() << std::endl;
+	// std::cout << "this: " << a->to_string() << std::endl;
+	// std::cout << "other " << b->to_string() << std::endl;
+	#endif
 
-      }
-      // #pragma omp section
-      {
-		#ifdef VERBOSE
-		std::cout << "b" << std::endl;
-		#endif
-		if(!b->get_crt_computed()){
-			b->update_device_data();
-		}
-      }
-  }
-  // start = get_cycles();
+	// Apply CRT and copy data to global memory, if needed
+	// #pragma omp parallel sections num_threads(2)
+	{
+	    // #pragma omp section
+	    {
+	      #ifdef VERBOSE
+      	  std::cout << "a: " << std::endl;
+      	  #endif
+	      if(!a->get_transf_computed()){
+	        a->update_device_data();
+	      }
 
-  P *c = new P(a->get_mod(),a->get_phi(),needed_spacing);
-  cuyasheint_t *d_result = c->get_device_crt_residues();
-  if(a->get_crt_spacing() > 0 && b->get_crt_spacing() > 0)
-	  d_result = CUDAFunctions::callPolynomialMul(	d_result,
-													a->get_device_crt_residues(),
-													update_A_spacing,
-													a->get_crt_spacing(),
-													b->get_device_crt_residues(),
-													update_B_spacing,
-													b->get_crt_spacing(),
-													needed_spacing,
-													a->CRTPrimes.size(),
-				  									a->get_stream()
-									);
-  c->set_device_crt_residues(d_result);
-  c->set_host_updated(false);
-  c->set_icrt_computed(false);
-  c->set_crt_computed(true);
+	    }
+	    // #pragma omp section
+	    {
+	      #ifdef VERBOSE
+       	  std::cout << "b: " << std::endl;
+      	  #endif
+       	  if(!b->get_transf_computed()){
+	        b->update_device_data();
+	      }
+	    }
+	}
 
-  // cudaError_t result = cudaDeviceSynchronize();
-  // assert(result == cudaSuccess);
-  return c;
+	P *c = new P(a->get_mod(),a->get_phi(),new_spacing);
+	CUDAFunctions::callPolynomialMul(  	c->get_device_crt_residues(),
+										a->get_device_crt_residues(),
+										b->get_device_crt_residues(),
+										(int)(a->CRTSPACING*P::CRTPrimes.size()),
+										a->get_stream());
+
+	c->set_host_updated(false);
+	c->set_icrt_computed(false);
+	c->set_crt_computed(false);
+	c->set_itransf_computed(false);
+	c->set_transf_computed(true);
+
+	return c;
 }
 
 template <class P>
 void common_multiplication_inplace(P *a, P *b){
+	// P should be Polynomial or Ciphertext
+	//////////////////////////////////
+	// Store result in polynomial a //
+	//////////////////////////////////
+	
+	#ifdef VERBOSE
+	std::cout << "Operator+= on GPU" << std::endl;
+	#endif
 
-  //////////////////////////////////
-  // Store result in polynomial a //
-  //////////////////////////////////
-  // Check align
-  int needed_spacing = pow(2,ceil(log2(std::max(a->get_crt_spacing(),b->get_crt_spacing()))));
-  
-  if(needed_spacing < CUDAFunctions::N)
-	needed_spacing = CUDAFunctions::N;
-  else if(needed_spacing != CUDAFunctions::N)
-	// Re-compute W matrix
-	CUDAFunctions::init(needed_spacing);
-  
-  
-  bool update_A_spacing = false; 
-  bool update_B_spacing = false;
-  if(CUDAFunctions::transform == NTTMUL){
-	if(a->CRTSPACING != needed_spacing)
-	  a->update_crt_spacing(needed_spacing);
-	if(b->CRTSPACING != needed_spacing)
-	  b->update_crt_spacing(needed_spacing);
-  }else{
-  if(a->get_crt_spacing() != needed_spacing)
-	  	update_A_spacing = true;  	
-  
-  if(b->get_crt_spacing() != needed_spacing)
-	  	update_B_spacing = true;
-  }
+	// Check align
+	int new_spacing = std::max(a->CRTSPACING,b->CRTSPACING);
+	if(a->CRTSPACING != b->CRTSPACING){
+	  a->update_crt_spacing(new_spacing);
+	  b->update_crt_spacing(new_spacing);
+	}
 
-  #ifdef VERBOSE
-  std::cout << "Mul with CRTSPACING " << needed_spacing << std::endl;
-  // std::cout << "this: " << a->to_string() << std::endl;
-  // std::cout << "other " << b->to_string() << std::endl;
-  #endif
+	#ifdef VERBOSE
+	std::cout << "Add with CRTSPACING" << a->get_crt_spacing() << std::endl;
+	// std::cout << "this: " << a->to_string() << std::endl;
+	// std::cout << "other " << b->to_string() << std::endl;
+	#endif
 
-  // Apply CRT and copy data to global memory, if needed
-  // #pragma omp sections
-  {
-      // #pragma omp section
-      {	
-		#ifdef VERBOSE
-		std::cout << "a" << std::endl;
-		#endif
-		if(!a->get_crt_computed()){
-			a->update_device_data();
+	// Apply CRT and copy data to global memory, if needed
+	// #pragma omp parallel sections num_threads(2)
+	{
+		// #pragma omp section
+		{
+
+			if(!a->get_transf_computed()){
+				a->update_device_data();
+			}
+
 		}
-
-      }
-      // #pragma omp section
-      {
-		#ifdef VERBOSE
-		std::cout << "b" << std::endl;
-		#endif
-		if(!b->get_crt_computed()){
-			b->update_device_data();
+		// #pragma omp section
+		{
+			if(!b->get_transf_computed()){
+				b->update_device_data();
+			}
 		}
-      }
-  }
-  // start = get_cycles();
-  cuyasheint_t *d_result = a->get_device_crt_residues();
-  if(a->get_crt_spacing() > 0 && b->get_crt_spacing() > 0)
-	  d_result = CUDAFunctions::callPolynomialMul(  a->get_device_crt_residues(),
-													a->get_device_crt_residues(),
-													update_A_spacing,
-													a->get_crt_spacing(),
-													b->get_device_crt_residues(),
-													update_B_spacing,
-													b->get_crt_spacing(),
-													needed_spacing,
-													a->CRTPrimes.size(),
-				  									a->get_stream()
-												);
-  a->set_device_crt_residues(d_result);
-  a->set_host_updated(false);
-  a->set_icrt_computed(false);
-  a->set_crt_computed(true);
+	}
 
-  // cudaError_t result = cudaDeviceSynchronize();
-  // assert(result == cudaSuccess);
-  return ;
+
+	CUDAFunctions::callPolynomialMul(   a->get_device_crt_residues(),
+										a->get_device_crt_residues(),
+										b->get_device_crt_residues(),
+										(int)(a->CRTSPACING*P::CRTPrimes.size()),
+										a->get_stream());
+
+	a->set_host_updated(false);
+	a->set_icrt_computed(false);
+	a->set_crt_computed(false);
+	a->set_itransf_computed(false);
+	a->set_transf_computed(true);
 }
 #endif

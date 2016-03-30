@@ -185,13 +185,14 @@ BOOST_AUTO_TEST_CASE(simpleAdd)
   Polynomial b(a);//Copy
   Polynomial c = a+b;
   c.update_host_data();//
+  c.normalize();
 
-  #ifdef VERBOSE
+  // #ifdef VERBOSE
   std::cout << "a: " << a.to_string() << std::endl;
   std::cout << "b: " << b.to_string() << std::endl;
   std::cout << "c: " << c.to_string() << std::endl;
-  #endif
-  BOOST_REQUIRE(c == (a*2)%(c.get_mod()));
+  // #endif
+  BOOST_REQUIRE(c == (a*2));
 }
 
 BOOST_AUTO_TEST_CASE(multipleAdds)
@@ -424,8 +425,6 @@ BOOST_AUTO_TEST_CASE(simpleMultiplyByPolynomial)
   Polynomial a;
   Polynomial b;
 
-  CUDAFunctions::init(2*degree);
-
   a.set_coeffs(degree);
   b.set_coeffs(degree);
   for(int i = 0; i < degree;i++){
@@ -442,7 +441,7 @@ BOOST_AUTO_TEST_CASE(simpleMultiplyByPolynomial)
 
   Polynomial c = a*b;
   c.reduce();
-  c.normalize();
+  // c.normalize();
 
   ZZ_pEX c_ntl = a_ntl*b_ntl;
   c_ntl %= conv<ZZ_pEX>(NTL_Phi);

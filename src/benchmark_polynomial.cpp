@@ -451,13 +451,8 @@ int main(int argc,char* argv[]){
       for(int i = 0; i < N;i++){
         CUDAFunctions::callPolynomialMul( a.get_device_crt_residues(),
                                           a.get_device_crt_residues(),
-                                          false,
-                                          a.get_crt_spacing(),
                                           b.get_device_crt_residues(),
-                                          false,
-                                          b.get_crt_spacing(),
-                                          needed_spacing,
-                                          Polynomial::CRTPrimes.size(),
+                                          needed_spacing*Polynomial::CRTPrimes.size(),
                                           a.get_stream()
                                           );
 

@@ -49,6 +49,8 @@ class Polynomial{
       this->set_host_updated(true);
       this->set_crt_computed(false);
       this->set_icrt_computed(false);
+      this->set_transf_computed(false);
+      this->set_itransf_computed(false);
       if(Polynomial::global_mod > 0)
         // If a global mod is defined, use it
         this->mod = Polynomial::global_mod; // Doesn't copy. Uses the reference.
@@ -81,6 +83,8 @@ class Polynomial{
       this->set_host_updated(true);
       this->set_crt_computed(false);
       this->set_icrt_computed(false);
+      this->set_transf_computed(false);
+      this->set_itransf_computed(false);
       this->mod = ZZ(p);// Copy
 
       if(Polynomial::global_phi){
@@ -108,6 +112,8 @@ class Polynomial{
       this->set_host_updated(true);
       this->set_crt_computed(false);
       this->set_icrt_computed(false);
+      this->set_transf_computed(false);
+      this->set_itransf_computed(false);
       this->mod = ZZ(p);// Copy
       this->phi = &P;// Copy
 
@@ -134,6 +140,8 @@ class Polynomial{
       this->set_host_updated(true);
       this->set_crt_computed(false);
       this->set_icrt_computed(false);
+      this->set_transf_computed(false);
+      this->set_itransf_computed(false);
       if(Polynomial::global_mod > 0){
         // If a global mod is defined, use it
         this->mod = Polynomial::global_mod; // Doesn't copy. Uses the reference.
@@ -164,6 +172,8 @@ class Polynomial{
       this->set_host_updated(true);
       this->set_crt_computed(false);
       this->set_icrt_computed(false);
+      this->set_transf_computed(false);
+      this->set_itransf_computed(false);
       this->mod = ZZ(p);// Copy
       this->phi = &P;// Copy
 
@@ -191,6 +201,8 @@ class Polynomial{
       this->set_host_updated(true);
       this->set_crt_computed(false);
       this->set_icrt_computed(false);
+      this->set_transf_computed(false);
+      this->set_itransf_computed(false);
       this->mod = ZZ(p);// Copy
 
       // CRT Spacing set to spacing
@@ -218,9 +230,12 @@ class Polynomial{
       this->d_bn_coefs = b->d_bn_coefs;
       this->h_bn_coefs = b->h_bn_coefs;
       this->d_polyCRT = b->d_polyCRT;
+      this->d_polyTransf = b->d_polyTransf;
 
       this->set_crt_computed(b->get_crt_computed());
       this->set_icrt_computed(b->get_icrt_computed());
+      this->set_transf_computed(b->get_transf_computed());
+      this->set_itransf_computed(b->get_itransf_computed());
       this->set_host_updated(b->get_host_updated());
 
       if(b->get_host_updated())
@@ -239,7 +254,7 @@ class Polynomial{
 
       this->update_crt_spacing(b.get_crt_spacing());
       if(b.get_icrt_computed()){
-        #warning this is wrong!
+        // #warning this is wrong!
         cudaError_t result = cudaMemcpyAsync(this->d_bn_coefs,b.d_bn_coefs,b.get_crt_spacing()*sizeof(bn_t),cudaMemcpyDeviceToDevice,b.get_stream());
         assert(result == cudaSuccess);
         assert(CRTSPACING > 0);
@@ -248,6 +263,8 @@ class Polynomial{
 
       this->set_crt_computed(b.get_crt_computed());
       this->set_icrt_computed(b.get_icrt_computed());
+      this->set_transf_computed(b.get_transf_computed());
+      this->set_itransf_computed(b.get_itransf_computed());
       this->set_host_updated(b.get_host_updated());
 
       if(b.get_crt_computed()){
@@ -613,7 +630,7 @@ class Polynomial{
     Polynomial operator/(ZZ b){
       Polynomial p(*this);
       if(!p.get_host_updated()){
-        #warning "Polynomial division on device not implemented!";
+        // #warning "Polynomial division on device not implemented!";
         p.update_host_data();
       }
 
@@ -687,6 +704,7 @@ class Polynomial{
         return false;
 
       for( int i = 0; i <= this->deg();i++){
+        std::cout << get_coeff(i) << " == " << b.get_coeff(i) << std::endl;
         if(this->get_coeff(i) != b.get_coeff(i))
           return false;
       }
@@ -739,7 +757,7 @@ class Polynomial{
       while(this->coefs.size() > 0 &&
             this->coefs.back() == 0)
         this->coefs.pop_back();
-      int new_spacing = pow(2,ceil(log2(deg())));
+      int new_spacing = 2*pow(2,ceil(log2(deg())));
       this->update_crt_spacing(new_spacing);
     }
     // gets and sets
@@ -801,8 +819,8 @@ class Polynomial{
         this->set_crt_computed(false);
         this->set_icrt_computed(false);
         this->set_host_updated(true);
-        if(this->get_crt_spacing() < (this->deg()+1))
-          this->update_crt_spacing(this->deg()+1);
+        // if(this->get_crt_spacing() < 2*(this->deg())+1)
+          // this->update_crt_spacing(2*(this->deg())+1);
     }
     void set_coeff(int index,int value){
 
@@ -828,9 +846,11 @@ class Polynomial{
       
       this->set_crt_computed(false);
       this->set_icrt_computed(false);
+      this->set_transf_computed(false);
+      this->set_itransf_computed(false);
       this->set_host_updated(true);
-      if(this->get_crt_spacing() < (this->deg()+1))
-        this->update_crt_spacing(this->deg()+1);  
+      // if(this->get_crt_spacing() < (2*(this->deg()+1)))
+        // this->update_crt_spacing(2*(this->deg()+1));  
     }
     void set_coeffs(std::vector<ZZ> values){
 
@@ -842,9 +862,11 @@ class Polynomial{
 
       this->set_crt_computed(false);
       this->set_icrt_computed(false);
+      this->set_transf_computed(false);
+      this->set_itransf_computed(false);
       this->set_host_updated(true);
-      if(this->get_crt_spacing() < (this->deg()+1))
-        this->update_crt_spacing(this->deg()+1);  
+      // if(this->get_crt_spacing() < (2*(this->deg()+1)))
+      //   this->update_crt_spacing(2*(this->deg()+1));  
     }
     void set_coeffs(){
 
@@ -1082,6 +1104,21 @@ class Polynomial{
         // #endif
       }
     }
+    bool get_transf_computed(){
+      bool b = this->TRANSF_COMPUTED;
+      return b;
+    }
+    void set_transf_computed(bool b){
+      this->TRANSF_COMPUTED = b;
+    }
+
+    bool get_itransf_computed(){
+      bool b = this->ITRANSF_COMPUTED;
+      return b;
+    }
+    void set_itransf_computed(bool b){
+      this->ITRANSF_COMPUTED = b;
+    }
     bool get_icrt_computed(){
       bool b = this->ICRT_COMPUTED;
 
@@ -1099,6 +1136,8 @@ class Polynomial{
     }
     void crt();
     void icrt();
+    void transf();
+    void itransf();
     void modn(ZZ n){
       cudaError_t result;
       
@@ -1181,8 +1220,9 @@ class Polynomial{
       }
       return true;
     }
-    void update_crt_spacing(const int spacing){
+    void update_crt_spacing(const int asked_spacing){
       
+      int spacing = asked_spacing; 
       #ifdef SPEEDCHECK
       std::cout << "update_crt_spacing - " << spacing << std::endl;
       #endif
@@ -1428,7 +1468,7 @@ class Polynomial{
     // static void XGCD(Polynomial &d, Polynomial &s,Polynomial &t, Polynomial &a,  Polynomial &b);
     static void BuildNthCyclotomic(Polynomial *phi, unsigned int n);
     static void random(Polynomial *a,const int degree){
-      a->set_coeffs(degree+1);
+      a->set_coeffs((degree+1));
 
       if(a->get_mod() > 0)
         for(int i = 0;i <= degree;i++)
@@ -1436,6 +1476,8 @@ class Polynomial{
       else
         for(int i = 0;i <= degree;i++)
           a->set_coeff(i,ZZ(rand()) % a->global_mod);
+      a->set_transf_computed(false);
+      a->set_itransf_computed(false);
       a->set_crt_computed(false);
       a->set_icrt_computed(false);
       a->set_host_updated(true);
@@ -1481,12 +1523,14 @@ class Polynomial{
     bool HOST_IS_UPDATED;
     bool CRT_COMPUTED;
     bool ICRT_COMPUTED;
+    bool TRANSF_COMPUTED;
+    bool ITRANSF_COMPUTED;
 
-    //Functions and methods
-    
-    //////////////////////////
-    // u = q * 2^(2*192)//q //
-    //////////////////////////
+    #ifdef NTTMUL
+    Complex *d_polyTransf = 0x0;
+    #else
+    cuyasheint_t *d_polyTransf = 0x0;
+    #endif
 
   protected:
     std::vector<ZZ> coefs;
