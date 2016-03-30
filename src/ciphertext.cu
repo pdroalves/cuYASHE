@@ -46,11 +46,11 @@ Ciphertext Ciphertext::operator*(Ciphertext &b){
   /**
    * At this point the function expects that [c1]_q and [c2]_q
    */
-  Polynomial g = common_multiplication<Polynomial>(this,&b);
+  Ciphertext g(common_multiplication<Polynomial>(this,&b));
 
   /**
    * This should not be necessary. 
-   * Someone need to modify Integer class to allow in-place multiplication
+   * Someone need to modify the Integer class to allow in-place multiplication
    */
   g.set_device_crt_residues( 
       CUDAFunctions::callPolynomialOPInteger( MUL,
@@ -60,25 +60,19 @@ Ciphertext Ciphertext::operator*(Ciphertext &b){
         g.get_crt_spacing(),
         Polynomial::CRTPrimes.size()
       )
-    );;
+    );
 
-  Ciphertext p(g.get_crt_spacing());
   g.icrt(); 
-  callCiphertextMulAux( p.d_bn_coefs, 
-                        g.d_bn_coefs, 
-                        Yashe::q, 
-                        g.deg()+1, 
-                        get_stream());
+  callCiphertextMulAux(g.d_bn_coefs, Yashe::q, g.deg(), g.get_stream());
   
-  p.aftermul = true;
-  p.level = std::max(this->level,b.level)+1;
-  p.set_crt_computed(false);
-  p.set_icrt_computed(true);
-  p.set_host_updated(false);
+  g.aftermul = true;
+  g.level = std::max(this->level,b.level)+1;
+  g.set_crt_computed(false);
+  g.set_icrt_computed(true);
+  g.set_host_updated(false);
 
   // g.release();
-  return p;
-
+  return g;
 }
 
 void Ciphertext::convert(){
@@ -126,54 +120,24 @@ void Ciphertext::keyswitch(){
   start = get_cycles();
   #endif
 
-  std::vector<Polynomial> P(Yashe::lwq,2*Polynomial::global_phi->deg()-1);
-
   /**
    * On Device
    */
   update_device_data();
   this->reduce();
-  if(Yashe::w == to_ZZ("4294967296")){
-    // Not used
-    bn_t W;
-    bn_t u_W;
-    //
-    
-    callWordDecomp<32>( &P,
-                        this->d_bn_coefs,
-                        Yashe::lwq,
-                        deg()+1,
-                        W,
-                        u_W,
-                        get_stream()
-                      );    
-  }else{
-    throw "Unknown Yashe::word";
+  assert(Yashe::w == to_ZZ("4294967296"));
+
+  callWordDecomp<32>( Yashe::P,
+                      this->d_bn_coefs,
+                      Yashe::lwq,
+                      deg()+1,
+                      get_stream()
+                    );    
+
+  for(int i = 0; i < Yashe::lwq; i ++){
+    Polynomial p = (Yashe::P->at(i))*(Yashe::gamma[i]);
+    *this += p;
   }
-  // std::cout << Yashe::w << std::endl;
-  // get_words(&W,Yashe::w);
-  // bn_t u_W = get_reciprocal(Yashe::w);
-
-   /**
-    * On Host
-    */
-  // if(Yashe::w == to_ZZ("4294967296")) 
-  //   worddecomp<32>(this,&P);
-  // else
-  //   throw "Unknown Yashe::word";
-  #ifdef NTTMUL_TRANSFORM
-    int transform = NTTMUL;
-  #else
-    int transform = CUFFTMUL;
-  #endif
-
-  if(transform == NTTMUL)
-    Ciphertext::keyswitch_mul(&P);
-  else  
-    for(int i = 0; i < Yashe::lwq; i ++){
-      Polynomial p = (P[i])*(Yashe::gamma[i]);
-      *this += p;
-    }
 
   this->reduce();
 

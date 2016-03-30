@@ -337,9 +337,9 @@ int main(int argc, char* argv[]){
     std::cout << "Homomorphic Multiplication) Time measured without memory copy: " << diff << " ms" << std::endl;
     mult_without_memcopy << d << " " << diff << std::endl;;
 
-    // diff = runKeyswitch(cipher, d);
-    // std::cout << "KeySwitch) Time measured with memory copy: " << diff << " ms" << std::endl;
-    // keyswitch << d << " " << diff << std::endl;;
+    diff = runKeyswitch(cipher, d);
+    std::cout << "KeySwitch) Time measured with memory copy: " << diff << " ms" << std::endl;
+    keyswitch << d << " " << diff << std::endl;;
   }
   cudaDeviceReset();
 }

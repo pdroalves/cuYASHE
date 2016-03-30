@@ -19,6 +19,7 @@ class Yashe{
     static int d;
     static Polynomial phi;
     static ZZ q;
+    static bn_t qDiv2;
     static Integer t;
     static Integer delta;
     static ZZ w;
@@ -28,6 +29,7 @@ class Yashe{
     static Polynomial ff;
     static int lwq;
     static ZZ WDMasking;
+    static std::vector<Polynomial> P;
     Yashe(){
       const int sigma_err = 8;
       const float gaussian_std_deviation = sigma_err*0.4;

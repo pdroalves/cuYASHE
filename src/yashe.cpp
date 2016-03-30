@@ -4,6 +4,7 @@
 int Yashe::d = 0;
 Polynomial Yashe::phi = Polynomial();
 ZZ Yashe::q = ZZ(0);
+bn_t Yashe::qDiv2;
 Integer Yashe::t = 0;
 Integer Yashe::delta = 0;
 ZZ Yashe::w = ZZ(0);
@@ -13,6 +14,8 @@ std::vector<Polynomial> Yashe::gamma;
 Polynomial Yashe::f = Polynomial();
 Polynomial Yashe::ff = Polynomial();
 ZZ Yashe::WDMasking = ZZ(0);
+std::vector<Polynomial> Yashe::P;
+
 
 void Yashe::generate_keys(){
   #ifdef DEBUG
@@ -24,8 +27,6 @@ void Yashe::generate_keys(){
   std::cout << "w: " << w << std::endl;
   std::cout << "R: " << Polynomial::global_mod << std::endl;
   #endif
-
-  delta = (q/t.get_value()); // q/t
 
   Polynomial g = this->xkey.get_sample(phi.deg()-1);
   #ifdef DEBUG
@@ -95,9 +96,39 @@ void Yashe::generate_keys(){
   // Word decomp mask
   WDMasking = NTL::LeftShift(ZZ(1),NumBits(Yashe::w))-1;
 
-  // Intialize the samples used by encrypt()
+  //////////////////////////////////
+  // Init static variables
   Yashe::ps.update_crt_spacing(2*phi.deg()-1);
   Yashe::e.update_crt_spacing(phi.deg()-1);
+  //////////////////////////////////
+  get_words(&qDiv2,q/2);
+  //////////////////////////////////
+  delta = (q/t.get_value()); // q/t
+  //////////////////////////////////
+  bn_t *d_P;
+  const int N = 2*Polynomial::global_phi->deg()-1;
+  const int size = N*lwq;
+
+  P.resize(lwq,N);
+  cudaError_t result = cudaMalloc((void**)&d_P,size*sizeof(bn_t));
+  assert(result == cudaSuccess);
+
+  bn_t *h_P;
+  h_P = (bn_t*)malloc(size*sizeof(bn_t));
+
+  // #pragma omp parallel for
+  for(int i = 0; i < size; i++)
+    get_words(&h_P[i],to_ZZ(0));
+
+  result = cudaMemcpy(d_P,h_P,size*sizeof(bn_t),cudaMemcpyHostToDevice);
+  assert(result == cudaSuccess);
+
+  for(int i = 0; i < lwq;i++){
+    // cudaFree(P[i].d_bn_coefs);
+    P[i].d_bn_coefs = d_P + i*N;
+  }
+  free(h_P);
+  /////
   #ifdef VERBOSE
   std::cout << "Keys generated." << std::endl;
   #endif
@@ -157,12 +188,22 @@ Polynomial Yashe::decrypt(Ciphertext c){
   }
   m.reduce();
 
-  // m *= Yashe::t;
+  m.set_device_crt_residues( 
+    CUDAFunctions::callPolynomialOPInteger( MUL,
+      m.get_stream(),
+      m.get_device_crt_residues(),
+      Yashe::t.get_device_crt_residues(),
+      m.get_crt_spacing(),
+      Polynomial::CRTPrimes.size()
+    )
+  );
   m.icrt();
-  // callCiphertextMulAuxMersenne( m.d_bn_coefs, 
-  //                               Yashe::q, 
-  //                               m.get_crt_spacing(), 
-  //                               m.get_stream());
+  callMersenneDiv(  m.d_bn_coefs, 
+                    Yashe::q, 
+                    m.get_crt_spacing(), 
+                    m.get_stream());
+  m.set_transf_computed(false);
+  m.set_itransf_computed(false);
   m.set_crt_computed(false);
   m.set_icrt_computed(true);
   m.set_host_updated(false);

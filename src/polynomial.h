@@ -318,6 +318,8 @@ class Polynomial{
 
       this->set_crt_computed(b.get_crt_computed());
       this->set_icrt_computed(b.get_icrt_computed());
+      this->set_transf_computed(b.get_transf_computed());
+      this->set_itransf_computed(b.get_itransf_computed());
       this->set_host_updated(b.get_host_updated());
 
       if(b.get_host_updated())

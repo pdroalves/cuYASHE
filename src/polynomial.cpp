@@ -157,7 +157,7 @@ void get_words(bn_t *b,ZZ a){
     if(used >= alloc){
       h_dp = (cuyasheint_t*)realloc(h_dp,alloc+STD_BNT_WORDS_ALLOC);
       alloc += STD_BNT_WORDS_ALLOC;
-      std::cout << "get_words realloc!" << std::endl;
+      std::cout << "get_words realloc! This shouldn't happen." << std::endl;
     }
     h_dp[used] = conv<uint64_t>(x);
   }
@@ -275,7 +275,7 @@ void Polynomial::transf(){
   int N = (get_crt_spacing());
 
   #ifdef NTTMUL_TRANSFORM
-  std::cout << "Transform" << std::endl;
+  // std::cout << "Transform" << std::endl;
 
   // int size = N*Polynomial::CRTPrimes.size();
 
@@ -311,7 +311,7 @@ void Polynomial::itransf(){
   int N = get_crt_spacing();
 
   #ifdef NTTMUL_TRANSFORM
-  std::cout << "Inverse Transform" << std::endl;
+  // std::cout << "Inverse Transform" << std::endl;
   // int size = N*Polynomial::CRTPrimes.size();
 
   // cudaError_t result = cudaMemsetAsync(CUDAFunctions::d_mulAux,
