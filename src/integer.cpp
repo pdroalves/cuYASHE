@@ -205,7 +205,9 @@ Polynomial Integer::operator*(Polynomial &a){
     p.set_device_crt_residues(d_result);
     p.set_host_updated(false);
     p.set_icrt_computed(false);
-    p.set_crt_computed(true);
+    p.set_crt_computed(false);
+    p.set_itransf_computed(false);
+    p.set_transf_computed(true);
       
   }else if (get_icrt_computed()){
     assert(p.d_bn_coefs);
@@ -217,6 +219,8 @@ Polynomial Integer::operator*(Polynomial &a){
                                       );
     p.set_crt_computed(false);
     p.set_host_updated(false);
+    p.set_itransf_computed(false);
+    p.set_transf_computed(false);
   }else{
     throw "Don't know how to multiply";
   }

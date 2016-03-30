@@ -275,7 +275,7 @@ void Polynomial::transf(){
   int N = (get_crt_spacing());
 
   #ifdef NTTMUL_TRANSFORM
-  // std::cout << "Transform" << std::endl;
+  std::cout << "Transform" << std::endl;
 
   // int size = N*Polynomial::CRTPrimes.size();
 
@@ -311,7 +311,7 @@ void Polynomial::itransf(){
   int N = get_crt_spacing();
 
   #ifdef NTTMUL_TRANSFORM
-  // std::cout << "Inverse Transform" << std::endl;
+  std::cout << "Inverse Transform" << std::endl;
   // int size = N*Polynomial::CRTPrimes.size();
 
   // cudaError_t result = cudaMemsetAsync(CUDAFunctions::d_mulAux,

@@ -1244,7 +1244,7 @@ class Polynomial{
         std::cout << "No need to update crt spacing." << std::endl;
         #endif
         return;
-      }else if(!get_crt_computed()){
+      }else if(!(get_crt_computed() || get_transf_computed())){
         update_host_data();
         
         #ifdef SPEEDCHECK

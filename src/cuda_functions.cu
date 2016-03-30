@@ -1309,13 +1309,9 @@ __host__ void Polynomial::reduce(){
   
   // Until we debug reduction on GPU, we need this
   // #warning Polynomial reduction forced to HOST
-  update_host_data();
-  this->set_crt_computed(false);
-  this->set_icrt_computed(false);
-  this->set_transf_computed(false);
-  this->set_itransf_computed(false);
+  // update_host_data();
 
-  if(!this->get_crt_computed()){
+  if(!(this->get_crt_computed() || this->get_transf_computed())){
     #ifdef VERBOSE
     std::cout << "Reduce on host." << std::endl;
     #endif
@@ -1338,8 +1334,13 @@ __host__ void Polynomial::reduce(){
       throw "Reduce: I don't know how to compute this!";
     }
     *this %= q;
-    this->normalize();
-    // this->update_crt_spacing(this->deg()+1);
+    normalize();
+    set_crt_computed(false);
+    set_icrt_computed(false);
+    set_transf_computed(false);
+    set_itransf_computed(false);
+    set_host_updated(true);
+    // update_crt_spacing(deg()+1);
   }else{
 
     #ifdef VERBOSE
@@ -1353,8 +1354,8 @@ __host__ void Polynomial::reduce(){
      // Polynomial reduction applied on CRT residues //
      //////////////////////////////////////////////////
     const int half = phi->deg()-1;
-    const int N = this->get_crt_spacing();
-    const int NPolis = this->CRTPrimes.size();
+    const int N = get_crt_spacing();
+    const int NPolis = CRTPrimes.size();
     int size = (N-half)*NPolis;
 
     if(size > 0){
@@ -1363,7 +1364,7 @@ __host__ void Polynomial::reduce(){
       /**
        * Polynomial reduction
        */
-      polynomialReductionCRT<<< gridDim,blockDim, 0, this->get_stream()>>>( this->get_device_crt_residues(),
+      polynomialReductionCRT<<< gridDim,blockDim, 0, get_stream()>>>( get_device_crt_residues(),
                                                                             half,
                                                                             N,
                                                                             NPolis);
@@ -1374,9 +1375,11 @@ __host__ void Polynomial::reduce(){
        * The polynomial reduction on CRT residues may generate erroneous values because of underflows.
        * To solve this we must apply ICRT at this point and call a routine to adjust the coefficients.  
        */
-      this->set_host_updated(false);
-      this->set_crt_computed(true);
-      this->set_icrt_computed(false);
+      set_crt_computed(true);
+      set_icrt_computed(false);
+      set_transf_computed(false);
+      set_itransf_computed(false);
+      set_host_updated(false);
       
       icrt();
       bn_t Q;
@@ -1388,8 +1391,12 @@ __host__ void Polynomial::reduce(){
       dim3 gridDimFix(size/ADDBLOCKXDIM + (size % ADDBLOCKXDIM == 0? 0:1));
       cuICRTFix<<< gridDimFix,blockDim,0,get_stream()>>>(d_bn_coefs, N, Q,get_reciprocal(q),Q2);      
 
-      set_icrt_computed(true);
       set_crt_computed(false);
+      set_icrt_computed(true);
+      set_transf_computed(false);
+      set_itransf_computed(false);
+      set_host_updated(false);
+
     }
     #else
     //////////////////////////////////////////////////
@@ -1417,14 +1424,16 @@ __host__ void Polynomial::reduce(){
       cudaError_t result = cudaGetLastError();
       assert(result == cudaSuccess);
       
-      this->set_host_updated(false);
-      this->set_crt_computed(false);
-      this->set_icrt_computed(true);
+      set_crt_computed(false);
+      set_icrt_computed(true);
+      set_transf_computed(false);
+      set_itransf_computed(false);
+      set_host_updated(false);
 
       result = cudaDeviceSynchronize();
       assert(result == cudaSuccess);
 
-      this->set_crt_computed(false);
+      set_crt_computed(false);
       modn(q);
     }
 

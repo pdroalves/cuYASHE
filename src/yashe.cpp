@@ -124,7 +124,7 @@ Ciphertext Yashe::encrypt(Polynomial m){
   ps *= h;
   e += mdelta;
   e += ps;
-  // e.reduce();
+  e.reduce(); // Bad bad performance
 
   Ciphertext c = e;
   return c;
@@ -159,10 +159,10 @@ Polynomial Yashe::decrypt(Ciphertext c){
 
   // m *= Yashe::t;
   m.icrt();
-  callCiphertextMulAuxMersenne( m.d_bn_coefs, 
-                                Yashe::q, 
-                                m.get_crt_spacing(), 
-                                m.get_stream());
+  // callCiphertextMulAuxMersenne( m.d_bn_coefs, 
+  //                               Yashe::q, 
+  //                               m.get_crt_spacing(), 
+  //                               m.get_stream());
   m.set_crt_computed(false);
   m.set_icrt_computed(true);
   m.set_host_updated(false);

@@ -30,6 +30,8 @@ class Ciphertext: public Polynomial{
       this->set_crt_computed(p.get_crt_computed());
       this->set_icrt_computed(p.get_icrt_computed());
       this->set_host_updated(p.get_host_updated());
+      this->set_transf_computed(p.get_transf_computed());
+      this->set_itransf_computed(p.get_itransf_computed());
 
       if(p.get_host_updated())
         set_coeffs(p.get_coeffs());
@@ -53,6 +55,8 @@ class Ciphertext: public Polynomial{
       this->set_crt_computed(p->get_crt_computed());
       this->set_icrt_computed(p->get_icrt_computed());
       this->set_host_updated(p->get_host_updated());
+      this->set_transf_computed(p->get_transf_computed());
+      this->set_itransf_computed(p->get_itransf_computed());
 
       if(p->get_host_updated())
         set_coeffs(p->get_coeffs());
@@ -74,6 +78,8 @@ class Ciphertext: public Polynomial{
       this->set_crt_computed(p.get_crt_computed());
       this->set_icrt_computed(p.get_icrt_computed());
       this->set_host_updated(p.get_host_updated());
+      this->set_transf_computed(p.get_transf_computed());
+      this->set_itransf_computed(p.get_itransf_computed());
 
       if(p.get_host_updated())
         set_coeffs(p.get_coeffs());
@@ -83,7 +89,9 @@ class Ciphertext: public Polynomial{
       this->set_stream();
       this->set_host_updated(true);
       this->set_crt_computed(false);
-      this->set_icrt_computed(true);
+      this->set_icrt_computed(false);
+      this->set_transf_computed(false);
+      this->set_itransf_computed(false);
       if(Polynomial::global_mod > 0)
         // If a global mod is defined, use it
         this->mod = Polynomial::global_mod; // Doesn't copy. Uses the reference.
@@ -110,7 +118,9 @@ class Ciphertext: public Polynomial{
       this->set_stream();
       this->set_host_updated(true);
       this->set_crt_computed(false);
-      this->set_icrt_computed(true);
+      this->set_icrt_computed(false);
+      this->set_transf_computed(false);
+      this->set_itransf_computed(false);
       this->mod = ZZ(p);// Copy
 
       if(Polynomial::global_phi){
@@ -131,7 +141,9 @@ class Ciphertext: public Polynomial{
       this->set_stream();
       this->set_host_updated(true);
       this->set_crt_computed(false);
-      this->set_icrt_computed(true);
+      this->set_icrt_computed(false);
+      this->set_transf_computed(false);
+      this->set_itransf_computed(false);
       this->mod = ZZ(p);// Copy
       *(this->phi) = Polynomial(P);// Copy
 
@@ -151,7 +163,9 @@ class Ciphertext: public Polynomial{
       this->set_stream();
       this->set_host_updated(true);
       this->set_crt_computed(false);
-      this->set_icrt_computed(true);
+      this->set_icrt_computed(false);
+      this->set_transf_computed(false);
+      this->set_itransf_computed(false);
       if(Polynomial::global_mod > 0){
         // If a global mod is defined, use it
         this->mod = Polynomial::global_mod; // Doesn't copy. Uses the reference.
@@ -175,7 +189,9 @@ class Ciphertext: public Polynomial{
       this->set_stream();
       this->set_host_updated(true);
       this->set_crt_computed(false);
-      this->set_icrt_computed(true);
+      this->set_icrt_computed(false);
+      this->set_transf_computed(false);
+      this->set_itransf_computed(false);
       this->mod = ZZ(p);// Copy
       this->phi = &P;// Copy
 
@@ -195,7 +211,9 @@ class Ciphertext: public Polynomial{
       this->set_stream();
       this->set_host_updated(true);
       this->set_crt_computed(false);
-      this->set_icrt_computed(true);
+      this->set_icrt_computed(false);
+      this->set_transf_computed(false);
+      this->set_itransf_computed(false);
       this->mod = ZZ(p);// Copy
 
       // CRT Spacing set to spacing

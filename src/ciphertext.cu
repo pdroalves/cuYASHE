@@ -5,7 +5,6 @@
 Ciphertext Ciphertext::operator+(Ciphertext &b){
   Ciphertext c = common_addition<Ciphertext>(this,&b);
   c.level = std::max(this->level,b.level);
-
   return c;
 }
 
@@ -47,19 +46,29 @@ Ciphertext Ciphertext::operator*(Ciphertext &b){
   /**
    * At this point the function expects that [c1]_q and [c2]_q
    */
-
   Polynomial g = common_multiplication<Polynomial>(this,&b);
-  // g.reduce();
-  g = Yashe::t*g;
 
-  Ciphertext p;
-  // p.update_crt_spacing(g.get_crt_spacing());
-  // g.icrt(); 
-  // callCiphertextMulAux( p.d_bn_coefs, 
-  //                       g.d_bn_coefs, 
-  //                       Yashe::q, 
-  //                       g.deg()+1, 
-  //                       get_stream());
+  /**
+   * This should not be necessary. 
+   * Someone need to modify Integer class to allow in-place multiplication
+   */
+  g.set_device_crt_residues( 
+      CUDAFunctions::callPolynomialOPInteger( MUL,
+        g.get_stream(),
+        g.get_device_crt_residues(),
+        Yashe::t.get_device_crt_residues(),
+        g.get_crt_spacing(),
+        Polynomial::CRTPrimes.size()
+      )
+    );;
+
+  Ciphertext p(g.get_crt_spacing());
+  g.icrt(); 
+  callCiphertextMulAux( p.d_bn_coefs, 
+                        g.d_bn_coefs, 
+                        Yashe::q, 
+                        g.deg()+1, 
+                        get_stream());
   
   p.aftermul = true;
   p.level = std::max(this->level,b.level)+1;
@@ -158,13 +167,13 @@ void Ciphertext::keyswitch(){
     int transform = CUFFTMUL;
   #endif
 
-  // if(transform == NTTMUL)
+  if(transform == NTTMUL)
     Ciphertext::keyswitch_mul(&P);
-  // else  
-  //   for(int i = 0; i < Yashe::lwq; i ++){
-  //     Polynomial p = (P[i])*(Yashe::gamma[i]);
-  //     *this += p;
-  //   }
+  else  
+    for(int i = 0; i < Yashe::lwq; i ++){
+      Polynomial p = (P[i])*(Yashe::gamma[i]);
+      *this += p;
+    }
 
   this->reduce();
 

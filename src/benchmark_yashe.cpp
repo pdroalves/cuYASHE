@@ -258,8 +258,8 @@ int main(int argc, char* argv[]){
     std::cout << "Writing keyswitch data to " << keyswitch_filename << std::endl;
     ZZ_p::init(q); // Defines GF(q)
        
-    for(int d = 1024;d <= 8192;d *= 2){
-    // for(int d = 4096;d <= 4096;d *= 2){
+    // for(int d = 1024;d <= 8192;d *= 2){
+    for(int d = 4096;d <= 4096;d *= 2){
 
     //////////////////////
     // Polynomial setup //
@@ -328,18 +328,10 @@ int main(int argc, char* argv[]){
     diff = runDecrypt(cipher, d);
     std::cout << "Decrypt) Time measured with memory copy: " << diff << " ms" << std::endl;
     decrypt << d << " " << diff << std::endl;;
-    
-    diff = runAdditionWithMemoryCopy(cipher, d);
-    std::cout << "Homomorphic Addition) Time measured with memory copy: " << diff << " ms" << std::endl;
-    add_with_memcopy << d << " " << diff << std::endl;;
 
     diff = runAdditionWithoutMemoryCopy(cipher, d);
     std::cout << "Homomorphic Addition) Time measured without memory copy: " << diff << " ms" << std::endl;
     add_without_memcopy << d << " " << diff << std::endl;;
-
-    diff = runMulWithMemoryCopy(cipher, d);
-    std::cout << "Homomorphic Multiplication) Time measured with memory copy: " << diff << " ms" << std::endl;
-    mult_with_memcopy << d << " " << diff << std::endl;;
     
     diff = runMulWithoutMemoryCopy(cipher, d);
     std::cout << "Homomorphic Multiplication) Time measured without memory copy: " << diff << " ms" << std::endl;
