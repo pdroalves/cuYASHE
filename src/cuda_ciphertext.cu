@@ -30,6 +30,7 @@ __global__ void cuWordecomp<32>(bn_t *P,bn_t *a,int lwq, int N){
 	if(tid < N){
 		bn_zero(&P[tid]);
 		P[tid].dp[cid] = (a[cid].dp[did/2] >> ((did%2)*32))&(4294967296-1); 
+		P[tid].used = 1;
 	}
 }
 

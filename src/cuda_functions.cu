@@ -1311,7 +1311,7 @@ __host__ void Polynomial::reduce(){
   // #warning Polynomial reduction forced to HOST
   // update_host_data();
 
-  if(!(this->get_crt_computed() || this->get_transf_computed())){
+  if(!(this->get_crt_computed() || this->get_icrt_computed() || this->get_transf_computed())){
     #ifdef VERBOSE
     std::cout << "Reduce on host." << std::endl;
     #endif

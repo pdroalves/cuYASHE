@@ -162,10 +162,11 @@ __host__ __device__ void bn_zero_non_used(bn_t *a) {
 __host__ __device__ bool bn_is_zero(const bn_t* a) {
 	#ifdef __CUDA_ARCH__
 	/**
-	 * This version doesn't have branchings, what is good for GPUs
+	 * This version doesn't have branchings
 	 */
-		return !isEqual( isEqual(a->used,0) + isEqual(a->used,1)*isEqual(a->dp[0],0)
-						,false);
+		// return !isEqual( isEqual(a->used,0) + isEqual(a->used,1)*isEqual(a->dp[0],0)
+		// 				,false);
+		return a->used == 0;
 	 // bool testA = a->used == 0;
 	 // bool testB = (a->used == 1) && (a->dp[0] == 0);
 	 // return testA || testB;

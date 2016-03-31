@@ -23,7 +23,7 @@ double runEncrypt(Yashe cipher, int d){
   
   Polynomial a(d);
   a.set_coeff(0,rand());
-  a.update_crt_spacing(d);
+  a.update_crt_spacing(2*d);
   a.update_device_data();
       
   clock_gettime( CLOCK_REALTIME, &start);
@@ -258,8 +258,8 @@ int main(int argc, char* argv[]){
     std::cout << "Writing keyswitch data to " << keyswitch_filename << std::endl;
     ZZ_p::init(q); // Defines GF(q)
        
-    // for(int d = 1024;d <= 8192;d *= 2){
-    for(int d = 4096;d <= 4096;d *= 2){
+    for(int d = 1024;d <= 8192;d *= 2){
+    // for(int d = 4096;d <= 4096;d *= 2){
 
     //////////////////////
     // Polynomial setup //

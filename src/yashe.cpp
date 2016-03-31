@@ -83,7 +83,7 @@ void Yashe::generate_keys(){
     gamma[k] += e;
     gamma[k] += hs;
     gamma[k].reduce();
-    gamma[k].update_crt_spacing((phi.deg()-1));
+    gamma[k].update_crt_spacing(2*(phi.deg()-1));
     gamma[k].update_device_data();
 
     #ifdef DEBUG
@@ -109,6 +109,7 @@ void Yashe::generate_keys(){
   const int N = 2*Polynomial::global_phi->deg()-1;
   const int size = N*lwq;
 
+  P.clear();
   P.resize(lwq,N);
   cudaError_t result = cudaMalloc((void**)&d_P,size*sizeof(bn_t));
   assert(result == cudaSuccess);
@@ -150,11 +151,33 @@ Ciphertext Yashe::encrypt(Polynomial m){
   std::cout << "ps: "<< ps.to_string() <<std::endl;
   std::cout << "e: "<< e.to_string() <<std::endl;
   #endif
- 
+  
   Polynomial mdelta = delta*m;
-  ps *= h;
-  e += mdelta;
-  e += ps;
+  // ps *= h;
+  // e += mdelta;
+  // e += ps;
+  assert(ps.get_crt_spacing() == h.get_crt_spacing());
+  CUDAFunctions::callPolynomialMul( ps.get_device_crt_residues(),
+                                    ps.get_device_crt_residues(),
+                                    h.get_device_crt_residues(),
+                                    (int)(ps.get_crt_spacing())*Polynomial::CRTPrimes.size(),
+                                    ps.get_stream()
+                                    );
+  mdelta.update_crt_spacing(e.get_crt_spacing());
+  assert(e.get_crt_spacing() == mdelta.get_crt_spacing());
+  CUDAFunctions::callPolynomialAddSub(e.get_device_crt_residues(),
+                                      e.get_device_crt_residues(),
+                                      mdelta.get_device_crt_residues(),
+                                      (int)(e.get_crt_spacing()*Polynomial::CRTPrimes.size()),
+                                      ADD,
+                                      e.get_stream());
+  assert(e.get_crt_spacing() == ps.get_crt_spacing());
+  CUDAFunctions::callPolynomialAddSub(e.get_device_crt_residues(),
+                                      e.get_device_crt_residues(),
+                                      ps.get_device_crt_residues(),
+                                      (int)(e.get_crt_spacing()*Polynomial::CRTPrimes.size()),
+                                      ADD,
+                                      e.get_stream());
   e.reduce(); // Bad bad performance
 
   Ciphertext c = e;

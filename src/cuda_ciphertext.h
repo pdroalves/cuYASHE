@@ -29,9 +29,9 @@ __host__ void callWordDecomp(	std::vector<Polynomial> *P,
 	const int size = N*lwq;
 
 	// Worddecomp
-	const int ADDGRIDXDIM = (size%180 == 0? size/180 : size/180 + 1);
+	const int ADDGRIDXDIM = (size%32 == 0? size/32 : size/32 + 1);
 	const dim3 gridDim(ADDGRIDXDIM);
-	const dim3 blockDim(180);
+	const dim3 blockDim(32);
 
 	callCuWordecomp(gridDim,blockDim,stream,WORDLENGTH,(P->at(0).d_bn_coefs),a,lwq, N);
 
@@ -43,8 +43,8 @@ __host__ void callWordDecomp(	std::vector<Polynomial> *P,
 		P->at(i).set_host_updated(false);
 	}
 
-	result = cudaDeviceSynchronize();
-	assert(result == cudaSuccess);
+	// result = cudaDeviceSynchronize();
+	// assert(result == cudaSuccess);
 }
 
 

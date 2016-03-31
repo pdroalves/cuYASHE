@@ -60,7 +60,7 @@ Ciphertext Ciphertext::operator*(Ciphertext &b){
         g.get_crt_spacing(),
         Polynomial::CRTPrimes.size()
       )
-    );
+      );
 
   g.icrt(); 
   callCiphertextMulAux(g.d_bn_coefs, Yashe::q, g.deg(), g.get_stream());
@@ -113,7 +113,7 @@ void worddecomp<32>(Ciphertext *c, std::vector<Polynomial> *P){
   }
 }
 
-
+// #define CYCLECOUNTING
 void Ciphertext::keyswitch(){
   #ifdef CYCLECOUNTING
   uint64_t start,end;
@@ -123,28 +123,42 @@ void Ciphertext::keyswitch(){
   /**
    * On Device
    */
-  update_device_data();
   this->reduce();
+  this->icrt();
   assert(Yashe::w == to_ZZ("4294967296"));
+  #ifdef CYCLECOUNTING
+  end = get_cycles();
+  std::cout << (end-start) << " cycles for the loop on keyswitch" << std::endl;
+  #endif
 
-  callWordDecomp<32>( Yashe::P,
+
+  callWordDecomp<32>( &Yashe::P,
                       this->d_bn_coefs,
                       Yashe::lwq,
                       deg()+1,
                       get_stream()
                     );    
-
   for(int i = 0; i < Yashe::lwq; i ++){
-    Polynomial p = (Yashe::P->at(i))*(Yashe::gamma[i]);
-    *this += p;
+    assert(Yashe::P.at(i).get_crt_spacing() == Yashe::gamma[i].get_crt_spacing());
+    int needed_spacing = Yashe::P.at(i).get_crt_spacing();
+
+    // In-place
+    CUDAFunctions::callPolynomialMul( Yashe::P.at(i).get_device_crt_residues(),
+                                      Yashe::P.at(i).get_device_crt_residues(),
+                                      Yashe::gamma[i].get_device_crt_residues(),
+                                      needed_spacing*Polynomial::CRTPrimes.size(),
+                                      Yashe::P.at(i).get_stream()
+                                      );
+    CUDAFunctions::callPolynomialAddSub(this->get_device_crt_residues(),
+                                        this->get_device_crt_residues(),
+                                        Yashe::P.at(i).get_device_crt_residues(),
+                                        (int)(this->get_crt_spacing()*Polynomial::CRTPrimes.size()),
+                                        ADD,
+                                        this->get_stream());
   }
 
   this->reduce();
 
-  #ifdef CYCLECOUNTING
-  end = get_cycles();
-  // std::cout << (end-start) << " cycles for the loop on keyswitch" << std::endl;
-  #endif
 }
 
 
