@@ -11,7 +11,7 @@ enum transforms {NTTMUL, CUFFTMUL};
 
 #define ADDBLOCKXDIM 32
 #ifdef CUFFTMUL_TRANSFORM
-#define CRTPRIMESIZE 9 
+#define CRTPRIMESIZE 19 
 #define PRIMES_BUCKET_SIZE 56                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     //
 extern const uint32_t PRIMES_BUCKET[];
 #else
