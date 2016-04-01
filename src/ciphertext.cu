@@ -56,7 +56,7 @@ Ciphertext Ciphertext::operator*(Ciphertext &b){
       CUDAFunctions::callPolynomialOPInteger( MUL,
         g.get_stream(),
         g.get_device_crt_residues(),
-        Yashe::t.get_device_crt_residues(),
+        Yashe::t,
         g.get_crt_spacing(),
         Polynomial::CRTPrimes.size()
       )
@@ -142,19 +142,41 @@ void Ciphertext::keyswitch(){
     assert(Yashe::P.at(i).get_crt_spacing() == Yashe::gamma[i].get_crt_spacing());
     int needed_spacing = Yashe::P.at(i).get_crt_spacing();
 
-    // In-place
+    // Optimization
+    // Someone needs to refactor this!
+    /////////
+    // Mul //
+    /////////
+    #ifdef NTTMUL_TRANSFORM
     CUDAFunctions::callPolynomialMul( Yashe::P.at(i).get_device_crt_residues(),
                                       Yashe::P.at(i).get_device_crt_residues(),
                                       Yashe::gamma[i].get_device_crt_residues(),
                                       needed_spacing*Polynomial::CRTPrimes.size(),
                                       Yashe::P.at(i).get_stream()
                                       );
-    CUDAFunctions::callPolynomialAddSub(this->get_device_crt_residues(),
-                                        this->get_device_crt_residues(),
-                                        Yashe::P.at(i).get_device_crt_residues(),
-                                        (int)(this->get_crt_spacing()*Polynomial::CRTPrimes.size()),
-                                        ADD,
-                                        this->get_stream());
+    #else
+    CUDAFunctions::executeCuFFTPolynomialMul(   Yashe::P.at(i).get_device_transf_residues(), 
+                                                Yashe::P.at(i).get_device_transf_residues(), 
+                                                Yashe::gamma[i].get_device_transf_residues(), 
+                                                needed_spacing*Polynomial::CRTPrimes.size(),
+                                                Yashe::gamma[i].get_stream());
+    #endif
+    /////////
+    // Add //
+    /////////
+    #ifdef NTTMUL_TRANSFORM
+    CUDAFunctions::callPolynomialAddSubInPlace( this->get_stream(),
+                                                this->get_device_crt_residues(),
+                                                Yashe::P.at(i).get_device_crt_residues(),
+                                                (int)(this->get_crt_spacing()*Polynomial::CRTPrimes.size()),
+                                                ADD);
+    #else
+    CUDAFunctions::callPolynomialcuFFTAddSubInPlace(  this->get_stream(),
+                                                      this->get_device_transf_residues(),
+                                                      Yashe::P.at(i).get_device_transf_residues(),
+                                                      (int)(this->get_crt_spacing()*Polynomial::CRTPrimes.size()),
+                                                      ADD);
+    #endif
   }
 
   this->reduce();

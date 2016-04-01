@@ -2,7 +2,6 @@
 #include <assert.h>
 #include <string.h>
 #include "polynomial.h"
-#include "integer.h"
 #include "settings.h"
 #include "common.h"
 #include "cuda_bn.h"

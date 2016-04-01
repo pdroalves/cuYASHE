@@ -5,7 +5,6 @@
 #include "polynomial.h"
 #include "ciphertext.h"
 #include "distribution.h"
-#include "integer.h"
 #include "cuda_ciphertext.h"
 
 class Yashe{
@@ -20,8 +19,8 @@ class Yashe{
     static Polynomial phi;
     static ZZ q;
     static bn_t qDiv2;
-    static Integer t;
-    static Integer delta;
+    static cuyasheint_t t;
+    static ZZ delta;
     static ZZ w;
     static std::vector<Polynomial> gamma;
     static Polynomial h;

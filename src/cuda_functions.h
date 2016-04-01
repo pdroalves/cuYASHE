@@ -63,6 +63,17 @@ class CUDAFunctions{
                                             cuyasheint_t *b,
                                             int size,
                                             int OP);
+    static void callPolynomialcuFFTAddSub(Complex *c,
+                                            Complex *a,
+                                            Complex *b,
+                                            int size,
+                                            int OP,
+                                            cudaStream_t stream);
+    static void callPolynomialcuFFTAddSubInPlace(cudaStream_t stream,
+                                            Complex *a,
+                                            Complex *b,
+                                            int size,
+                                            int OP);
 
     static void executeNTTScale(    cuyasheint_t *a, 
                                     const int size, 
@@ -97,12 +108,32 @@ class CUDAFunctions{
                                                         cuyasheint_t *b,
                                                         const int size,
                                                         cudaStream_t stream);
-    static cuyasheint_t* callPolynomialOPInteger( const int opcode,
-                                            cudaStream_t stream,
-                                            cuyasheint_t *a,
-                                            cuyasheint_t *integer_array,
-                                            const int N,
-                                            const int NPolis);
+    static cuyasheint_t* callPolynomialOPInteger(   const int opcode,
+                                                    cudaStream_t stream,
+                                                    cuyasheint_t *a,
+                                                    cuyasheint_t integer_array,
+                                                    const int N,
+                                                    const int NPolis);
+    static void callPolynomialOPIntegerInplace(     const int opcode,
+                                                    cudaStream_t stream,
+                                                    cuyasheint_t *a,
+                                                    cuyasheint_t integer,
+                                                    const int N,
+                                                    const int NPolis);
+    static Complex* callPolynomialcuFFTOPInteger(
+                                                  const int opcode,
+                                                  cudaStream_t stream,
+                                                  Complex *a,
+                                                  cuyasheint_t integer,
+                                                  const int N,
+                                                  const int NPolis);
+    static void callPolynomialcuFFTOPIntegerInplace(
+                                                      const int opcode,
+                                                      cudaStream_t stream,
+                                                      Complex *a,
+                                                      cuyasheint_t integer,
+                                                      const int N,
+                                                      const int NPolis);
     static void callPolynomialOPDigit( const int opcode,
                                             cudaStream_t stream,
                                             bn_t *a,

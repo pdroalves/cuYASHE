@@ -5,8 +5,8 @@ int Yashe::d = 0;
 Polynomial Yashe::phi = Polynomial();
 ZZ Yashe::q = ZZ(0);
 bn_t Yashe::qDiv2;
-Integer Yashe::t = 0;
-Integer Yashe::delta = 0;
+cuyasheint_t Yashe::t = 0;
+ZZ Yashe::delta = to_ZZ(0);
 ZZ Yashe::w = ZZ(0);
 int Yashe::lwq = 0;
 Polynomial Yashe::h = Polynomial();
@@ -38,7 +38,7 @@ void Yashe::generate_keys(){
   while(1==1){
     Polynomial fl = xkey.get_sample(phi.deg()-1);
 
-    f = t*fl + 1;
+    f = fl*t + 1;
     f.reduce();
 
     #ifdef DEBUG
@@ -63,7 +63,7 @@ void Yashe::generate_keys(){
   ff = f*f;
   ff.reduce();
 
-  h = t*fInv*g;
+  h = fInv*g*t;
   h.reduce();
   h.update_device_data();
 
@@ -103,7 +103,7 @@ void Yashe::generate_keys(){
   //////////////////////////////////
   get_words(&qDiv2,q/2);
   //////////////////////////////////
-  delta = (q/t.get_value()); // q/t
+  delta = (q/t); // q/t
   //////////////////////////////////
   bn_t *d_P;
   const int N = 2*Polynomial::global_phi->deg()-1;
@@ -136,7 +136,6 @@ void Yashe::generate_keys(){
 }
 
 Ciphertext Yashe::encrypt(Polynomial m){
-
   #ifdef DEBUG
   std::cout << "delta: "<< delta.get_value() <<std::endl;
   #endif
@@ -152,33 +151,62 @@ Ciphertext Yashe::encrypt(Polynomial m){
   std::cout << "e: "<< e.to_string() <<std::endl;
   #endif
   
-  Polynomial mdelta = delta*m;
+  Polynomial mdelta = m*delta;
   // ps *= h;
   // e += mdelta;
   // e += ps;
   assert(ps.get_crt_spacing() == h.get_crt_spacing());
+  /////////////////
+  // ps = ps + h //
+  /////////////////
+  #ifdef NTTMUL_TRANSFORM
   CUDAFunctions::callPolynomialMul( ps.get_device_crt_residues(),
                                     ps.get_device_crt_residues(),
                                     h.get_device_crt_residues(),
                                     (int)(ps.get_crt_spacing())*Polynomial::CRTPrimes.size(),
                                     ps.get_stream()
                                     );
+  #else
+  CUDAFunctions::executeCuFFTPolynomialMul(   ps.get_device_transf_residues(), 
+                                              ps.get_device_transf_residues(), 
+                                              h.get_device_transf_residues(), 
+                                              ps.get_crt_spacing()*Polynomial::CRTPrimes.size(),
+                                              ps.get_stream());
+  #endif
+  
   mdelta.update_crt_spacing(e.get_crt_spacing());
+
   assert(e.get_crt_spacing() == mdelta.get_crt_spacing());
-  CUDAFunctions::callPolynomialAddSub(e.get_device_crt_residues(),
-                                      e.get_device_crt_residues(),
-                                      mdelta.get_device_crt_residues(),
-                                      (int)(e.get_crt_spacing()*Polynomial::CRTPrimes.size()),
-                                      ADD,
-                                      e.get_stream());
-  assert(e.get_crt_spacing() == ps.get_crt_spacing());
-  CUDAFunctions::callPolynomialAddSub(e.get_device_crt_residues(),
-                                      e.get_device_crt_residues(),
-                                      ps.get_device_crt_residues(),
-                                      (int)(e.get_crt_spacing()*Polynomial::CRTPrimes.size()),
-                                      ADD,
-                                      e.get_stream());
-  e.reduce(); // Bad bad performance
+  /////////////////////
+  // e = e + m*delta //
+  // e = e + ps //
+  ////////////////
+  #ifdef NTTMUL_TRANSFORM
+
+  CUDAFunctions::callPolynomialAddSubInPlace( e.get_stream(),
+                                              e.get_device_crt_residues(),
+                                              mdelta.get_device_crt_residues(),
+                                              (int)(e.get_crt_spacing()*Polynomial::CRTPrimes.size()),
+                                              ADD);
+
+  CUDAFunctions::callPolynomialAddSubInPlace( e.get_stream(),
+                                              e.get_device_crt_residues(),
+                                              ps.get_device_crt_residues(),
+                                              (int)(e.get_crt_spacing()*Polynomial::CRTPrimes.size()),
+                                              ADD);
+  #else
+  CUDAFunctions::callPolynomialcuFFTAddSubInPlace(  e.get_stream(),
+                                                    e.get_device_transf_residues(),
+                                                    mdelta.get_device_transf_residues(),
+                                                    (int)(e.get_crt_spacing()*Polynomial::CRTPrimes.size()),
+                                                    ADD);
+  CUDAFunctions::callPolynomialcuFFTAddSubInPlace(  e.get_stream(),
+                                                    e.get_device_transf_residues(),
+                                                    ps.get_device_transf_residues(),
+                                                    (int)(e.get_crt_spacing()*Polynomial::CRTPrimes.size()),
+                                                    ADD);
+  #endif
+  e.reduce();
 
   Ciphertext c = e;
   return c;
@@ -211,15 +239,23 @@ Polynomial Yashe::decrypt(Ciphertext c){
   }
   m.reduce();
 
-  m.set_device_crt_residues( 
-    CUDAFunctions::callPolynomialOPInteger( MUL,
-      m.get_stream(),
-      m.get_device_crt_residues(),
-      Yashe::t.get_device_crt_residues(),
-      m.get_crt_spacing(),
-      Polynomial::CRTPrimes.size()
-    )
+  #ifdef NTTMUL_TRANSFORM
+  CUDAFunctions::callPolynomialOPIntegerInplace( MUL,
+                                          m.get_stream(),
+                                          m.get_device_crt_residues(),
+                                          Yashe::t,
+                                          m.get_crt_spacing(),
+                                          Polynomial::CRTPrimes.size()
   );
+  #else
+  CUDAFunctions::callPolynomialcuFFTOPIntegerInplace( MUL,
+                                                      m.get_stream(),
+                                                      m.get_device_transf_residues(),
+                                                      Yashe::t,
+                                                      m.get_crt_spacing(),
+                                                      Polynomial::CRTPrimes.size()
+  );
+  #endif
   m.icrt();
   callMersenneDiv(  m.d_bn_coefs, 
                     Yashe::q, 

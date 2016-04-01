@@ -56,6 +56,11 @@ int CUDAFunctions::N = 0;
 __host__ __device__ inline  uint64_t s_add(uint64_t a,uint64_t b);
 __host__ __device__ inline uint64_t s_sub(uint64_t a,uint64_t b);
 
+static __device__ inline Complex ComplexMul(Complex a, Complex b);
+static __device__ inline Complex ComplexAdd(Complex a, Complex b);
+static __device__ inline Complex ComplexSub(Complex a, Complex b);
+
+
 ///////////////////////
 // Memory operations //
 ///////////////////////
@@ -115,6 +120,7 @@ __host__ cuyasheint_t* CUDAFunctions::callRealignCRTResidues(cudaStream_t stream
 /// ADD
 ///////////////////////////////////////
 
+#ifdef NTTMUL_TRANSFORM
 __global__ void polynomialAddSub(const int OP,const cuyasheint_t *a,const cuyasheint_t *b,cuyasheint_t *c,const int size,const int N){
   // We have one thread per polynomial coefficient on 32 threads-block.
   // For CRT polynomial adding, all representations should be concatenated aligned
@@ -144,6 +150,7 @@ __host__ void CUDAFunctions::callPolynomialAddSub(cuyasheint_t *c,cuyasheint_t *
   std::cout << "polynomialAdd kernel:" << cudaGetErrorString(cudaGetLastError()) << std::endl;
   #endif
 }
+
 
 __global__ void polynomialAddSubInPlace(const int OP, cuyasheint_t *a,const cuyasheint_t *b,const int size,const int N){
   // We have one thread per polynomial coefficient on 32 threads-block.
@@ -183,6 +190,75 @@ __host__ void CUDAFunctions::callPolynomialAddSubInPlace(cudaStream_t stream,cuy
   std::cout << "polynomialAdd kernel:" << cudaGetErrorString(cudaGetLastError()) << std::endl;
   #endif
 }
+
+#else
+__global__ void polynomialcuFFTAddSub(const int OP,const Complex *a,const Complex *b,Complex *c,const int size,const int N){
+  // We have one thread per polynomial coefficient on 32 threads-block.
+  // For CRT polynomial adding, all representations should be concatenated aligned
+  const int tid = threadIdx.x + blockDim.x*blockIdx.x;
+
+  if(tid < size ){
+      // Coalesced access to global memory. Doing this way we reduce required bandwich.
+      if(OP == ADD){
+        c[tid] = ComplexAdd(a[tid],b[tid]);
+      }else
+      c[tid] = ComplexSub(a[tid],b[tid]);
+  }
+}
+
+__host__ void CUDAFunctions::callPolynomialcuFFTAddSub(Complex *c,Complex *a,Complex *b,int size,int OP,cudaStream_t stream){
+  // This method expects that both arrays are aligned
+  int nthreads = 64;
+  int ADDGRIDXDIM = (size%nthreads == 0? size/nthreads : size/nthreads + 1);
+  dim3 gridDim(ADDGRIDXDIM);
+  dim3 blockDim(nthreads);
+
+  polynomialcuFFTAddSub <<< gridDim,blockDim,0,stream  >>> (OP,a,b,c,size,N);
+  assert(cudaGetLastError() == cudaSuccess);
+  #ifdef VERBOSE
+  std::cout << "polynomialAdd kernel:" << cudaGetErrorString(cudaGetLastError()) << std::endl;
+  #endif
+}
+
+
+__global__ void polynomialcuFFTAddSubInPlace(const int OP, Complex *a,const Complex *b,const int size,const int N){
+  // We have one thread per polynomial coefficient on 32 threads-block.
+  // For CRT polynomial adding, all representations should be concatenated aligned
+  const int tid = threadIdx.x + blockDim.x*blockIdx.x;
+  // const int rid = tid / N; // Residue id
+  Complex a_value;
+  Complex b_value;
+
+  if(tid < size ){
+      // printf("A[0]: %d\nB[0]: %d\n\n",a[tid],b[tid]);
+      // Coalesced access to global memory. Doing this way we reduce required bandwich.
+      a_value = a[tid];
+      b_value = b[tid];
+
+      if(OP == ADD)
+        a_value = ComplexAdd(a_value,b_value);
+      else
+        a_value = ComplexSub(a_value,b_value);
+
+      a[tid] = a_value;
+  }
+}
+
+__host__ void CUDAFunctions::callPolynomialcuFFTAddSubInPlace(cudaStream_t stream,Complex *a,Complex *b,int size,int OP){
+  // This method expects that both arrays are aligned
+  // Add and store in array a
+  int ADDGRIDXDIM = (size%ADDBLOCKXDIM == 0? size/ADDBLOCKXDIM : size/ADDBLOCKXDIM + 1);
+  dim3 gridDim(ADDGRIDXDIM);
+  dim3 blockDim(ADDBLOCKXDIM);
+
+  polynomialcuFFTAddSubInPlace <<< gridDim,blockDim,0,stream >>> (OP,a,b,size,N);
+  assert(cudaGetLastError() == cudaSuccess);
+  #ifdef VERBOSE
+  std::cout << "polynomialAdd kernel:" << cudaGetErrorString(cudaGetLastError()) << std::endl;
+  #endif
+}
+#endif
+
 ///////////////////////////////////////
 
 ///////////////////////////////////////
@@ -226,6 +302,24 @@ __global__ void copyAndNormalizeComplexRealPartToInteger(cuyasheint_t *b,const C
 // Complex operations
 ////////////////////////////////////////////////////////////////////////////////
 
+// Addition
+static __device__ inline Complex ComplexAdd(Complex a, Complex b)
+{
+    Complex c;
+    c.x = a.x + b.x;
+    c.y = a.y + b.y;
+    return c;
+}
+
+
+static __device__ inline Complex ComplexSub(Complex a, Complex b)
+{
+    Complex c;
+    c.x = a.x - b.x;
+    c.y = a.y - b.y;
+    return c;
+}
+
 // Complex multiplication
 static __device__ inline Complex ComplexMul(Complex a, Complex b)
 {
@@ -237,7 +331,7 @@ static __device__ inline Complex ComplexMul(Complex a, Complex b)
 
 
 // Complex pointwise multiplication
-static __global__ void polynomialcuFFTMul(Complex *c, const Complex *a,const Complex *b,int size){
+__global__ void polynomialcuFFTMul(Complex *c, const Complex *a,const Complex *b,int size){
     const int tid = threadIdx.x + blockDim.x*blockIdx.x;
 
     if(tid < size  ){
@@ -675,7 +769,7 @@ __global__ void polynomialNTTAdd(cuyasheint_t *a,const cuyasheint_t *b,const int
 
 __global__ void polynomialOPInteger(const int opcode,
                                       const cuyasheint_t *a,
-                                      const cuyasheint_t *integer_array,
+                                      const cuyasheint_t integer_array,
                                       cuyasheint_t *output,
                                       const int N,
                                       const int NPolis){
@@ -688,7 +782,7 @@ __global__ void polynomialOPInteger(const int opcode,
 
   if(tid < size ){
       // Coalesced access to global memory. Doing this way we reduce required bandwich.
-    cuyasheint_t operand = integer_array[rid] % CRTPrimesConstant[rid];
+    cuyasheint_t operand = integer_array;
 
     switch(opcode)
     {
@@ -720,7 +814,7 @@ __host__ cuyasheint_t* CUDAFunctions::callPolynomialOPInteger(
                                                               const int opcode,
                                                               cudaStream_t stream,
                                                               cuyasheint_t *a,
-                                                              cuyasheint_t *integer_array,
+                                                              cuyasheint_t integer_array,
                                                               const int N,
                                                               const int NPolis)
 {
@@ -745,6 +839,127 @@ __host__ cuyasheint_t* CUDAFunctions::callPolynomialOPInteger(
   assert(cudaGetLastError() == cudaSuccess);
 
   return d_pointer;
+}
+__host__ void CUDAFunctions::callPolynomialOPIntegerInplace(
+                                                              const int opcode,
+                                                              cudaStream_t stream,
+                                                              cuyasheint_t *a,
+                                                              cuyasheint_t integer_array,
+                                                              const int N,
+                                                              const int NPolis)
+{
+  // This method applies a 0-degree operation over all CRT residues
+  const int size = N*NPolis;
+
+  const int ADDGRIDXDIM = (size%ADDBLOCKXDIM == 0? size/ADDBLOCKXDIM : size/ADDBLOCKXDIM + 1);
+  const dim3 gridDim(ADDGRIDXDIM);
+  const dim3 blockDim(ADDBLOCKXDIM);
+
+  polynomialOPInteger<<< gridDim,blockDim, 0, stream>>> ( opcode,
+                                                          a,
+                                                          integer_array,
+                                                          a,
+                                                          N,
+                                                          NPolis);
+  assert(cudaGetLastError() == cudaSuccess);
+  return;
+}
+
+__global__ void polynomialcuFFTOPInteger( const int opcode,
+                                          const Complex *a,
+                                          const cuyasheint_t integer,
+                                          Complex *output,
+                                          const int N,
+                                          const int NPolis){
+  // We have one thread per polynomial coefficient on 32 threads-block.
+  // For CRT polynomial adding, all representations should be concatenated aligned
+  const int size = N*NPolis;
+  const int tid = threadIdx.x + blockDim.x*blockIdx.x;
+  const int cid = tid % N; // Coefficient id
+  // const int rid = tid / N; // Residue id
+
+  if(tid < size ){
+      // Coalesced access to global memory. Doing this way we reduce required bandwich.
+    Complex operand = {__ull2double_rn(integer),0};
+
+    switch(opcode)
+    {
+    case ADD:
+      if(cid == 0)
+        output[tid] = ComplexAdd(a[tid],operand) ;
+      break;
+    case SUB:
+      if(cid == 0){
+        output[tid] = ComplexSub(a[tid],operand);
+      }
+      break;
+    case MUL:
+        output[tid] = ComplexMul(a[tid] , operand);
+      break;
+    default:
+      //This case shouldn't be used. 
+      assert(1 == 0);
+      break;
+    }
+  }
+
+}
+
+__host__ Complex* CUDAFunctions::callPolynomialcuFFTOPInteger(
+                                                              const int opcode,
+                                                              cudaStream_t stream,
+                                                              Complex *a,
+                                                              cuyasheint_t integer,
+                                                              const int N,
+                                                              const int NPolis)
+{
+  // This method applies a 0-degree operation over all CRT residues
+  const int size = N*NPolis;
+
+  const int ADDGRIDXDIM = (size%ADDBLOCKXDIM == 0? size/ADDBLOCKXDIM : size/ADDBLOCKXDIM + 1);
+  const dim3 gridDim(ADDGRIDXDIM);
+  const dim3 blockDim(ADDBLOCKXDIM);
+
+  Complex *d_pointer;
+  cudaError_t result = cudaMalloc((void**)&d_pointer,
+                                  size*sizeof(Complex));        
+  assert(result == cudaSuccess);
+
+  polynomialcuFFTOPInteger<<< gridDim,blockDim, 0, stream>>> ( opcode,
+                                                          a,
+                                                          integer,
+                                                          d_pointer,
+                                                          N,
+                                                          NPolis);
+  assert(cudaGetLastError() == cudaSuccess);
+
+  return d_pointer;
+}
+
+__host__ void CUDAFunctions::callPolynomialcuFFTOPIntegerInplace(
+                                                                      const int opcode,
+                                                                      cudaStream_t stream,
+                                                                      Complex *a,
+                                                                      cuyasheint_t integer,
+                                                                      const int N,
+                                                                      const int NPolis)
+{
+  // This method applies a 0-degree operation over all CRT residues
+  const int size = N*NPolis;
+
+  const int ADDGRIDXDIM = (size%ADDBLOCKXDIM == 0? size/ADDBLOCKXDIM : size/ADDBLOCKXDIM + 1);
+  const dim3 gridDim(ADDGRIDXDIM);
+  const dim3 blockDim(ADDBLOCKXDIM);
+
+  polynomialcuFFTOPInteger<<< gridDim,blockDim, 0, stream>>> ( opcode,
+                                                                a,
+                                                                integer,
+                                                                a,
+                                                                N,
+                                                                NPolis);
+  assert(cudaGetLastError() == cudaSuccess);
+
+  return;
 }
 
 __global__ void polynomialOPDigit(const int opcode,
@@ -987,7 +1202,7 @@ __host__ cuyasheint_t* CUDAFunctions::callPolynomialMul(cuyasheint_t *output,
   assert((N>0)&&((N & (N - 1)) == 0));//Check if N is power of 2
   assert(N == CUDAFunctions::N);
   cuyasheint_t *d_result = output;
-  cudaError_t result;
+  // cudaError_t result;
 
   // #ifdef NTTMUL
   if(transform == NTTMUL){
@@ -1296,11 +1511,11 @@ __host__ void Polynomial::reduce(){
   
   // Until we debug reduction on GPU, we need this
   // #warning Polynomial reduction forced to HOST
-  update_host_data();
-  set_crt_computed(false);
-  set_icrt_computed(false);
-  set_transf_computed(false);
-  set_itransf_computed(false);
+  // update_host_data();
+  // set_crt_computed(false);
+  // set_icrt_computed(false);
+  // set_transf_computed(false);
+  // set_itransf_computed(false);
 
   if(!(this->get_crt_computed() || this->get_icrt_computed() || this->get_transf_computed())){
     #ifdef VERBOSE
@@ -1325,13 +1540,13 @@ __host__ void Polynomial::reduce(){
       throw "Reduce: I don't know how to compute this!";
     }
     *this %= q;
-    normalize();
     set_crt_computed(false);
     set_icrt_computed(false);
     set_transf_computed(false);
     set_itransf_computed(false);
     set_host_updated(true);
-    // update_crt_spacing(deg()+1);
+    normalize();
+    update_crt_spacing(2*phi->deg());
   }else{
 
     #ifdef VERBOSE

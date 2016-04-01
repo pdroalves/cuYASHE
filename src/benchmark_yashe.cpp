@@ -38,7 +38,7 @@ double runEncrypt(Yashe cipher, int d){
 double runDecrypt(Yashe cipher, int d){
   struct timespec start, stop;
   
-  Polynomial a(d-1);
+  Polynomial a(2*d-1);
   a.set_coeff(0,rand());
   a.update_device_data();
 
@@ -258,8 +258,8 @@ int main(int argc, char* argv[]){
     std::cout << "Writing keyswitch data to " << keyswitch_filename << std::endl;
     ZZ_p::init(q); // Defines GF(q)
        
-    for(int d = 1024;d <= 8192;d *= 2){
-    // for(int d = 4096;d <= 4096;d *= 2){
+    // for(int d = 1024;d <= 8192;d *= 2){
+    for(int d = 4096;d <= 4096;d *= 2){
 
     //////////////////////
     // Polynomial setup //
@@ -325,10 +325,17 @@ int main(int argc, char* argv[]){
     std::cout << "Encrypt) Time measured with memory copy: " << diff << " ms" << std::endl;
     encrypt << d << " " << diff << std::endl;
     
+          size_t t,f;
+      cudaMemGetInfo(&f, &t);
+      cout << "Used memory: " << (t-f)/(1024*1024) << std::endl;
+      cout << "Free memory: " << f/(1024*1024) << std::endl;
     diff = runDecrypt(cipher, d);
     std::cout << "Decrypt) Time measured with memory copy: " << diff << " ms" << std::endl;
     decrypt << d << " " << diff << std::endl;;
 
+      cudaMemGetInfo(&f, &t);
+      cout << "Used memory: " << (t-f)/(1024*1024) << std::endl;
+      cout << "Free memory: " << f/(1024*1024) << std::endl;
     diff = runAdditionWithoutMemoryCopy(cipher, d);
     std::cout << "Homomorphic Addition) Time measured without memory copy: " << diff << " ms" << std::endl;
     add_without_memcopy << d << " " << diff << std::endl;;

@@ -180,7 +180,7 @@ void Distribution::generate_sample(Polynomial *p,int mod,int degree){
 Polynomial Distribution::get_sample(int degree,int spacing){
   Polynomial p(spacing);
   int mod;
-  int rec;
+  // int rec;
   // int phase = 0;
   switch(this->kind){
     case DISCRETE_GAUSSIAN:

@@ -17,7 +17,7 @@ enum kind_t
 };
 
 #define MAX_DEGREE 16384
-#define SEED (unsigned long)(7226776555987513888)
+#define SEED (unsigned long long)(7226776555987513888)
 
 class Distribution{
   private:

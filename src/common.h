@@ -29,10 +29,8 @@ P common_addition(P *a,P *b){
 	#endif
 		// Check align
 	int new_spacing = std::max(a->CRTSPACING,b->CRTSPACING);
-	if(a->CRTSPACING != b->CRTSPACING){
-	  a->update_crt_spacing(new_spacing);
-	  b->update_crt_spacing(new_spacing);
-	}
+	a->update_crt_spacing(new_spacing);
+	b->update_crt_spacing(new_spacing);
 
 	#ifdef VERBOSE
 	std::cout << "Add with CRTSPACING" << a->get_crt_spacing() << std::endl;
@@ -65,13 +63,21 @@ P common_addition(P *a,P *b){
 	}
 
 	P c = P(a->get_mod(),a->get_phi(),new_spacing);
+	#ifdef NTTMUL_TRANSFORM
 	CUDAFunctions::callPolynomialAddSub(c.get_device_crt_residues(),
 										a->get_device_crt_residues(),
 										b->get_device_crt_residues(),
 										(int)(a->CRTSPACING*P::CRTPrimes.size()),
 										ADD,
 										a->get_stream());
-
+	#else
+	CUDAFunctions::callPolynomialcuFFTAddSub(c.get_device_transf_residues(),
+											a->get_device_transf_residues(),
+											b->get_device_transf_residues(),
+											(int)(a->CRTSPACING*P::CRTPrimes.size()),
+											ADD,
+											a->get_stream());
+	#endif
 	c.set_host_updated(false);
 	c.set_icrt_computed(false);
 	c.set_crt_computed(false);
@@ -124,12 +130,19 @@ void common_addition_inplace(P *a,P *b){
 		}
 	}
 
-
+	#ifdef NTTMUL_TRANSFORM
 	CUDAFunctions::callPolynomialAddSubInPlace( a->get_stream(),
 												a->get_device_crt_residues(),
 												b->get_device_crt_residues(),
 												(int)(a->CRTSPACING*P::CRTPrimes.size()),
 												ADD);
+	#else
+	CUDAFunctions::callPolynomialcuFFTAddSubInPlace( a->get_stream(),
+												a->get_device_transf_residues(),
+												b->get_device_transf_residues(),
+												(int)(a->CRTSPACING*P::CRTPrimes.size()),
+												ADD);
+	#endif
 
 	a->set_host_updated(false);
 	a->set_icrt_computed(false);
@@ -261,11 +274,20 @@ void common_multiplication_inplace(P *a, P *b){
 	}
 
 
-	CUDAFunctions::callPolynomialMul(   a->get_device_crt_residues(),
+	#ifdef NTTMUL_TRANSFORM
+	CUDAFunctions::callPolynomialMul(  	a->get_device_crt_residues(),
 										a->get_device_crt_residues(),
 										b->get_device_crt_residues(),
 										new_spacing*P::CRTPrimes.size(),
 										a->get_stream());
+	#else
+	CUDAFunctions::executeCuFFTPolynomialMul( 	a->get_device_transf_residues(), 
+	                                            a->get_device_transf_residues(), 
+	                                            b->get_device_transf_residues(), 
+	                                            new_spacing*P::CRTPrimes.size(),
+	                                            b->get_stream());
+	#endif
+
 
 	a->set_host_updated(false);
 	a->set_icrt_computed(false);

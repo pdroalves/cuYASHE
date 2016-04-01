@@ -16,7 +16,7 @@
 
 #define BILLION  1000000000L
 #define MILLION  1000000L
-#define N 1
+#define N 100
 
 #define CUHEA 0
 #define CUHEB 1
@@ -250,10 +250,10 @@ int main(int argc,char* argv[]){
     clock_gettime( CLOCK_REALTIME, &start);
     for(int i = 0; i < N;i++){
       callICRT( a.d_bn_coefs,
-        a.get_device_crt_residues(),
-        a.get_crt_spacing(),
-        Polynomial::CRTPrimes.size(),
-        a.get_stream()
+                a.get_device_crt_residues(),
+                a.get_crt_spacing(),
+                Polynomial::CRTPrimes.size(),
+                a.get_stream()
       );
       result = cudaDeviceSynchronize();
       assert(result == cudaSuccess);
@@ -429,13 +429,21 @@ int main(int argc,char* argv[]){
 
       clock_gettime( CLOCK_REALTIME, &start);
       for(int i = 0; i < N;i++){
-
+          #ifdef NTTMUL_TRANSFORM
         CUDAFunctions::callPolynomialAddSub(a.get_device_crt_residues(),
                                             a.get_device_crt_residues(),
                                             b.get_device_crt_residues(),
                                             (int)(a.get_crt_spacing()*Polynomial::CRTPrimes.size()),
                                             ADD,
                                             a.get_stream());
+          #else
+          CUDAFunctions::callPolynomialcuFFTAddSub( a.get_device_transf_residues(),
+                                                    a.get_device_transf_residues(),
+                                                    b.get_device_transf_residues(),
+                                                    (int)(a.CRTSPACING*Polynomial::CRTPrimes.size()),
+                                                    ADD,
+                                                    a.get_stream());
+          #endif
 
         result = cudaDeviceSynchronize();
         assert(result == cudaSuccess);
@@ -459,13 +467,19 @@ int main(int argc,char* argv[]){
 
       clock_gettime( CLOCK_REALTIME, &start);
       for(int i = 0; i < N;i++){
-        CUDAFunctions::callPolynomialMul( a.get_device_crt_residues(),
-                                          a.get_device_crt_residues(),
-                                          b.get_device_crt_residues(),
-                                          needed_spacing*Polynomial::CRTPrimes.size(),
-                                          a.get_stream()
-                                          );
-
+        #ifdef NTTMUL_TRANSFORM
+        CUDAFunctions::callPolynomialMul(   a.get_device_crt_residues(),
+                                            a.get_device_crt_residues(),
+                                            b.get_device_crt_residues(),
+                                            needed_spacing*Polynomial::CRTPrimes.size(),
+                                            a.get_stream());
+        #else
+        CUDAFunctions::executeCuFFTPolynomialMul(   a.get_device_transf_residues(), 
+                                                    a.get_device_transf_residues(), 
+                                                    b.get_device_transf_residues(), 
+                                                    needed_spacing*Polynomial::CRTPrimes.size(),
+                                                    b.get_stream());
+        #endif
         result = cudaDeviceSynchronize();
         assert(result == cudaSuccess);
         // c.release();

@@ -20,7 +20,6 @@ __host__ void callWordDecomp(	std::vector<Polynomial> *P,
 								int N,
 								cudaStream_t stream
 							){
-	cudaError_t result;
 
 	/**
 	 * P is a collection of lwq arrays of size (deg+1)
