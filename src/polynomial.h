@@ -230,7 +230,9 @@ class Polynomial{
       this->d_bn_coefs = b->d_bn_coefs;
       this->h_bn_coefs = b->h_bn_coefs;
       this->d_polyCRT = b->d_polyCRT;
+      #ifdef CUFFTMUL_TRANSFORM
       this->d_polyTransf = b->d_polyTransf;
+      #endif
 
       this->set_crt_computed(b->get_crt_computed());
       this->set_icrt_computed(b->get_icrt_computed());
@@ -269,6 +271,10 @@ class Polynomial{
 
       if(b.get_crt_computed()){
         cudaError_t result = cudaMemcpyAsync(this->d_polyCRT,b.d_polyCRT,b.get_crt_spacing()*Polynomial::CRTPrimes.size()*sizeof(cuyasheint_t),cudaMemcpyDeviceToDevice,b.get_stream());
+        assert(result == cudaSuccess);
+      }
+      if(b.get_transf_computed()){
+        cudaError_t result = cudaMemcpyAsync(this->d_polyTransf,b.d_polyTransf,b.get_crt_spacing()*Polynomial::CRTPrimes.size()*sizeof(cuyasheint_t),cudaMemcpyDeviceToDevice,b.get_stream());
         assert(result == cudaSuccess);
       }
 
@@ -315,6 +321,7 @@ class Polynomial{
       this->d_bn_coefs = b.d_bn_coefs;
       this->h_bn_coefs = b.h_bn_coefs;
       this->d_polyCRT = b.d_polyCRT;
+      this->d_polyTransf = b.d_polyTransf;
 
       this->set_crt_computed(b.get_crt_computed());
       this->set_icrt_computed(b.get_icrt_computed());
@@ -706,7 +713,6 @@ class Polynomial{
         return false;
 
       for( int i = 0; i <= this->deg();i++){
-        std::cout << get_coeff(i) << " == " << b.get_coeff(i) << std::endl;
         if(this->get_coeff(i) != b.get_coeff(i))
           return false;
       }
@@ -760,6 +766,7 @@ class Polynomial{
             this->coefs.back() == 0)
         this->coefs.pop_back();
       int new_spacing = 2*pow(2,ceil(log2(deg())));
+      // int new_spacing = 2*pow(2,ceil(log2(Polynomial::global_phi->deg())));
       this->update_crt_spacing(new_spacing);
     }
     // gets and sets
@@ -821,8 +828,8 @@ class Polynomial{
         this->set_crt_computed(false);
         this->set_icrt_computed(false);
         this->set_host_updated(true);
-        // if(this->get_crt_spacing() < 2*(this->deg())+1)
-          // this->update_crt_spacing(2*(this->deg())+1);
+        if(this->get_crt_spacing() < 2*(this->deg())+1)
+          this->update_crt_spacing(2*(this->deg())+1);
     }
     void set_coeff(int index,int value){
 
@@ -851,8 +858,8 @@ class Polynomial{
       this->set_transf_computed(false);
       this->set_itransf_computed(false);
       this->set_host_updated(true);
-      // if(this->get_crt_spacing() < (2*(this->deg()+1)))
-        // this->update_crt_spacing(2*(this->deg()+1));  
+      if(this->get_crt_spacing() < (2*(this->deg()+1)))
+        this->update_crt_spacing(2*(this->deg()+1));  
     }
     void set_coeffs(std::vector<ZZ> values){
 
@@ -867,8 +874,8 @@ class Polynomial{
       this->set_transf_computed(false);
       this->set_itransf_computed(false);
       this->set_host_updated(true);
-      // if(this->get_crt_spacing() < (2*(this->deg()+1)))
-      //   this->update_crt_spacing(2*(this->deg()+1));  
+      if(this->get_crt_spacing() < (2*(this->deg()+1)))
+        this->update_crt_spacing(2*(this->deg()+1));  
     }
     void set_coeffs(){
 
@@ -913,11 +920,22 @@ class Polynomial{
       // this->update_crt_spacing(this->get_crt_spacing());
       return this->d_polyCRT;
     }
+    #ifdef CUFFTMUL_TRANSFORM
+    Complex* get_device_transf_residues(){
+      // Returns the address of crt residues at device memory
+      return this->d_polyTransf;
+    }
+    void set_device_transf_residues(Complex *residues){
+      d_polyTransf = residues;
+    }
+    #endif
     void set_device_crt_residues(cuyasheint_t *residues){
       d_polyCRT = residues;
     }
 
     int get_crt_spacing(){
+      // this->update_crt_spacing(2*Polynomial::global_phi->deg());
+
       return this->CRTSPACING;
     }
 
@@ -1305,6 +1323,10 @@ class Polynomial{
          */
         // result = cudaMalloc((void**)&d_polyCRT,(new_spacing*(CRTPrimes.size())+new_spacing*STD_BNT_WORDS_ALLOC)*sizeof(cuyasheint_t));        
         // assert(result == cudaSuccess);
+        #ifdef CUFFTMUL_TRANSFORM
+        result = cudaMalloc((void**)&d_polyTransf,new_spacing*(CRTPrimes.size())*sizeof(Complex));        
+        assert(result == cudaSuccess);
+        #endif
         result = cudaMalloc((void**)&d_polyCRT,new_spacing*(CRTPrimes.size())*sizeof(cuyasheint_t));        
         assert(result == cudaSuccess);
         result = cudaMalloc((void**)&tmp,new_spacing*STD_BNT_WORDS_ALLOC*sizeof(cuyasheint_t));        
@@ -1329,6 +1351,10 @@ class Polynomial{
         /**
          * Update residues array
          */
+        #ifdef CUFFTMUL_TRANSFORM
+        result = cudaMemsetAsync(d_polyTransf,0,new_spacing*(CRTPrimes.size())*sizeof(Complex),get_stream());
+        assert(result == cudaSuccess);
+        #endif
         result = cudaMemsetAsync(d_polyCRT,0,new_spacing*(CRTPrimes.size())*sizeof(cuyasheint_t),get_stream());
         assert(result == cudaSuccess);
 
@@ -1528,10 +1554,8 @@ class Polynomial{
     bool TRANSF_COMPUTED;
     bool ITRANSF_COMPUTED;
 
-    #ifdef NTTMUL
+    #ifdef CUFFTMUL_TRANSFORM
     Complex *d_polyTransf = 0x0;
-    #else
-    cuyasheint_t *d_polyTransf = 0x0;
     #endif
 
   protected:

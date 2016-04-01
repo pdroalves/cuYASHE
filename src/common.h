@@ -145,11 +145,17 @@ P* common_multiplication(P *a, P *b){
 	std::cout << "Operator+ on GPU" << std::endl;
 	#endif
 		// Check align
-	int new_spacing = std::max(a->CRTSPACING,b->CRTSPACING);
-	if(a->CRTSPACING != b->CRTSPACING){
-	  a->update_crt_spacing(new_spacing);
-	  b->update_crt_spacing(new_spacing);
-	}
+	int new_spacing = std::max(a->get_crt_spacing(),b->get_crt_spacing());
+	if(new_spacing < CUDAFunctions::N)
+		new_spacing = CUDAFunctions::N;
+	else if(new_spacing > CUDAFunctions::N)
+		CUDAFunctions::init(new_spacing);
+	new_spacing = CUDAFunctions::N;
+
+	if(a->get_crt_spacing() != new_spacing)
+		a->update_crt_spacing(new_spacing);
+	if(b->get_crt_spacing() != new_spacing)
+		b->update_crt_spacing(new_spacing);
 
 	#ifdef VERBOSE
 	std::cout << "Add with CRTSPACING" << a->get_crt_spacing() << std::endl;
@@ -182,11 +188,19 @@ P* common_multiplication(P *a, P *b){
 	}
 
 	P *c = new P(a->get_mod(),a->get_phi(),new_spacing);
+	#ifdef NTTMUL_TRANSFORM
 	CUDAFunctions::callPolynomialMul(  	c->get_device_crt_residues(),
 										a->get_device_crt_residues(),
 										b->get_device_crt_residues(),
-										(int)(a->CRTSPACING*P::CRTPrimes.size()),
+										new_spacing*P::CRTPrimes.size(),
 										a->get_stream());
+	#else
+	CUDAFunctions::executeCuFFTPolynomialMul( 	c->get_device_transf_residues(), 
+	                                            a->get_device_transf_residues(), 
+	                                            b->get_device_transf_residues(), 
+	                                            new_spacing*P::CRTPrimes.size(),
+	                                            b->get_stream());
+	#endif
 
 	c->set_host_updated(false);
 	c->set_icrt_computed(false);
@@ -208,12 +222,18 @@ void common_multiplication_inplace(P *a, P *b){
 	std::cout << "Operator+= on GPU" << std::endl;
 	#endif
 
+	int new_spacing = std::max(a->get_crt_spacing(),b->get_crt_spacing());
 	// Check align
-	int new_spacing = std::max(a->CRTSPACING,b->CRTSPACING);
-	if(a->CRTSPACING != b->CRTSPACING){
-	  a->update_crt_spacing(new_spacing);
-	  b->update_crt_spacing(new_spacing);
-	}
+	if(new_spacing < CUDAFunctions::N)
+		new_spacing = CUDAFunctions::N;
+	else if(new_spacing > CUDAFunctions::N)
+		CUDAFunctions::init(new_spacing);
+	new_spacing = CUDAFunctions::N;
+
+	if(a->get_crt_spacing() != new_spacing)
+		a->update_crt_spacing(new_spacing);
+	if(b->get_crt_spacing() != new_spacing)
+		b->update_crt_spacing(new_spacing);
 
 	#ifdef VERBOSE
 	std::cout << "Add with CRTSPACING" << a->get_crt_spacing() << std::endl;
@@ -244,7 +264,7 @@ void common_multiplication_inplace(P *a, P *b){
 	CUDAFunctions::callPolynomialMul(   a->get_device_crt_residues(),
 										a->get_device_crt_residues(),
 										b->get_device_crt_residues(),
-										(int)(a->CRTSPACING*P::CRTPrimes.size()),
+										new_spacing*P::CRTPrimes.size(),
 										a->get_stream());
 
 	a->set_host_updated(false);

@@ -7,6 +7,11 @@
 #include "common.h"
 #include "cuda_bn.h"
 
+#include <cuda.h>
+#include <cuda_runtime_api.h>
+#include <cuda_runtime.h>
+#include <cufft.h>
+
 ZZ Polynomial::CRTProduct = ZZ(1);
 std::vector<cuyasheint_t> Polynomial::CRTPrimes(0);
 std::vector<ZZ> Polynomial::CRTMpi;
@@ -266,6 +271,10 @@ ZZ get_ZZ(bn_t *a){
   return b;
 }
 
+__global__ void nothing_here(Complex *a){
+  a[0] = a[0];
+}
+
 /**
  * Applies NTT
  */
@@ -290,12 +299,16 @@ void Polynomial::transf(){
   );
 
   #else
-  
-  // cudafftResult fftResult = cufftExecZ2Z( CUDAFunctions::plan,
-  //                                         (cufftDoubleComplex *)(get_device_crt_residues()),
-  //                                         (cufftDoubleComplex *)(get_device_transf_residues()),
-  //                                         CUFFT_FORWARD
-  //                                       );
+  int size = N*CRTPrimes.size();
+
+  CUDAFunctions::executeCopyIntegerToComplex(d_polyTransf,d_polyCRT,size,get_stream());
+  assert(cudaGetLastError() == cudaSuccess);
+
+  cufftExecZ2Z( CUDAFunctions::plan,
+                (cufftDoubleComplex *)(d_polyTransf),
+                (cufftDoubleComplex *)(d_polyTransf),
+                CUFFT_FORWARD
+              );
   // assert(fftResult == CUFFT_SUCCESS);
 
   #endif
@@ -325,13 +338,17 @@ void Polynomial::itransf(){
   );
 
   #else
+  int size = N*CRTPrimes.size();
   
-  // cudafftResult fftResult = cufftExecZ2Z( CUDAFunctions::plan,
-  //                                         (cufftDoubleComplex *)(get_device_crt_residues()),
-  //                                         (cufftDoubleComplex *)(get_device_transf_residues()),
-  //                                         CUFFT_INVERSE
-  //                                       );
+  cufftExecZ2Z( CUDAFunctions::plan,
+                (cufftDoubleComplex *)(d_polyTransf),
+                (cufftDoubleComplex *)(d_polyTransf),
+                CUFFT_INVERSE
+              );
   // assert(fftResult == CUFFT_SUCCESS);
+
+  CUDAFunctions::executeCopyAndNormalizeComplexRealPartToInteger(d_polyCRT,(cufftDoubleComplex *)d_polyTransf,size,N,get_stream());
+  assert(cudaGetLastError() == cudaSuccess);
   #endif
   set_transf_computed(false); // This is in-place
   set_itransf_computed(true);

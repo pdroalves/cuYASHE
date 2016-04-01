@@ -53,8 +53,8 @@ cufftHandle CUDAFunctions::plan;
 // #endif
 int CUDAFunctions::N = 0;
 
-__host__ __device__ __inline__  uint64_t s_add(uint64_t a,uint64_t b);
-__host__ __device__ __inline__ uint64_t s_sub(uint64_t a,uint64_t b);
+__host__ __device__ inline  uint64_t s_add(uint64_t a,uint64_t b);
+__host__ __device__ inline uint64_t s_sub(uint64_t a,uint64_t b);
 
 ///////////////////////
 // Memory operations //
@@ -133,9 +133,10 @@ __global__ void polynomialAddSub(const int OP,const cuyasheint_t *a,const cuyash
 
 __host__ void CUDAFunctions::callPolynomialAddSub(cuyasheint_t *c,cuyasheint_t *a,cuyasheint_t *b,int size,int OP,cudaStream_t stream){
   // This method expects that both arrays are aligned
-  int ADDGRIDXDIM = (size%ADDBLOCKXDIM == 0? size/ADDBLOCKXDIM : size/ADDBLOCKXDIM + 1);
+  int nthreads = 64;
+  int ADDGRIDXDIM = (size%nthreads == 0? size/nthreads : size/nthreads + 1);
   dim3 gridDim(ADDGRIDXDIM);
-  dim3 blockDim(ADDBLOCKXDIM);
+  dim3 blockDim(nthreads);
 
   polynomialAddSub <<< gridDim,blockDim,0,stream  >>> (OP,a,b,c,size,N);
   assert(cudaGetLastError() == cudaSuccess);
@@ -214,17 +215,11 @@ __global__ void copyAndRealignIntegerToComplex(Complex *a,cuyasheint_t *b,const 
   }
 }
 
-__global__ void copyAndNormalizeComplexRealPartToInteger(cuyasheint_t *b,const Complex *a,const int size,const double scale,const int N){
+__global__ void copyAndNormalizeComplexRealPartToInteger(cuyasheint_t *b,const Complex *a,const int size,const int N){
   const int tid = threadIdx.x + blockDim.x*blockIdx.x;
-  // const int rid = tid / N; // Residue id
-  cuyasheint_t value;
-  double fvalue;
-  // double frac;
   if(tid < size ){
-      fvalue = a[tid].x * scale;
-      value = rint(fvalue);
-
-      b[tid] = value;
+      double scale = 1.0/N;
+      b[tid] = rint(a[tid].x*scale);
   }
 }
 ////////////////////////////////////////////////////////////////////////////////
@@ -242,7 +237,7 @@ static __device__ inline Complex ComplexMul(Complex a, Complex b)
 
 
 // Complex pointwise multiplication
-static __global__ void polynomialcuFFTMul(const Complex *a, const Complex *b,Complex *c,int size){
+static __global__ void polynomialcuFFTMul(Complex *c, const Complex *a,const Complex *b,int size){
     const int tid = threadIdx.x + blockDim.x*blockIdx.x;
 
     if(tid < size  ){
@@ -288,7 +283,7 @@ __host__ __device__ uint64_t s_rem (uint64_t a)
   return res;
 }
 
-__host__ __device__  __inline__ uint64_t s_mul(uint64_t a,uint64_t b){
+__host__ __device__  inline uint64_t s_mul(uint64_t a,uint64_t b){
   // Multiply and reduce a and b by prime 2^64-2^32+1
   #ifdef __CUDA_ARCH__
   const uint64_t GAP = (UINT64_MAX-PRIMEP+1);
@@ -333,7 +328,7 @@ __host__ __device__  __inline__ uint64_t s_mul(uint64_t a,uint64_t b){
   #endif
   return res;
 }
-__host__ __device__ __inline__  uint64_t s_add(uint64_t a,uint64_t b){
+__host__ __device__ inline  uint64_t s_add(uint64_t a,uint64_t b){
   // Add and reduce a and b by prime 2^64-2^32+1
   // 4294967295L == UINT64_MAX - P
   uint64_t res = a+b;
@@ -342,7 +337,7 @@ __host__ __device__ __inline__  uint64_t s_add(uint64_t a,uint64_t b){
   return s_rem(res);
 }
 
-__host__ __device__ __inline__ uint64_t s_sub(uint64_t a,uint64_t b){
+__host__ __device__ inline uint64_t s_sub(uint64_t a,uint64_t b){
   // Computes a-b % P
   // 4294967295L == UINT64_MAX - P
 
@@ -365,7 +360,7 @@ __device__ void butterfly(uint64_t *v){
 }
 
 template<>
-__device__ __inline__ void butterfly<2,FORWARD>(uint64_t *v){
+__device__ inline void butterfly<2,FORWARD>(uint64_t *v){
   ///////////////////////
   // Radix-2 Butterfly //
   ///////////////////////
@@ -376,7 +371,7 @@ __device__ __inline__ void butterfly<2,FORWARD>(uint64_t *v){
 }
 
 template<>
-__device__ __inline__ void butterfly<2,INVERSE>(uint64_t *v){
+__device__ inline void butterfly<2,INVERSE>(uint64_t *v){
   ///////////////////////
   // Radix-2 Butterfly //
   ///////////////////////
@@ -387,7 +382,7 @@ __device__ __inline__ void butterfly<2,INVERSE>(uint64_t *v){
 }
 
 template<>
-__device__ __inline__ void butterfly<4,FORWARD>(uint64_t *v){
+__device__ inline void butterfly<4,FORWARD>(uint64_t *v){
   ///////////////////////
   // Radix-4 Butterfly //
   ///////////////////////
@@ -419,7 +414,7 @@ __device__ __inline__ void butterfly<4,FORWARD>(uint64_t *v){
 }
 
 template<>
-__device__ __inline__ void butterfly<4,INVERSE>(uint64_t *v){
+__device__ inline void butterfly<4,INVERSE>(uint64_t *v){
   ///////////////////////
   // Radix-4 Butterfly //
   ///////////////////////
@@ -592,6 +587,9 @@ __host__ __device__ void NTTIteration(cuyasheint_t *W,
 	uint64_t v[RADIX] = {0};
 	const int idxS = j+residue_index;
   int w_index = ((j%Ns)*N)/(Ns*RADIX);
+  const int idxD = expand(j,Ns,RADIX)+residue_index;
+  if(idxD == 151 || idxD+Ns == 151)
+    v[0] = v[0];
 
   for(int r=0; r<RADIX; r++)
     if(type == FORWARD)
@@ -601,7 +599,7 @@ __host__ __device__ void NTTIteration(cuyasheint_t *W,
 
   butterfly<RADIX,type>(v);
 
-	const int idxD = expand(j,Ns,RADIX)+residue_index;
+	// const int idxD = expand(j,Ns,RADIX)+residue_index;
 	for(int r=0; r<RADIX;r++)
   		data1[idxD+r*Ns] = v[r];
   
@@ -820,6 +818,9 @@ __host__ cuyasheint_t* CUDAFunctions::applyNTT( cuyasheint_t *d_a,
                                                 const int NPolis,
                                                 int type,
                                                 cudaStream_t stream){
+  if(N != CUDAFunctions::N)
+    CUDAFunctions::init(N/2);
+
   cudaError_t result;
   const int size = N*NPolis;
   // cuyasheint_t *aux = CUDAFunctions::d_mulAux;
@@ -891,7 +892,6 @@ __host__ void CUDAFunctions::executeCopyIntegerToComplex(   Complex *d_a,
 __host__ void CUDAFunctions::executeCopyAndNormalizeComplexRealPartToInteger(   cuyasheint_t *d_a, 
                                                                                 cufftDoubleComplex *a,
                                                                                 const int size,
-                                                                                int signal_size,
                                                                                 int N,
                                                                                 cudaStream_t stream){
   dim3 blockDim(32);
@@ -900,7 +900,6 @@ __host__ void CUDAFunctions::executeCopyAndNormalizeComplexRealPartToInteger(   
   copyAndNormalizeComplexRealPartToInteger<<< gridDim,blockDim,0,stream >>>( d_a,
                                                                             a,
                                                                             size,
-                                                                            1.0f/signal_size,
                                                                             N);
 
   assert(cudaGetLastError() == cudaSuccess);
@@ -916,16 +915,15 @@ __host__ void CUDAFunctions::executeNTTScale(   cuyasheint_t *d_result,
   assert(cudaGetLastError() == cudaSuccess);
 }
 
-__host__ void CUDAFunctions::executeCuFFTPolynomialMul( Complex *a, 
+__host__ void CUDAFunctions::executeCuFFTPolynomialMul( Complex *c, 
+                                                        Complex *a, 
                                                         Complex *b, 
-                                                        Complex *c, 
-                                                        int size_c, 
                                                         int size, 
                                                         cudaStream_t stream){
   dim3 blockDim(32);
   dim3 gridDim(size/32 + (size % 32 == 0? 0:1));
 
-  polynomialcuFFTMul<<<gridDim,blockDim,0,stream>>>(a,b,c,size);
+  polynomialcuFFTMul<<<gridDim,blockDim,0,stream>>>(c,a,b,size);
 
   assert(cudaGetLastError() == cudaSuccess);
 }
@@ -1006,22 +1004,11 @@ __host__ cuyasheint_t* CUDAFunctions::callPolynomialMul(cuyasheint_t *output,
     /////////////
     // cuFFT  //
     ///////////
-    Complex *d_a = CUDAFunctions::d_mulComplexA;
-    Complex *d_b = CUDAFunctions::d_mulComplexB;
-    Complex *d_c = CUDAFunctions::d_mulComplexC;
-    
-    result = cudaMemsetAsync(d_a,0,size*sizeof(Complex),stream);
-    assert(result == cudaSuccess);
-    result = cudaMemsetAsync(d_b,0,size*sizeof(Complex),stream);
-    assert(result == cudaSuccess);
-    result = cudaMemsetAsync(d_c,0,size*sizeof(Complex),stream);
-    assert(result == cudaSuccess);
+    // dim3 blockDim(32);
+    // dim3 gridDim(size/32 + (size % 32 == 0? 0:1));
 
-    dim3 blockDim(32);
-    dim3 gridDim(size/32 + (size % 32 == 0? 0:1));
-
-    polynomialcuFFTMul<<<gridDim,blockDim,0,stream>>>(d_a,d_b,d_c,size);
-    assert(cudaGetLastError() == cudaSuccess);
+    // polynomialcuFFTMul<<<gridDim,blockDim,0,stream>>>(d_a,d_b,d_c,size);
+    // assert(cudaGetLastError() == cudaSuccess);
   }
 
   return d_result;
@@ -1309,7 +1296,11 @@ __host__ void Polynomial::reduce(){
   
   // Until we debug reduction on GPU, we need this
   // #warning Polynomial reduction forced to HOST
-  // update_host_data();
+  update_host_data();
+  set_crt_computed(false);
+  set_icrt_computed(false);
+  set_transf_computed(false);
+  set_itransf_computed(false);
 
   if(!(this->get_crt_computed() || this->get_icrt_computed() || this->get_transf_computed())){
     #ifdef VERBOSE
@@ -1359,6 +1350,8 @@ __host__ void Polynomial::reduce(){
     int size = (N-half)*NPolis;
 
     if(size > 0){
+      itransf();
+
       dim3 blockDim(ADDBLOCKXDIM);
       dim3 gridDim(size/ADDBLOCKXDIM + (size % ADDBLOCKXDIM == 0? 0:1));
       /**

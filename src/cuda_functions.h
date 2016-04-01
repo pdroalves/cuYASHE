@@ -74,11 +74,10 @@ class CUDAFunctions{
                                     const int size, 
                                     cudaStream_t stream);
     static void executeCuFFTPolynomialMul( Complex *a, 
-                                                    Complex *b, 
-                                                    Complex *c, 
-                                                    int size_c, 
-                                                    int size, 
-                                                    cudaStream_t stream);
+                                            Complex *b, 
+                                            Complex *c, 
+                                            int size, 
+                                            cudaStream_t stream);
     static void executePolynomialAdd(cuyasheint_t *c, 
                                     cuyasheint_t *a, 
                                     cuyasheint_t *b, 
@@ -91,7 +90,6 @@ class CUDAFunctions{
     static void executeCopyAndNormalizeComplexRealPartToInteger(   cuyasheint_t *d_a, 
                                                                                 cufftDoubleComplex *a,
                                                                                 const int size,
-                                                                                int signal_size,
                                                                                 int N,
                                                                                 cudaStream_t stream);
     static cuyasheint_t* callPolynomialMul(cuyasheint_t *output,

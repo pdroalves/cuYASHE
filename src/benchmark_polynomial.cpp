@@ -16,7 +16,7 @@
 
 #define BILLION  1000000000L
 #define MILLION  1000000L
-#define N 100
+#define N 1
 
 #define CUHEA 0
 #define CUHEB 1
@@ -433,7 +433,7 @@ int main(int argc,char* argv[]){
         CUDAFunctions::callPolynomialAddSub(a.get_device_crt_residues(),
                                             a.get_device_crt_residues(),
                                             b.get_device_crt_residues(),
-                                            (int)(a.CRTSPACING*Polynomial::CRTPrimes.size()),
+                                            (int)(a.get_crt_spacing()*Polynomial::CRTPrimes.size()),
                                             ADD,
                                             a.get_stream());
 
@@ -447,8 +447,8 @@ int main(int argc,char* argv[]){
       gpu_add_without_memcopy << d << " " << diff  << std::endl;
 
 
-      // ///////////////////////////////////////////////
-      // // MUL
+      // // ///////////////////////////////////////////////
+      // // // MUL
       Polynomial::random(&a,d-1);
       Polynomial::random(&b,d-1);
       a.update_crt_spacing(2*d);

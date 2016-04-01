@@ -39,7 +39,7 @@ struct PolySuite
 
     PolySuite(){
         BOOST_TEST_MESSAGE("setup PolySuite");
-	std::cout << "CRT Primes of " << CRTPRIMESIZE << " bits" << std::endl;
+	      std::cout << "CRT Primes of " << CRTPRIMESIZE << " bits" << std::endl;
 
         degree = 16;
 
@@ -112,7 +112,7 @@ struct YasheSuite
 
 
         Polynomial::gen_crt_primes(Polynomial::global_mod,degree);
-        CUDAFunctions::init(2*degree);
+        CUDAFunctions::init(degree);
 
         // Yashe
         cipher = Yashe();
@@ -187,11 +187,11 @@ BOOST_AUTO_TEST_CASE(simpleAdd)
   c.update_host_data();//
   c.normalize();
 
-  // #ifdef VERBOSE
+  #ifdef VERBOSE
   std::cout << "a: " << a.to_string() << std::endl;
   std::cout << "b: " << b.to_string() << std::endl;
   std::cout << "c: " << c.to_string() << std::endl;
-  // #endif
+  #endif
   BOOST_REQUIRE(c == (a*2));
 }
 
@@ -441,7 +441,7 @@ BOOST_AUTO_TEST_CASE(simpleMultiplyByPolynomial)
 
   Polynomial c = a*b;
   c.reduce();
-  // c.normalize();
+  c.normalize();
 
   ZZ_pEX c_ntl = a_ntl*b_ntl;
   c_ntl %= conv<ZZ_pEX>(NTL_Phi);
@@ -473,7 +473,7 @@ BOOST_AUTO_TEST_CASE(simpleMultiplyByPolynomial)
 BOOST_AUTO_TEST_CASE(multiplyByPolynomial)
 {
 
-  CUDAFunctions::init(2*degree);
+  CUDAFunctions::init(degree);
 
   for(int count = 0; count < NTESTS; count++){
 
@@ -491,16 +491,16 @@ BOOST_AUTO_TEST_CASE(multiplyByPolynomial)
       NTL::SetCoeff(b_ntl,i,conv<ZZ_p>(b.get_coeff(i)));
 
     Polynomial c = a*b;
-      std::cout << "c: " << (c.to_string()) <<std::endl;
+      // std::cout << "c: " << (c.to_string()) <<std::endl;
     c.reduce();
 
     ZZ_pEX c_ntl = a_ntl*b_ntl;
     c_ntl %= conv<ZZ_pEX>(NTL_Phi);
 
-      std::cout << "a: " << (a.to_string()) <<std::endl;
-      std::cout << "b: " << (b.to_string()) <<std::endl;
-      std::cout << "c: " << (c.to_string()) <<std::endl;
-      std::cout << "c_ntl: " << c_ntl << " degree: " << NTL::deg(c_ntl) << std::endl << std::endl;
+      // std::cout << "a: " << (a.to_string()) <<std::endl;
+      // std::cout << "b: " << (b.to_string()) <<std::endl;
+      // std::cout << "c: " << (c.to_string()) <<std::endl;
+      // std::cout << "c_ntl: " << c_ntl << " degree: " << NTL::deg(c_ntl) << std::endl << std::endl;
     #ifdef DEBUG
     if(c_ntl != c){
     }
@@ -528,7 +528,7 @@ BOOST_AUTO_TEST_CASE(multiplyByPolynomial)
 BOOST_AUTO_TEST_CASE(multiplyAndAddByPolynomial)
 {
 
-  CUDAFunctions::init(2*degree);
+  CUDAFunctions::init(degree);
 
   for(int count = 0; count < NTESTS; count++){
 
@@ -581,7 +581,7 @@ BOOST_AUTO_TEST_CASE(multiplyAndAddByPolynomial)
 BOOST_AUTO_TEST_CASE(addAndMultiplyByPolynomial)
 {
 
-  CUDAFunctions::init(2*degree);
+  CUDAFunctions::init(degree);
 
   for(int count = 0; count < NTESTS; count++){
 
@@ -630,7 +630,7 @@ BOOST_AUTO_TEST_CASE(addAndMultiplyByPolynomial)
 BOOST_AUTO_TEST_CASE(randomPolynomialOperations)
 {
 
-  CUDAFunctions::init(2*degree);
+  CUDAFunctions::init(degree);
 
   long value;
   ZZ valueZZ;
@@ -824,7 +824,7 @@ BOOST_AUTO_TEST_CASE(severalMultiplications)
   Polynomial a;
   Polynomial b;
 
-  CUDAFunctions::init(2*degree);
+  CUDAFunctions::init(degree);
 
   Polynomial::random(&a,degree-1);
   Polynomial::random(&b,degree-1);

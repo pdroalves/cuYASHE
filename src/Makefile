@@ -1,4 +1,4 @@
-OPT = -O3
+OPT = -O0
 
 CUDA_CC = nvcc $(OPT) -G -g -std=c++11
 CC = g++ -std=c++11 -g -Wall -Wfatal-errors -m64 $(OPT)
@@ -46,8 +46,9 @@ benchmark_polynomial.o:benchmark_polynomial.cpp
 benchmark_yashe.o:benchmark_yashe.cpp
 	$(CC) -c benchmark_yashe.cpp -o benchmark_yashe.o $(OPENMP) $(LCUDA) $(ICUDA) -lcurand $(LTIME_MEASURE)
 
-polynomial.o:polynomial.cpp
-	$(CC) -c polynomial.cpp -o polynomial.o $(OPENMP) $(LCUDA) $(ICUDA) $(NTL)
+polynomial.o:polynomial.cu
+	# $(CC) -c polynomial.cpp -o polynomial.o $(OPENMP) $(LCUDA) $(ICUDA) $(NTL) -lcufft
+	$(CUDA_CC) $(CUDA_ARCH) -c polynomial.cu -o polynomial.o  -lcufft -Xcompiler $(NTL) -Xcompiler $(OPENMP) 
 
 ciphertext.o:ciphertext.cu
 	$(CUDA_CC) $(CUDA_ARCH) -c ciphertext.cu -Xcompiler $(NTL) -Xcompiler $(OPENMP) 

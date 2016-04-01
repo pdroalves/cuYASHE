@@ -26,6 +26,7 @@ class Ciphertext: public Polynomial{
       this->d_bn_coefs = p.d_bn_coefs;
       this->h_bn_coefs = p.h_bn_coefs;
       this->d_polyCRT = p.get_device_crt_residues();
+      this->set_device_transf_residues( p.get_device_transf_residues() );
 
       this->set_crt_computed(p.get_crt_computed());
       this->set_icrt_computed(p.get_icrt_computed());
@@ -51,6 +52,8 @@ class Ciphertext: public Polynomial{
       this->d_bn_coefs = p->d_bn_coefs;
       this->h_bn_coefs = p->h_bn_coefs;
       this->d_polyCRT = p->get_device_crt_residues();
+      this->set_device_transf_residues( p->get_device_transf_residues() );
+
 
       this->set_crt_computed(p->get_crt_computed());
       this->set_icrt_computed(p->get_icrt_computed());
@@ -74,6 +77,8 @@ class Ciphertext: public Polynomial{
       this->d_bn_coefs = p.d_bn_coefs;
       this->h_bn_coefs = p.h_bn_coefs;
       this->d_polyCRT = p.get_device_crt_residues();
+      this->set_device_transf_residues( p.get_device_transf_residues() );
+
 
       this->set_crt_computed(p.get_crt_computed());
       this->set_icrt_computed(p.get_icrt_computed());
