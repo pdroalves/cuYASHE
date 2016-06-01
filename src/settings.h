@@ -1,11 +1,28 @@
+/**
+ * cuYASHE
+ * Copyright (C) 2015-2016 cuYASHE Authors
+ * 
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ * 
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ * 
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
 #ifndef SETTINGS_H
 #define SETTINGS_H
 
 #include <cstdint>
 
 // This define the default transform for polynomial multiplication
- #define NTTMUL_TRANSFORM
-//#define CUFFTMUL_TRANSFORM
+// #define NTTMUL_TRANSFORM
+#define CUFFTMUL_TRANSFORM
 
 enum transforms {NTTMUL, CUFFTMUL};
 
@@ -15,7 +32,7 @@ enum transforms {NTTMUL, CUFFTMUL};
 #define PRIMES_BUCKET_SIZE 56                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     //
 extern const uint32_t PRIMES_BUCKET[];
 #else
-#define CRTPRIMESIZE 15 
+#define CRTPRIMESIZE 10 
 #define PRIMES_BUCKET_SIZE 200                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           //
 extern const uint32_t PRIMES_BUCKET[];
 #endif
@@ -35,7 +52,7 @@ extern const uint32_t PRIMES_BUCKET[];
 // Standard number of words to allocate
 // #define STD_BNT_WORDS_ALLOC 32 // Up to 1024 bits big integers
 #define STD_BNT_WORDS_ALLOC 10 // Up to  bits big integers
-#define DSTD_BNT_WORDS_ALLOC 2*STD_BNT_WORDS_ALLOC // Up to  bits big integers
+#define DSTD_BNT_WORDS_ALLOC 20 // Up to  bits big integers
 
 // We use cuyasheint_t as uint64_t to simplify operations
 typedef uint64_t cuyasheint_t;

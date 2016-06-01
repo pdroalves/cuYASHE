@@ -1,3 +1,20 @@
+/**
+ * cuYASHE
+ * Copyright (C) 2015-2016 cuYASHE Authors
+ * 
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ * 
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ * 
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
 #include <assert.h>
 #include "distribution.h"
 
@@ -162,6 +179,8 @@ void Distribution::generate_sample(Polynomial *p,int mod,int degree){
   callCuGetUniformSampleCRT(p->get_device_crt_residues(), degree +1,Polynomial::CRTPrimes.size(), mod);
   p->set_icrt_computed(false);
   p->set_crt_computed(true);
+  p->set_itransf_computed(false);
+  p->set_transf_computed(false);
   p->set_host_updated(false);
   
   ///////////////////////////////////////
@@ -178,7 +197,7 @@ void Distribution::generate_sample(Polynomial *p,int mod,int degree){
 Polynomial Distribution::get_sample(int degree,int spacing){
   Polynomial p(spacing);
   int mod;
-  int rec;
+  // int rec;
   // int phase = 0;
   switch(this->kind){
     case DISCRETE_GAUSSIAN:
@@ -196,6 +215,7 @@ Polynomial Distribution::get_sample(int degree,int spacing){
   }
 
   p.set_coeffs(degree+1);
+  // p.update_crt_spacing(2*(degree+1));
   generate_sample(&p,mod,degree);
   return p;
 }
@@ -220,6 +240,13 @@ Polynomial Distribution::get_sample(Polynomial *p, int degree){
     break;
   }
 
+
+  p->set_icrt_computed(false);
+  p->set_crt_computed(false);
+  p->set_itransf_computed(false);
+  p->set_transf_computed(false);
+  p->set_host_updated(true);
+  p->update_crt_spacing(2*(degree+1));
   p->set_coeffs(degree+1);
   generate_sample(p,mod,degree);
   return p;

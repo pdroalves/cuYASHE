@@ -1,11 +1,32 @@
+/**
+ * cuYASHE
+ * Copyright (C) 2015-2016 cuYASHE Authors
+ * 
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ * 
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ * 
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
 #include <omp.h>
 #include <assert.h>
 #include <string.h>
 #include "polynomial.h"
-#include "integer.h"
 #include "settings.h"
 #include "common.h"
 #include "cuda_bn.h"
+
+#include <cuda.h>
+#include <cuda_runtime_api.h>
+#include <cuda_runtime.h>
+#include <cufft.h>
 
 ZZ Polynomial::CRTProduct = ZZ(1);
 std::vector<cuyasheint_t> Polynomial::CRTPrimes(0);
@@ -71,94 +92,8 @@ Polynomial Polynomial::operator*(Polynomial &b){
 Polynomial Polynomial::operator*=(Polynomial &b){
   common_multiplication_inplace<Polynomial>(this,&b);
 
-  // cudaError_t result = cudaDeviceSynchronize();
-  // assert(result == cudaSuccess);
-
- //////////////////////////////////
-  // Store result in polynomial a //
-  //////////////////////////////////
-  // Check align
-  // int needed_spacing = pow(2,ceil(log2(this->deg() + b.deg())));
-  // int needed_spacing = pow(2,ceil(log2(std::max(this->get_crt_spacing(),b.get_crt_spacing()))));
-    
-  // if(needed_spacing < CUDAFunctions::N)
-  // needed_spacing = CUDAFunctions::N;
-  // else if(needed_spacing != CUDAFunctions::N)
-  // // Re-compute W matrix
-  // CUDAFunctions::init(needed_spacing);
-  
-  // bool update_A_spacing = false; 
-  // bool update_B_spacing = false;
-  // #ifdef NTTMUL
-  // if(this->CRTSPACING != needed_spacing)
-  //   this->update_crt_spacing(needed_spacing);
-  // if(b.CRTSPACING != needed_spacing)
-  //   b.update_crt_spacing(needed_spacing);
-  // #elif defined(CUFFTMUL)
-  // if(this->get_crt_spacing() != needed_spacing){
-  //   // if(!this->get_crt_computed())
-  //     // this->update_crt_spacing(needed_spacing);
-  //   // else
-  //     update_A_spacing = true;    
-  // }
-  // if(b.get_crt_spacing() != needed_spacing){
-  //   // if(!b.get_crt_computed())
-  //     // b.update_crt_spacing(needed_spacing);
-  //   // else
-  //     update_B_spacing = true;
-  // }
-  // #endif
-
-  // #ifdef VERBOSE
-  // std::cout << "Mul with CRTSPACING " << needed_spacing << std::endl;
-  // // std::cout << "this: " << this->to_string() << std::endl;
-  // // std::cout << "other " << b.to_string() << std::endl;
-  // #endif
-
-  // // Apply CRT and copy data to global memory, if needed
-  // // #pragma omp sections
-  // {
-  //     // #pragma omp section
-  //     { 
-  //   #ifdef VERBOSE
-  //   std::cout << "a" << std::endl;
-  //   #endif
-  //   if(!this->get_crt_computed()){
-  //     this->update_device_data();
-  //   }
-
-  //     }
-  //     // #pragma omp section
-  //     {
-  //   #ifdef VERBOSE
-  //   std::cout << "b" << std::endl;
-  //   #endif
-  //   if(!b.get_crt_computed()){
-  //     b.update_device_data();
-  //   }
-  //     }
-  // }
-  // // start = get_cycles();
-  // cuyasheint_t *d_result = this->get_device_crt_residues();
-  // if(this->get_crt_spacing() > 0 && b.get_crt_spacing() > 0)
-  //   d_result = CUDAFunctions::callPolynomialMul(  this->get_device_crt_residues(),
-  //                   this->get_device_crt_residues(),
-  //                   update_A_spacing,
-  //                   this->get_crt_spacing(),
-  //                   b.get_device_crt_residues(),
-  //                   update_B_spacing,
-  //                   b.get_crt_spacing(),
-  //                   needed_spacing,
-  //                   this->CRTPrimes.size(),
-  //                     this->get_stream()
-  //                 );
-  // this->set_device_crt_residues(d_result);
-  // this->set_host_updated(false);
-  // this->set_icrt_computed(false);
-  // this->set_crt_computed(true);
-
-  // cudaError_t result = cudaDeviceSynchronize();
-  // assert(result == cudaSuccess);
+  cudaError_t result = cudaDeviceSynchronize();
+  assert(result == cudaSuccess);
   return *this;
 }
 
@@ -243,7 +178,7 @@ void get_words(bn_t *b,ZZ a){
     if(used >= alloc){
       h_dp = (cuyasheint_t*)realloc(h_dp,alloc+STD_BNT_WORDS_ALLOC);
       alloc += STD_BNT_WORDS_ALLOC;
-      std::cout << "get_words realloc!" << std::endl;
+      std::cout << "get_words realloc! This shouldn't happen." << std::endl;
     }
     h_dp[used] = conv<uint64_t>(x);
   }
@@ -294,7 +229,7 @@ void get_words_host(bn_t *b,ZZ a){
   }
 
   // if(b->alloc != alloc && alloc > 0){
-    cudaError_t result;
+    // cudaError_t result;
     if(b->alloc != alloc || b->dp == 0x0)
       // If b->dp was allocated with less data than we need
       if(b->alloc != 0)
@@ -352,6 +287,89 @@ ZZ get_ZZ(bn_t *a){
   return b;
 }
 
+__global__ void nothing_here(Complex *a){
+  a[0] = a[0];
+}
+
+/**
+ * Applies NTT
+ */
+void Polynomial::transf(){
+  if(!get_crt_computed())
+    crt();
+  int N = (get_crt_spacing());
+
+  #ifdef NTTMUL_TRANSFORM
+  // std::cout << "Transform" << std::endl;
+
+  // int size = N*Polynomial::CRTPrimes.size();
+
+  // cudaError_t result = cudaMemsetAsync(CUDAFunctions::d_mulAux,
+  //                                       0,
+  //                                       size*sizeof(cuyasheint_t),
+  //                                       get_stream());  
+  // assert(result == cudaSuccess);
+
+  set_device_crt_residues(
+    CUDAFunctions::applyNTT( get_device_crt_residues(), N, CRTPrimes.size(), FORWARD, get_stream() )
+  );
+
+  #else
+  int size = N*CRTPrimes.size();
+
+  CUDAFunctions::executeCopyIntegerToComplex(d_polyTransf,d_polyCRT,size,get_stream());
+  assert(cudaGetLastError() == cudaSuccess);
+
+  cufftExecZ2Z( CUDAFunctions::plan,
+                (cufftDoubleComplex *)(d_polyTransf),
+                (cufftDoubleComplex *)(d_polyTransf),
+                CUFFT_FORWARD
+              );
+  // assert(fftResult == CUFFT_SUCCESS);
+
+  #endif
+
+  set_transf_computed(true);
+  set_crt_computed(false); // This is in-place
+}
+
+// Applies FFT
+void Polynomial::itransf(){
+  if(!get_transf_computed())
+    return;
+  int N = get_crt_spacing();
+
+  #ifdef NTTMUL_TRANSFORM
+  // std::cout << "Inverse Transform" << std::endl;
+  // int size = N*Polynomial::CRTPrimes.size();
+
+  // cudaError_t result = cudaMemsetAsync(CUDAFunctions::d_mulAux,
+  //                                       0,
+  //                                       size*sizeof(cuyasheint_t),
+  //                                       get_stream());  
+  // assert(result == cudaSuccess);
+
+  set_device_crt_residues(
+    CUDAFunctions::applyNTT( get_device_crt_residues(), N, CRTPrimes.size(), INVERSE, get_stream())
+  );
+
+  #else
+  int size = N*CRTPrimes.size();
+  
+  cufftExecZ2Z( CUDAFunctions::plan,
+                (cufftDoubleComplex *)(d_polyTransf),
+                (cufftDoubleComplex *)(d_polyTransf),
+                CUFFT_INVERSE
+              );
+  // assert(fftResult == CUFFT_SUCCESS);
+
+  CUDAFunctions::executeCopyAndNormalizeComplexRealPartToInteger(d_polyCRT,(cufftDoubleComplex *)d_polyTransf,size,N,get_stream());
+  assert(cudaGetLastError() == cudaSuccess);
+  #endif
+  set_transf_computed(false); // This is in-place
+  set_itransf_computed(true);
+}
+
 void Polynomial::crt(){
   if(get_crt_computed())
     return;
@@ -381,6 +399,9 @@ void Polynomial::crt(){
                           // INVERSE,
                           // get_stream());
   set_crt_computed(true);
+  
+  // NTT-FFT
+  transf();
 }
 
 void Polynomial::update_device_data(){
@@ -401,12 +422,12 @@ void Polynomial::update_device_data(){
     #endif
     
     // Verifica se o espaçamento é válido. Se não for, ajusta.
-    if(this->get_crt_spacing() < (this->deg()+1)){
+    if(this->get_crt_spacing() < 2*(this->deg()+1)){
       int new_spacing;
-      if((this->deg()+1) > 0)
-        new_spacing = this->deg()+1;
-      else
-        new_spacing = Polynomial::global_phi->deg();
+      // if((this->deg()+1) > 0)
+        // new_spacing = 2*(this->deg()+1);
+      // else
+        new_spacing = 2*Polynomial::global_phi->deg();
 
       // Data on device isn't updated (we check it on begginning)
       // So, update_crt_spacing(int) will only update CRTSpacing and alloc memory
@@ -468,13 +489,16 @@ void Polynomial::icrt(){
   if(get_icrt_computed())
     return;
 
+  // INTT-IFFT
+  itransf();
+
   /**
    * If there is no residue computed on GPU, just copy host data
    */
-  if(!get_crt_computed()){
-    update_device_data();
-    return;
-  }
+  // if(!get_itransf_computed()){
+    // ();
+    // return;
+  // }
 
   #ifdef SPEEDCHECK
   std::cout << "Applying ICRT." << std::endl;
@@ -497,6 +521,8 @@ void Polynomial::icrt(){
       );
 
   this->set_icrt_computed(true);
+
+
 }
 
 void Polynomial::update_host_data(){
@@ -706,7 +732,9 @@ bn_t get_reciprocal(bn_t q){
 void compute_reciprocal(ZZ q){
       ZZ u_ZZ;
 
-      ZZ x = power2_ZZ(4*WORD);
+      int nwords = NTL::NumBits(q)/WORD + (NTL::NumBits(q)%WORD != 0);
+
+      ZZ x = power2_ZZ(2*WORD*nwords);
       u_ZZ = x/q;
       // std::cout << "The reciprocal of " << q << " is " << u_ZZ << std::endl;
 

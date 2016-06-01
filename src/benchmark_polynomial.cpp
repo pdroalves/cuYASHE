@@ -1,3 +1,20 @@
+/**
+ * cuYASHE
+ * Copyright (C) 2015-2016 cuYASHE Authors
+ * 
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ * 
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ * 
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
 #include "benchmark_polynomial.h"
 #include "polynomial.h"
 #include "settings.h"
@@ -22,7 +39,8 @@
 #define CUHEA 0
 #define CUHEB 1
 #define CUHEC 2
-// #define CUHEBENCHMARK CUHEA
+#define CUHED 3
+ // #define CUHEBENCHMARK CUHEA
 
 
 int main(int argc,char* argv[]){
@@ -137,6 +155,10 @@ int main(int argc,char* argv[]){
       #else
         #if CUHEBENCHMARK == CUHEC
           q = to_ZZ("21554205777836932311257790222775820395941902542645617275843070438676498155961571817910808995272187433051497282433670297800520799691688083743793L");
+        #else
+          #if CUHEBENCHMARK == CUHED
+	         q = to_ZZ("10791551");
+          #endif
         #endif
       #endif
     #endif
@@ -160,16 +182,23 @@ int main(int argc,char* argv[]){
 
 
   #ifndef CUHEBENCHMARK
+<<<<<<< HEAD
     //for(int d = 1024;d <= 8192;d *= 2){
      for(int d = 4096;d <= 4096;d *= 2){
+=======
+    for(int d = 1024;d <= 8192;d *= 2){
+     // for(int d = 4096;d <= 4096;d *= 2){
+>>>>>>> 0afc553e8609adda85929439f18f40f6d2acba2f
   #else
     #if CUHEBENCHMARK == CUHEA
-      for(int d = 8192;d <= 8192;d *= 2){
+      for(int d = 4096;d <= 4096;d *= 2){
     #else
       #if CUHEBENCHMARK == CUHEB
-        for(int d = 16384;d <= 16384;d *= 2){
+        for(int d = 8192;d <= 8192;d *= 2){
       #else
         #if CUHEBENCHMARK == CUHEC
+          for(int d = 16384;d <= 32768;d *= 2){
+        #else
           for(int d = 32768;d <= 32768;d *= 2){
         #endif
       #endif
@@ -199,7 +228,7 @@ int main(int argc,char* argv[]){
     std::cout << "Bp: " << NTL::NumBits(Polynomial::CRTProduct) << " bits )"<<std::endl;
 
     std::cout << "q: " << NTL::NumBytes(q)*8 << " bits" << std::endl;
-    CUDAFunctions::init(2*d);
+    CUDAFunctions::init(d);
 
     Polynomial a;
     Polynomial b;
@@ -218,7 +247,13 @@ int main(int argc,char* argv[]){
     clock_gettime( CLOCK_REALTIME, &start);
     for(int i = 0; i < N;i++){
       a.set_crt_computed(false);
-      a.crt();
+      callCRT(a.d_bn_coefs,
+          d+1,
+          a.get_device_crt_residues(),
+          a.get_crt_spacing(),
+          Polynomial::CRTPrimes.size(),
+          a.get_stream()
+      );
       result = cudaDeviceSynchronize();
       assert(result == cudaSuccess);
     }
@@ -237,8 +272,12 @@ int main(int argc,char* argv[]){
 
     clock_gettime( CLOCK_REALTIME, &start);
     for(int i = 0; i < N;i++){
-      a.set_icrt_computed(false);
-      a.icrt();
+      callICRT( a.d_bn_coefs,
+                a.get_device_crt_residues(),
+                a.get_crt_spacing(),
+                Polynomial::CRTPrimes.size(),
+                a.get_stream()
+      );
       result = cudaDeviceSynchronize();
       assert(result == cudaSuccess);
     }
@@ -381,20 +420,20 @@ int main(int argc,char* argv[]){
       // clock_gettime( CLOCK_REALTIME, &start);
       // for(int i = 0; i < N;i++){
 
-      //   a += b;
+      //    a += b;
 
-      //   a.set_crt_computed(false);
-      //   a.set_icrt_computed(false);
-      //   b.set_crt_computed(false);
-      //   b.set_icrt_computed(false);
-      //   result = cudaDeviceSynchronize();
-      //   assert(result == cudaSuccess);
-      //   // c.release();
-      // }
-      // clock_gettime( CLOCK_REALTIME, &stop);
-      // diff = compute_time_ms(start,stop)/N;
-      // std::cout << "ADD) Time measured with memory copy: " << diff << " ms" << std::endl;
-      // gpu_add_with_memcopy << d << " " << diff  << std::endl;
+      //    a.set_crt_computed(false);
+      //    a.set_icrt_computed(false);
+      //    b.set_crt_computed(false);
+      //    b.set_icrt_computed(false);
+      //    result = cudaDeviceSynchronize();
+      //    assert(result == cudaSuccess);
+      //    // c.release();
+      //  }
+      //  clock_gettime( CLOCK_REALTIME, &stop);
+      //  diff = compute_time_ms(start,stop)/N;
+      //  std::cout << "ADD) Time measured with memory copy: " << diff << " ms" << std::endl;
+      //  gpu_add_with_memcopy << d << " " << diff  << std::endl;
 
       ///////////////////////////////////////
       // Time measured without memory copy //
@@ -413,13 +452,21 @@ int main(int argc,char* argv[]){
 
       clock_gettime( CLOCK_REALTIME, &start);
       for(int i = 0; i < N;i++){
-
+          #ifdef NTTMUL_TRANSFORM
         CUDAFunctions::callPolynomialAddSub(a.get_device_crt_residues(),
                                             a.get_device_crt_residues(),
                                             b.get_device_crt_residues(),
-                                            (int)(a.CRTSPACING*Polynomial::CRTPrimes.size()),
+                                            (int)(a.get_crt_spacing()*Polynomial::CRTPrimes.size()),
                                             ADD,
                                             a.get_stream());
+          #else
+          CUDAFunctions::callPolynomialcuFFTAddSub( a.get_device_transf_residues(),
+                                                    a.get_device_transf_residues(),
+                                                    b.get_device_transf_residues(),
+                                                    (int)(a.CRTSPACING*Polynomial::CRTPrimes.size()),
+                                                    ADD,
+                                                    a.get_stream());
+          #endif
 
         result = cudaDeviceSynchronize();
         assert(result == cudaSuccess);
@@ -431,20 +478,31 @@ int main(int argc,char* argv[]){
       gpu_add_without_memcopy << d << " " << diff  << std::endl;
 
 
-      // ///////////////////////////////////////////////
-      // // MUL
+      // // ///////////////////////////////////////////////
+      // // // MUL
       Polynomial::random(&a,d-1);
       Polynomial::random(&b,d-1);
-      a.update_crt_spacing(d);
+      a.update_crt_spacing(2*d);
       a.update_device_data();
-      b.update_crt_spacing(d);
+      b.update_crt_spacing(2*d);
       b.update_device_data();
       int needed_spacing = pow(2,ceil(log2(a.deg() + b.deg())));
 
       clock_gettime( CLOCK_REALTIME, &start);
       for(int i = 0; i < N;i++){
-        a *= b;
-        a.CRTSPACING = b.CRTSPACING;
+        #ifdef NTTMUL_TRANSFORM
+        CUDAFunctions::callPolynomialMul(   a.get_device_crt_residues(),
+                                            a.get_device_crt_residues(),
+                                            b.get_device_crt_residues(),
+                                            needed_spacing*Polynomial::CRTPrimes.size(),
+                                            a.get_stream());
+        #else
+        CUDAFunctions::executeCuFFTPolynomialMul(   a.get_device_transf_residues(), 
+                                                    a.get_device_transf_residues(), 
+                                                    b.get_device_transf_residues(), 
+                                                    needed_spacing*Polynomial::CRTPrimes.size(),
+                                                    b.get_stream());
+        #endif
         result = cudaDeviceSynchronize();
         assert(result == cudaSuccess);
         // c.release();
@@ -464,7 +522,7 @@ int main(int argc,char* argv[]){
         clock_gettime( CLOCK_REALTIME, &start);
         for(int Ns=1; Ns<N; Ns*=RADIX){
           CUDAFunctions::callNTT( 2*d, 
-                                  Polynomial::CRTPrimes.size(),
+                                  1,
                                   RADIX,
                                   CUDAFunctions::d_mulA,
                                   CUDAFunctions::d_mulAux,

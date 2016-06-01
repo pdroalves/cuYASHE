@@ -1,4 +1,20 @@
-
+/**
+ * cuYASHE
+ * Copyright (C) 2015-2016 cuYASHE Authors
+ * 
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ * 
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ * 
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
 #include <fstream>
 #include <iterator>
 #include <iomanip>
@@ -15,7 +31,7 @@
 
 #define BILLION  1000000000L
 #define MILLION  1000000L
-#define N 10
+#define N 100
 
 
 double runEncrypt(Yashe cipher, int d){
@@ -23,7 +39,7 @@ double runEncrypt(Yashe cipher, int d){
   
   Polynomial a(d);
   a.set_coeff(0,rand());
-  a.update_crt_spacing(d);
+  a.update_crt_spacing(2*d);
   a.update_device_data();
       
   clock_gettime( CLOCK_REALTIME, &start);
@@ -38,7 +54,7 @@ double runEncrypt(Yashe cipher, int d){
 double runDecrypt(Yashe cipher, int d){
   struct timespec start, stop;
   
-  Polynomial a(d-1);
+  Polynomial a(2*d-1);
   a.set_coeff(0,rand());
   a.update_device_data();
 
@@ -281,7 +297,7 @@ int main(int argc, char* argv[]){
     ZZ_pE::init(NTL_Phi);
 
     Polynomial::gen_crt_primes(Polynomial::global_mod,d);
-    CUDAFunctions::init(2*d);
+    CUDAFunctions::init(d);
     
     std::cout << "CRT primes generated in " << diff << " ms." << std::endl;
     std::cout << "q: " << NTL::NumBytes(q)*8 << " bits" << std::endl;
@@ -325,29 +341,28 @@ int main(int argc, char* argv[]){
     std::cout << "Encrypt) Time measured with memory copy: " << diff << " ms" << std::endl;
     encrypt << d << " " << diff << std::endl;
     
+          size_t t,f;
+      cudaMemGetInfo(&f, &t);
+      cout << "Used memory: " << (t-f)/(1024*1024) << std::endl;
+      cout << "Free memory: " << f/(1024*1024) << std::endl;
     diff = runDecrypt(cipher, d);
     std::cout << "Decrypt) Time measured with memory copy: " << diff << " ms" << std::endl;
     decrypt << d << " " << diff << std::endl;;
-    
-    diff = runAdditionWithMemoryCopy(cipher, d);
-    std::cout << "Homomorphic Addition) Time measured with memory copy: " << diff << " ms" << std::endl;
-    add_with_memcopy << d << " " << diff << std::endl;;
 
+      cudaMemGetInfo(&f, &t);
+      cout << "Used memory: " << (t-f)/(1024*1024) << std::endl;
+      cout << "Free memory: " << f/(1024*1024) << std::endl;
     diff = runAdditionWithoutMemoryCopy(cipher, d);
     std::cout << "Homomorphic Addition) Time measured without memory copy: " << diff << " ms" << std::endl;
     add_without_memcopy << d << " " << diff << std::endl;;
-
-    diff = runMulWithMemoryCopy(cipher, d);
-    std::cout << "Homomorphic Multiplication) Time measured with memory copy: " << diff << " ms" << std::endl;
-    mult_with_memcopy << d << " " << diff << std::endl;;
     
     diff = runMulWithoutMemoryCopy(cipher, d);
     std::cout << "Homomorphic Multiplication) Time measured without memory copy: " << diff << " ms" << std::endl;
     mult_without_memcopy << d << " " << diff << std::endl;;
 
-    // diff = runKeyswitch(cipher, d);
-    // std::cout << "KeySwitch) Time measured with memory copy: " << diff << " ms" << std::endl;
-    // keyswitch << d << " " << diff << std::endl;;
+    diff = runKeyswitch(cipher, d);
+    std::cout << "KeySwitch) Time measured with memory copy: " << diff << " ms" << std::endl;
+    keyswitch << d << " " << diff << std::endl;;
   }
   cudaDeviceReset();
 }

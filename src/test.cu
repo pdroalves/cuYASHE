@@ -1,3 +1,20 @@
+/**
+ * cuYASHE
+ * Copyright (C) 2015-2016 cuYASHE Authors
+ * 
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ * 
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ * 
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
 #define BOOST_TEST_DYN_LINK
 #define BOOST_TEST_MODULE cuYASHE
 #include <boost/test/unit_test.hpp>
@@ -39,7 +56,7 @@ struct PolySuite
 
     PolySuite(){
         BOOST_TEST_MESSAGE("setup PolySuite");
-	std::cout << "CRT Primes of " << CRTPRIMESIZE << " bits" << std::endl;
+	      std::cout << "CRT Primes of " << CRTPRIMESIZE << " bits" << std::endl;
 
         degree = 16;
 
@@ -112,7 +129,7 @@ struct YasheSuite
 
 
         Polynomial::gen_crt_primes(Polynomial::global_mod,degree);
-        CUDAFunctions::init(2*degree);
+        CUDAFunctions::init(degree);
 
         // Yashe
         cipher = Yashe();
@@ -185,13 +202,15 @@ BOOST_AUTO_TEST_CASE(simpleAdd)
   Polynomial b(a);//Copy
   Polynomial c = a+b;
   c.update_host_data();//
+  c.normalize();
 
-  #ifdef VERBOSE
+  // #ifdef VERBOSE
   std::cout << "a: " << a.to_string() << std::endl;
+  std::cout << "(2*a): " << (a*2).to_string() << std::endl;
   std::cout << "b: " << b.to_string() << std::endl;
   std::cout << "c: " << c.to_string() << std::endl;
-  #endif
-  BOOST_REQUIRE(c == (a*2)%(c.get_mod()));
+  // #endif
+  BOOST_REQUIRE(c == (a*2));
 }
 
 BOOST_AUTO_TEST_CASE(multipleAdds)
@@ -347,84 +366,11 @@ BOOST_AUTO_TEST_CASE(smulTest)
 }
 #endif
 
-BOOST_AUTO_TEST_CASE(multiplyByZZOnCPU)
-{
-  Polynomial a;
-  ZZ b;
-
-  for(int count = 0; count < NTESTS; count++){
-
-    Polynomial::random(&a,degree-1);
-
-    ZZ_pEX a_ntl;
-    for(int i = 0;i <= a.deg();i++)
-      NTL::SetCoeff(a_ntl,i,conv<ZZ_p>(a.get_coeff(i)));
-    NTL::RandomBnd(b,ZZ(42));
-    // b = ZZ(0);
-
-    Polynomial c = a*b % Polynomial::global_mod;
-    c.update_host_data();
-    c.normalize();
-
-    ZZ_pEX c_ntl = a_ntl*conv<ZZ_p>(b);
-
-    #ifdef VERBOSE
-    std::cout << "a: " << a.to_string() << " degree: " << a.deg() <<std::endl;
-    std::cout << "b: " << b <<std::endl;
-    std::cout << "c: " << c.to_string() << " degree: " << c.deg() <<std::endl;
-    std::cout << ": " << c_ntl << " degree: " << NTL::deg(c_ntl) << std::endl << std::endl;
-    std::cout << "c_ntl: " << c_ntl << " degree: " << NTL::deg(c_ntl) << std::endl << std::endl;
-    std::cout << "count: " << count << std::endl;
-    #endif
-    BOOST_REQUIRE(NTL::deg(c_ntl) == c.deg());
-    for(int i = 0;i <= c.deg();i++)
-      BOOST_REQUIRE(conv<ZZ>(NTL::rep(c_ntl[i])[0]) == c.get_coeff(i));
-  }
-}
-
-BOOST_AUTO_TEST_CASE(multiplyByZZOnGPU)
-{
-  Polynomial a;
-  ZZ b;
-
-  for(int count = 0; count < NTESTS; count++){
-
-    Polynomial::random(&a,degree-1);
-
-    ZZ_pEX a_ntl;
-    for(int i = 0;i <= a.deg();i++)
-      NTL::SetCoeff(a_ntl,i,conv<ZZ_p>(a.get_coeff(i)));
-    NTL::RandomBnd(b,ZZ(42));
-    // b = ZZ(0);
-
-    // This will force the execution on GPU
-    a.update_device_data();
-    a.set_host_updated(false);
-
-    Polynomial c = a*b;
-    c.normalize();
-
-    ZZ_pEX c_ntl = a_ntl*conv<ZZ_p>(b);
-
-    #ifdef VERBOSE
-    std::cout << "a: " << a.to_string() << " degree: " << a.deg() <<std::endl;
-    std::cout << "b: " << b <<std::endl;
-    std::cout << "c: " << c.to_string() << " degree: " << c.deg() <<std::endl;
-    std::cout << "c_ntl: " << c_ntl << " degree: " << NTL::deg(c_ntl) << std::endl << std::endl;
-    std::cout << "count: " << count << std::endl;
-    #endif
-    BOOST_REQUIRE(NTL::deg(c_ntl) == c.deg());
-    for(int i = 0;i <= c.deg();i++)
-      BOOST_REQUIRE(conv<ZZ>(NTL::rep(c_ntl[i])[0]) == c.get_coeff(i));
-  }
-}
 
 BOOST_AUTO_TEST_CASE(simpleMultiplyByPolynomial)
 {
   Polynomial a;
   Polynomial b;
-
-  CUDAFunctions::init(2*degree);
 
   a.set_coeffs(degree);
   b.set_coeffs(degree);
@@ -474,7 +420,7 @@ BOOST_AUTO_TEST_CASE(simpleMultiplyByPolynomial)
 BOOST_AUTO_TEST_CASE(multiplyByPolynomial)
 {
 
-  CUDAFunctions::init(2*degree);
+  CUDAFunctions::init(degree);
 
   for(int count = 0; count < NTESTS; count++){
 
@@ -492,16 +438,16 @@ BOOST_AUTO_TEST_CASE(multiplyByPolynomial)
       NTL::SetCoeff(b_ntl,i,conv<ZZ_p>(b.get_coeff(i)));
 
     Polynomial c = a*b;
-      std::cout << "c: " << (c.to_string()) <<std::endl;
+      // std::cout << "c: " << (c.to_string()) <<std::endl;
     c.reduce();
 
     ZZ_pEX c_ntl = a_ntl*b_ntl;
     c_ntl %= conv<ZZ_pEX>(NTL_Phi);
 
-      std::cout << "a: " << (a.to_string()) <<std::endl;
-      std::cout << "b: " << (b.to_string()) <<std::endl;
-      std::cout << "c: " << (c.to_string()) <<std::endl;
-      std::cout << "c_ntl: " << c_ntl << " degree: " << NTL::deg(c_ntl) << std::endl << std::endl;
+      // std::cout << "a: " << (a.to_string()) <<std::endl;
+      // std::cout << "b: " << (b.to_string()) <<std::endl;
+      // std::cout << "c: " << (c.to_string()) <<std::endl;
+      // std::cout << "c_ntl: " << c_ntl << " degree: " << NTL::deg(c_ntl) << std::endl << std::endl;
     #ifdef DEBUG
     if(c_ntl != c){
     }
@@ -529,7 +475,7 @@ BOOST_AUTO_TEST_CASE(multiplyByPolynomial)
 BOOST_AUTO_TEST_CASE(multiplyAndAddByPolynomial)
 {
 
-  CUDAFunctions::init(2*degree);
+  CUDAFunctions::init(degree);
 
   for(int count = 0; count < NTESTS; count++){
 
@@ -582,7 +528,7 @@ BOOST_AUTO_TEST_CASE(multiplyAndAddByPolynomial)
 BOOST_AUTO_TEST_CASE(addAndMultiplyByPolynomial)
 {
 
-  CUDAFunctions::init(2*degree);
+  CUDAFunctions::init(degree);
 
   for(int count = 0; count < NTESTS; count++){
 
@@ -628,172 +574,172 @@ BOOST_AUTO_TEST_CASE(addAndMultiplyByPolynomial)
   }
 }
 
-BOOST_AUTO_TEST_CASE(randomPolynomialOperations)
-{
+// BOOST_AUTO_TEST_CASE(randomPolynomialOperations)
+// {
 
-  CUDAFunctions::init(2*degree);
+//   CUDAFunctions::init(degree);
 
-  long value;
-  ZZ valueZZ;
+//   long value;
+//   ZZ valueZZ;
 
-  /////////////
-  // cuYASHE //
-  /////////////
-  Polynomial a;
-  Polynomial b;
-  Polynomial c;
+//   /////////////
+//   // cuYASHE //
+//   /////////////
+//   Polynomial a;
+//   Polynomial b;
+//   Polynomial c;
 
-  /**
-   * Generate some set of coefficients
-   */
-  Polynomial::random(&a,degree-1);
-  Polynomial::random(&b,degree-1);
+//   /**
+//    * Generate some set of coefficients
+//    */
+//   Polynomial::random(&a,degree-1);
+//   Polynomial::random(&b,degree-1);
 
-  a.update_device_data();
-  b.update_device_data();
-  c = a+b;
+//   a.update_device_data();
+//   b.update_device_data();
+//   c = a+b;
 
-  /////////
-  // NTL //
-  /////////
-  ZZ_pEX b_ntl;
-  ZZ_pEX a_ntl;
-  ZZ_pEX c_ntl;
-  for(int i = 0;i <= a.deg();i++)
-    NTL::SetCoeff(a_ntl,i,conv<ZZ_p>(a.get_coeff(i)));
-  for(int i = 0;i <= b.deg();i++)
-    NTL::SetCoeff(b_ntl,i,conv<ZZ_p>(b.get_coeff(i)));
-  c_ntl = a_ntl + b_ntl;
+//   /////////
+//   // NTL //
+//   /////////
+//   ZZ_pEX b_ntl;
+//   ZZ_pEX a_ntl;
+//   ZZ_pEX c_ntl;
+//   for(int i = 0;i <= a.deg();i++)
+//     NTL::SetCoeff(a_ntl,i,conv<ZZ_p>(a.get_coeff(i)));
+//   for(int i = 0;i <= b.deg();i++)
+//     NTL::SetCoeff(b_ntl,i,conv<ZZ_p>(b.get_coeff(i)));
+//   c_ntl = a_ntl + b_ntl;
 
 
-  for(int count = 0; count < 2*NTESTS; count++){
-    /** Get a random operation and a random variable */
-    int random_op_bit = rand()%2;
-    // int random_ab = rand()%4;
-    int random_ab = 3;
+//   for(int count = 0; count < 2*NTESTS; count++){
+//     /** Get a random operation and a random variable */
+//     int random_op_bit = rand()%2;
+//     // int random_ab = rand()%4;
+//     int random_ab = 3;
 
-    // std::cout << "random_op: " << random_op_bit << std::endl;
-    // std::cout << "random_ab: " << random_ab << std::endl;
+//     // std::cout << "random_op: " << random_op_bit << std::endl;
+//     // std::cout << "random_ab: " << random_ab << std::endl;
 
-    switch(random_op_bit){
-      case 1:
-      ////////////
-      // 1: mul //
-      ////////////
+//     switch(random_op_bit){
+//       case 1:
+//       ////////////
+//       // 1: mul //
+//       ////////////
 
-      switch(random_ab){
-        case 0:
-          /** 
-           * 0: a
-           */
+//       switch(random_ab){
+//         case 0:
+//           /** 
+//            * 0: a
+//            */
           
-          // std::cout << " random *=a " << std::endl;
-          c *= a;
-          c_ntl *= a_ntl;
-        break;
-        case 1:
-        /**
-         * 1: b
-         */
-        // std::cout << " random *=b " << std::endl;
-        // std::cout << b.to_string() << std::endl;
-        // std::cout << b_ntl << std::endl;
+//           // std::cout << " random *=a " << std::endl;
+//           c *= a;
+//           c_ntl *= a_ntl;
+//         break;
+//         case 1:
+//         /**
+//          * 1: b
+//          */
+//         // std::cout << " random *=b " << std::endl;
+//         // std::cout << b.to_string() << std::endl;
+//         // std::cout << b_ntl << std::endl;
 
-        c *= b;
-        c_ntl *= b_ntl;
-        break;
-        case 2:
-        /**
-         * 2: some integer
-         */
-        // std::cout << " random *= %c " << std::endl;
-        value = conv<long>(ZZ(rand()) % c.get_mod());
-        c *= value;
-        c_ntl *= value;
-        break;
-        case 3:
-        /**
-         * 3: some ZZ
-         */
-        // std::cout << " random *= %c " << std::endl;
-        valueZZ = (ZZ(rand()) % c.get_mod());
-        c *= valueZZ;
-        c_ntl *= conv<ZZ_p>(valueZZ);
-        break;
-      }
-      break;
-      case 0:
-      ////////////
-      // 0: add //
-      ////////////
+//         c *= b;
+//         c_ntl *= b_ntl;
+//         break;
+//         case 2:
+//         /**
+//          * 2: some integer
+//          */
+//         // std::cout << " random *= %c " << std::endl;
+//         value = conv<long>(ZZ(rand()) % c.get_mod());
+//         c *= value;
+//         c_ntl *= value;
+//         break;
+//         case 3:
+//         /**
+//          * 3: some ZZ
+//          */
+//         // std::cout << " random *= %c " << std::endl;
+//         valueZZ = (ZZ(rand()) % c.get_mod());
+//         c *= valueZZ;
+//         c_ntl *= conv<ZZ_p>(valueZZ);
+//         break;
+//       }
+//       break;
+//       case 0:
+//       ////////////
+//       // 0: add //
+//       ////////////
 
-      switch(random_ab){
-        case 0:
-        /**
-         * 0: a
-         */
-        // std::cout << " random += a " << std::endl;
-        c += a;
-        c_ntl += a_ntl;
-        break;
-        case 1:
-        /**
-         * 1: b
-         */
-        // std::cout << " random += b " << std::endl;
-        c += b;
-        c_ntl += b_ntl;
-        break;
-        case 2:
-        /**
-         * 2: some integer
-         */
-        // std::cout << " random += %c " << std::endl;
-        value = conv<long>(ZZ(rand()) % c.get_mod());
+//       switch(random_ab){
+//         case 0:
+//         /**
+//          * 0: a
+//          */
+//         // std::cout << " random += a " << std::endl;
+//         c += a;
+//         c_ntl += a_ntl;
+//         break;
+//         case 1:
+//         /**
+//          * 1: b
+//          */
+//         // std::cout << " random += b " << std::endl;
+//         c += b;
+//         c_ntl += b_ntl;
+//         break;
+//         case 2:
+//         /**
+//          * 2: some integer
+//          */
+//         // std::cout << " random += %c " << std::endl;
+//         value = conv<long>(ZZ(rand()) % c.get_mod());
         
-        // std::cout << c.to_string() << std::endl;
-        // std::cout << c_ntl << std::endl;
+//         // std::cout << c.to_string() << std::endl;
+//         // std::cout << c_ntl << std::endl;
 
-        c += value;
-        c_ntl += value;
-        break;
-        case 3:
-        /**
-         * 3: some ZZ
-         */
-        valueZZ = (ZZ(rand()) % c.get_mod());
-        c += valueZZ;
-        c_ntl += conv<ZZ_p>(valueZZ);
-        break;
-      }
-      break;
+//         c += value;
+//         c_ntl += value;
+//         break;
+//         case 3:
+//         /**
+//          * 3: some ZZ
+//          */
+//         valueZZ = (ZZ(rand()) % c.get_mod());
+//         c += valueZZ;
+//         c_ntl += conv<ZZ_p>(valueZZ);
+//         break;
+//       }
+//       break;
 
-    }
+//     }
 
-    c.reduce();
-    c.normalize();
+//     c.reduce();
+//     c.normalize();
 
-    c_ntl %= conv<ZZ_pEX>(ZZ_pE::modulus());
+//     c_ntl %= conv<ZZ_pEX>(ZZ_pE::modulus());
 
-    // std::cout << "c: " << c.to_string() << " degree: " << c.deg() <<std::endl;
-    // std::cout << "c_ntl: " << c_ntl << " degree: " << NTL::deg(c_ntl) << std::endl << std::endl;
+//     // std::cout << "c: " << c.to_string() << " degree: " << c.deg() <<std::endl;
+//     // std::cout << "c_ntl: " << c_ntl << " degree: " << NTL::deg(c_ntl) << std::endl << std::endl;
 
-    BOOST_REQUIRE(NTL::deg(c_ntl) == c.deg());
-    for(int i = 0;i <= c.deg();i++){
-      ZZ ntl_value;
-      if( NTL::IsZero(NTL::coeff(c_ntl,i)) )
-      // Without this, NTL raises an exception when we call rep()
-        ntl_value = 0L;
-      else
-        ntl_value = conv<ZZ>(NTL::rep(NTL::coeff(c_ntl,i))[0]);
+//     BOOST_REQUIRE(NTL::deg(c_ntl) == c.deg());
+//     for(int i = 0;i <= c.deg();i++){
+//       ZZ ntl_value;
+//       if( NTL::IsZero(NTL::coeff(c_ntl,i)) )
+//       // Without this, NTL raises an exception when we call rep()
+//         ntl_value = 0L;
+//       else
+//         ntl_value = conv<ZZ>(NTL::rep(NTL::coeff(c_ntl,i))[0]);
 
-      // std::cout << c.get_coeff(i) << " == " << ntl_value << std::endl;
-      BOOST_REQUIRE(c.get_coeff(i) == ntl_value);
-    }
+//       // std::cout << c.get_coeff(i) << " == " << ntl_value << std::endl;
+//       BOOST_REQUIRE(c.get_coeff(i) == ntl_value);
+//     }
 
-    c.update_device_data();
-  }
-}
+//     c.update_device_data();
+//   }
+// }
 
 BOOST_AUTO_TEST_CASE(modularInversion)
 {
@@ -825,7 +771,7 @@ BOOST_AUTO_TEST_CASE(severalMultiplications)
   Polynomial a;
   Polynomial b;
 
-  CUDAFunctions::init(2*degree);
+  CUDAFunctions::init(degree);
 
   Polynomial::random(&a,degree-1);
   Polynomial::random(&b,degree-1);
@@ -1046,8 +992,8 @@ BOOST_AUTO_TEST_CASE(encryptandAdd)
 
     Polynomial a_decrypted = cipher.decrypt(c);
 
-    Polynomial value = (a+a)
-;    value.update_host_data();
+    Polynomial value = (a+a);
+    value.update_host_data();
     Polynomial value_reduced = value % t;
 
     #ifdef VERBOSE

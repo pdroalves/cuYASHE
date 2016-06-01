@@ -1,3 +1,20 @@
+/**
+ * cuYASHE
+ * Copyright (C) 2015-2016 cuYASHE Authors
+ * 
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ * 
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ * 
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
 #include <cuda.h>
 #include <cuda_runtime_api.h>
 #include <cuda_runtime.h>
@@ -16,8 +33,8 @@
 // #define PRIMITIVE_ROOT (int)3
 #define PRIMEP (uint64_t)18446744069414584321
 #define PRIMITIVE_ROOT (int)7
+#define W2 (uint64_t)16777216
 #define W4 (uint64_t)281474976710656L
-
 ZZ PZZ = to_ZZ(PRIMEP); 
 
 #ifdef NTTMUL_TRANSFORM
@@ -42,6 +59,7 @@ extern __constant__ int M_used;
 extern __constant__ cuyasheint_t u[STD_BNT_WORDS_ALLOC];
 extern __constant__ int u_used;
 extern __constant__ cuyasheint_t CRTPrimesConstant[PRIMES_BUCKET_SIZE];
+
 __constant__ cuyasheint_t W16[225]; 
 __constant__ cuyasheint_t WInv16[225]; 
 __constant__ cuyasheint_t W8[50]; 
@@ -51,6 +69,14 @@ __constant__ cuyasheint_t WInv8[50];
 cufftHandle CUDAFunctions::plan;
 // #endif
 int CUDAFunctions::N = 0;
+
+__host__ __device__ inline  uint64_t s_add(uint64_t a,uint64_t b);
+__host__ __device__ inline uint64_t s_sub(uint64_t a,uint64_t b);
+
+static __device__ inline Complex ComplexMul(Complex a, Complex b);
+static __device__ inline Complex ComplexAdd(Complex a, Complex b);
+static __device__ inline Complex ComplexSub(Complex a, Complex b);
+
 
 ///////////////////////
 // Memory operations //
@@ -100,7 +126,7 @@ __host__ cuyasheint_t* CUDAFunctions::callRealignCRTResidues(cudaStream_t stream
                             stream);
   assert(result == cudaSuccess);
 
-  realignCRTResidues <<< gridDim,blockDim, 1, stream >>> (oldSpacing,newSpacing,array,d_new_array,residuesSize,residuesQty);
+  realignCRTResidues <<< gridDim,blockDim, 0, stream >>> (oldSpacing,newSpacing,array,d_new_array,residuesSize,residuesQty);
   result = cudaGetLastError();
   assert(result == cudaSuccess);
 
@@ -111,6 +137,7 @@ __host__ cuyasheint_t* CUDAFunctions::callRealignCRTResidues(cudaStream_t stream
 /// ADD
 ///////////////////////////////////////
 
+#ifdef NTTMUL_TRANSFORM
 __global__ void polynomialAddSub(const int OP,const cuyasheint_t *a,const cuyasheint_t *b,cuyasheint_t *c,const int size,const int N){
   // We have one thread per polynomial coefficient on 32 threads-block.
   // For CRT polynomial adding, all representations should be concatenated aligned
@@ -119,19 +146,20 @@ __global__ void polynomialAddSub(const int OP,const cuyasheint_t *a,const cuyash
   if(tid < size ){
       // Coalesced access to global memory. Doing this way we reduce required bandwich.
       if(OP == ADD){
-        c[tid] = a[tid] + b[tid];
-        if(c[tid] < a[tid])
-          printf("Overflow!");
+        c[tid] = s_add(a[tid],b[tid]);
+        // if(c[tid] < a[tid])
+          // printf("Overflow!");
       }else
-        c[tid] = a[tid] - b[tid];
+        c[tid] = s_sub(a[tid],b[tid]);
   }
 }
 
 __host__ void CUDAFunctions::callPolynomialAddSub(cuyasheint_t *c,cuyasheint_t *a,cuyasheint_t *b,int size,int OP,cudaStream_t stream){
   // This method expects that both arrays are aligned
-  int ADDGRIDXDIM = (size%ADDBLOCKXDIM == 0? size/ADDBLOCKXDIM : size/ADDBLOCKXDIM + 1);
+  int nthreads = 64;
+  int ADDGRIDXDIM = (size%nthreads == 0? size/nthreads : size/nthreads + 1);
   dim3 gridDim(ADDGRIDXDIM);
-  dim3 blockDim(ADDBLOCKXDIM);
+  dim3 blockDim(nthreads);
 
   polynomialAddSub <<< gridDim,blockDim,0,stream  >>> (OP,a,b,c,size,N);
   assert(cudaGetLastError() == cudaSuccess);
@@ -139,6 +167,7 @@ __host__ void CUDAFunctions::callPolynomialAddSub(cuyasheint_t *c,cuyasheint_t *
   std::cout << "polynomialAdd kernel:" << cudaGetErrorString(cudaGetLastError()) << std::endl;
   #endif
 }
+
 
 __global__ void polynomialAddSubInPlace(const int OP, cuyasheint_t *a,const cuyasheint_t *b,const int size,const int N){
   // We have one thread per polynomial coefficient on 32 threads-block.
@@ -155,11 +184,11 @@ __global__ void polynomialAddSubInPlace(const int OP, cuyasheint_t *a,const cuya
       b_value = b[tid];
 
       if(OP == ADD){
-        a_value += b_value;
+        a_value = s_add(a_value,b_value);
         // if(a_value < a[tid])
           // printf("Overflow!\n");
       }else
-        a_value -= b_value;
+        a_value = s_sub(a_value,b_value);
 
       a[tid] = a_value;
   }
@@ -178,6 +207,75 @@ __host__ void CUDAFunctions::callPolynomialAddSubInPlace(cudaStream_t stream,cuy
   std::cout << "polynomialAdd kernel:" << cudaGetErrorString(cudaGetLastError()) << std::endl;
   #endif
 }
+
+#else
+__global__ void polynomialcuFFTAddSub(const int OP,const Complex *a,const Complex *b,Complex *c,const int size,const int N){
+  // We have one thread per polynomial coefficient on 32 threads-block.
+  // For CRT polynomial adding, all representations should be concatenated aligned
+  const int tid = threadIdx.x + blockDim.x*blockIdx.x;
+
+  if(tid < size ){
+      // Coalesced access to global memory. Doing this way we reduce required bandwich.
+      if(OP == ADD){
+        c[tid] = ComplexAdd(a[tid],b[tid]);
+      }else
+      c[tid] = ComplexSub(a[tid],b[tid]);
+  }
+}
+
+__host__ void CUDAFunctions::callPolynomialcuFFTAddSub(Complex *c,Complex *a,Complex *b,int size,int OP,cudaStream_t stream){
+  // This method expects that both arrays are aligned
+  int nthreads = 64;
+  int ADDGRIDXDIM = (size%nthreads == 0? size/nthreads : size/nthreads + 1);
+  dim3 gridDim(ADDGRIDXDIM);
+  dim3 blockDim(nthreads);
+
+  polynomialcuFFTAddSub <<< gridDim,blockDim,0,stream  >>> (OP,a,b,c,size,N);
+  assert(cudaGetLastError() == cudaSuccess);
+  #ifdef VERBOSE
+  std::cout << "polynomialAdd kernel:" << cudaGetErrorString(cudaGetLastError()) << std::endl;
+  #endif
+}
+
+
+__global__ void polynomialcuFFTAddSubInPlace(const int OP, Complex *a,const Complex *b,const int size,const int N){
+  // We have one thread per polynomial coefficient on 32 threads-block.
+  // For CRT polynomial adding, all representations should be concatenated aligned
+  const int tid = threadIdx.x + blockDim.x*blockIdx.x;
+  // const int rid = tid / N; // Residue id
+  Complex a_value;
+  Complex b_value;
+
+  if(tid < size ){
+      // printf("A[0]: %d\nB[0]: %d\n\n",a[tid],b[tid]);
+      // Coalesced access to global memory. Doing this way we reduce required bandwich.
+      a_value = a[tid];
+      b_value = b[tid];
+
+      if(OP == ADD)
+        a_value = ComplexAdd(a_value,b_value);
+      else
+        a_value = ComplexSub(a_value,b_value);
+
+      a[tid] = a_value;
+  }
+}
+
+__host__ void CUDAFunctions::callPolynomialcuFFTAddSubInPlace(cudaStream_t stream,Complex *a,Complex *b,int size,int OP){
+  // This method expects that both arrays are aligned
+  // Add and store in array a
+  int ADDGRIDXDIM = (size%ADDBLOCKXDIM == 0? size/ADDBLOCKXDIM : size/ADDBLOCKXDIM + 1);
+  dim3 gridDim(ADDGRIDXDIM);
+  dim3 blockDim(ADDBLOCKXDIM);
+
+  polynomialcuFFTAddSubInPlace <<< gridDim,blockDim,0,stream >>> (OP,a,b,size,N);
+  assert(cudaGetLastError() == cudaSuccess);
+  #ifdef VERBOSE
+  std::cout << "polynomialAdd kernel:" << cudaGetErrorString(cudaGetLastError()) << std::endl;
+  #endif
+}
+#endif
+
 ///////////////////////////////////////
 
 ///////////////////////////////////////
@@ -210,22 +308,34 @@ __global__ void copyAndRealignIntegerToComplex(Complex *a,cuyasheint_t *b,const 
   }
 }
 
-__global__ void copyAndNormalizeComplexRealPartToInteger(cuyasheint_t *b,const Complex *a,const int size,const double scale,const int N){
+__global__ void copyAndNormalizeComplexRealPartToInteger(cuyasheint_t *b,const Complex *a,const int size,const int N){
   const int tid = threadIdx.x + blockDim.x*blockIdx.x;
-  const int rid = tid / N; // Residue id
-  cuyasheint_t value;
-  double fvalue;
-  // double frac;
   if(tid < size ){
-      fvalue = a[tid].x * scale;
-      value = rint(fvalue);
-
-      b[tid] = value;
+      double scale = 1.0/N;
+      b[tid] = rint(a[tid].x*scale);
   }
 }
 ////////////////////////////////////////////////////////////////////////////////
 // Complex operations
 ////////////////////////////////////////////////////////////////////////////////
+
+// Addition
+static __device__ inline Complex ComplexAdd(Complex a, Complex b)
+{
+    Complex c;
+    c.x = a.x + b.x;
+    c.y = a.y + b.y;
+    return c;
+}
+
+
+static __device__ inline Complex ComplexSub(Complex a, Complex b)
+{
+    Complex c;
+    c.x = a.x - b.x;
+    c.y = a.y - b.y;
+    return c;
+}
 
 // Complex multiplication
 static __device__ inline Complex ComplexMul(Complex a, Complex b)
@@ -238,7 +348,7 @@ static __device__ inline Complex ComplexMul(Complex a, Complex b)
 
 
 // Complex pointwise multiplication
-static __global__ void polynomialcuFFTMul(const Complex *a, const Complex *b,Complex *c,int size_c,int size){
+__global__ void polynomialcuFFTMul(Complex *c, const Complex *a,const Complex *b,int size){
     const int tid = threadIdx.x + blockDim.x*blockIdx.x;
 
     if(tid < size  ){
@@ -284,7 +394,7 @@ __host__ __device__ uint64_t s_rem (uint64_t a)
   return res;
 }
 
-__host__ __device__  uint64_t s_mul(uint64_t a,uint64_t b){
+__host__ __device__  inline uint64_t s_mul(uint64_t a,uint64_t b){
   // Multiply and reduce a and b by prime 2^64-2^32+1
   #ifdef __CUDA_ARCH__
   const uint64_t GAP = (UINT64_MAX-PRIMEP+1);
@@ -329,7 +439,7 @@ __host__ __device__  uint64_t s_mul(uint64_t a,uint64_t b){
   #endif
   return res;
 }
-__host__ __device__  uint64_t s_add(uint64_t a,uint64_t b){
+__host__ __device__ inline  uint64_t s_add(uint64_t a,uint64_t b){
   // Add and reduce a and b by prime 2^64-2^32+1
   // 4294967295L == UINT64_MAX - P
   uint64_t res = a+b;
@@ -338,8 +448,7 @@ __host__ __device__  uint64_t s_add(uint64_t a,uint64_t b){
   return s_rem(res);
 }
 
-
-__host__ __device__ uint64_t s_sub(uint64_t a,uint64_t b){
+__host__ __device__ inline uint64_t s_sub(uint64_t a,uint64_t b){
   // Computes a-b % P
   // 4294967295L == UINT64_MAX - P
 
@@ -362,7 +471,7 @@ __device__ void butterfly(uint64_t *v){
 }
 
 template<>
-__device__ void butterfly<2,FORWARD>(uint64_t *v){
+__device__ inline void butterfly<2,FORWARD>(uint64_t *v){
   ///////////////////////
   // Radix-2 Butterfly //
   ///////////////////////
@@ -373,7 +482,7 @@ __device__ void butterfly<2,FORWARD>(uint64_t *v){
 }
 
 template<>
-__device__ void butterfly<2,INVERSE>(uint64_t *v){
+__device__ inline void butterfly<2,INVERSE>(uint64_t *v){
   ///////////////////////
   // Radix-2 Butterfly //
   ///////////////////////
@@ -384,123 +493,113 @@ __device__ void butterfly<2,INVERSE>(uint64_t *v){
 }
 
 template<>
-__device__ void butterfly<4,FORWARD>(uint64_t *v){
+__device__ inline void butterfly<4,FORWARD>(uint64_t *v){
   ///////////////////////
   // Radix-4 Butterfly //
   ///////////////////////
-  const uint64_t v0 = s_rem(v[0]);
-  const uint64_t v1 = s_rem(v[1]);
-  const uint64_t v2 = s_rem(v[2]);
-  const uint64_t v3 = s_rem(v[3]);
+  // const uint64_t v0 = (v[0]);
+  // const uint64_t v1 = (v[1]);
+  // const uint64_t v2 = (v[2]);
+  // const uint64_t v3 = (v[3]);
   
-  // v0 + v1 + v2 + v3
-  v[0] = s_add(s_add(s_add(v0,v1),v2),v3);
-  // v0 + W4*v1 - v2 - W4*v3
-  v[1] = s_sub(s_sub(s_add(v0,s_mul(W4,v1)),v2),s_mul(W4,v3)); 
-  // v0 - v1 + v2 - v3
-  v[2] = s_sub(s_add(s_sub(v0,v1),v2),v3);
-  // v0 - W4*v1 - v2 + W4*v3
-  v[3] = s_add(s_sub(s_sub(v0,s_mul(W4,v1)),v2),s_mul(W4,v3)); 
+  // // v0 + v1 + v2 + v3
+  // v[0] = s_add(s_add(s_add(v0,v1),v2),v3);
+  // // v0 + W4*v1 - v2 - W4*v3
+  // v[1] = s_sub(s_sub(s_add(v0,s_mul(W4,v1)),v2),s_mul(W4,v3)); 
+  // // v0 - v1 + v2 - v3
+  // v[2] = s_sub(s_add(s_sub(v0,v1),v2),v3);
+  // // v0 - W4*v1 - v2 + W4*v3
+  // v[3] = s_add(s_sub(s_sub(v0,s_mul(W4,v1)),v2),s_mul(W4,v3)); 
+   
+  register uint64_t s[4], temp;
+  s[0] = s_add(v[0], v[2]);
+  s[1] = s_sub(v[0], v[2]);
+  s[2] = s_add(v[1], v[3]);
+  s[3] = s_sub(v[1], v[3]);
+  temp = s_mul(s[3], 48);
+  v[0] = s_add(s[0], s[2]);
+  v[1] = s_add(s[1], temp);
+  v[2] = s_sub(s[0], s[2]);
+  v[3] = s_sub(s[1], temp);
   
 }
 
 template<>
-__device__ void butterfly<4,INVERSE>(uint64_t *v){
+__device__ inline void butterfly<4,INVERSE>(uint64_t *v){
   ///////////////////////
   // Radix-4 Butterfly //
   ///////////////////////
-  const uint64_t v0 = s_rem(v[0]);
-  const uint64_t v1 = s_rem(v[1]);
-  const uint64_t v2 = s_rem(v[2]);
-  const uint64_t v3 = s_rem(v[3]);
+  // const uint64_t v0 = (v[0]);
+  // const uint64_t v1 = (v[1]);
+  // const uint64_t v2 = (v[2]);
+  // const uint64_t v3 = (v[3]);
   
-  // v0 + v1 + v2 + v3
-  v[0] = s_add(s_add(s_add(v0,v1),v2),v3);
-  // v0 - W4*v1 - v2 + W4*v3
-  v[1] = s_add(s_sub(s_sub(v0,s_mul(W4,v1)),v2),s_mul(W4,v3)); 
-  // v0 - v1 + v2 - v3
-  v[2] = s_sub(s_add(s_sub(v0,v1),v2),v3);
-  // v0 + W4*v1 - v2 - W4*v3
-  v[3] = s_sub(s_sub(s_add(v0,s_mul(W4,v1)),v2),s_mul(W4,v3));  
-  
+  // // v0 + v1 + v2 + v3
+  // v[0] = s_add(s_add(s_add(v0,v1),v2),v3);
+  // // v0 - W4*v1 - v2 + W4*v3
+  // v[1] = s_add(s_sub(s_sub(v0,s_mul(W4,v1)),v2),s_mul(W4,v3)); 
+  // // v0 - v1 + v2 - v3
+  // v[2] = s_sub(s_add(s_sub(v0,v1),v2),v3);
+  // // v0 + W4*v1 - v2 - W4*v3
+  // v[3] = s_sub(s_sub(s_add(v0,s_mul(W4,v1)),v2),s_mul(W4,v3));  
+
+  register uint64_t s[4], temp;
+  s[0] = s_add(v[0], v[2]);
+  s[1] = s_sub(v[0], v[2]);
+  s[2] = s_add(v[1], v[3]);
+  s[3] = s_sub(v[1], v[3]);
+  temp = s_mul(s[3], W4);
+  v[0] = s_add(s[0], s[2]);
+  v[1] = s_sub(s[1], temp);
+  v[2] = s_sub(s[0], s[2]);
+  v[3] = s_add(s[1], temp);
 }
 
-///////////////////
-// Doesn't work! //
-///////////////////
-// template<>
-// __device__ void butterfly<8,FORWARD>(uint64_t *v){
-//   ///////////////////////
-//   // Radix-4 Butterfly //
-//   ///////////////////////
-//   const uint64_t v0 = s_rem(v[0]);
-//   const uint64_t v1 = s_rem(v[1]);
-//   const uint64_t v2 = s_rem(v[2]);
-//   const uint64_t v3 = s_rem(v[3]);
-//   const uint64_t v4 = s_rem(v[4]);
-//   const uint64_t v5 = s_rem(v[5]);
-//   const uint64_t v6 = s_rem(v[6]);
-//   const uint64_t v7 = s_rem(v[7]);
+template<>
+__device__ void butterfly<8,FORWARD>(uint64_t *v){
+  ///////////////////////
+  // Radix-4 Butterfly //
+  ///////////////////////
   
-
-//   v[0] = s_add(s_add(s_add(s_add(s_add(s_add(s_add(v0,v1),v2),v3),v4),v5),v6),v7);
-//   v[1] = s_add(s_add(s_add(s_add(s_add(s_add(s_add( v0,
-//                                                     s_mul(v1,W8[1])),
-//                                                     s_mul(v2,W8[2])),
-//                                                     s_mul(v3,W8[3])),
-//                                                     s_mul(v4,W8[4])),
-//                                                     s_mul(v5,W8[5])),
-//                                                     s_mul(v6,W8[6])),
-//                                                     s_mul(v7,W8[7]));
-//   v[2] = s_add(s_add(s_add(s_add(s_add(s_add(s_add( v0,
-//                                                     s_mul(v1,W8[2])),
-//                                                     s_mul(v2,W8[4])),
-//                                                     s_mul(v3,W8[6])),
-//                                                     s_mul(v4,W8[8])),
-//                                                     s_mul(v5,W8[10])),
-//                                                     s_mul(v6,W8[12])),
-//                                                     s_mul(v7,W8[14]));
-//   v[3] = s_add(s_add(s_add(s_add(s_add(s_add(s_add( v0,
-//                                                     s_mul(v1,W8[3])),
-//                                                     s_mul(v2,W8[6])),
-//                                                     s_mul(v3,W8[9])),
-//                                                     s_mul(v4,W8[12])),
-//                                                     s_mul(v5,W8[15])),
-//                                                     s_mul(v6,W8[18])),
-//                                                     s_mul(v7,W8[21]));
-//   v[4] = s_add(s_add(s_add(s_add(s_add(s_add(s_add( v0,
-//                                                     s_mul(v1,W8[4])),
-//                                                     s_mul(v2,W8[8])),
-//                                                     s_mul(v3,W8[12])),
-//                                                     s_mul(v4,W8[16])),
-//                                                     s_mul(v5,W8[20])),
-//                                                     s_mul(v6,W8[24])),
-//                                                     s_mul(v7,W8[28]));
-//   v[5] = s_add(s_add(s_add(s_add(s_add(s_add(s_add( v0,
-//                                                     s_mul(v1,W8[5])),
-//                                                     s_mul(v2,W8[10])),
-//                                                     s_mul(v3,W8[15])),
-//                                                     s_mul(v4,W8[20])),
-//                                                     s_mul(v5,W8[25])),
-//                                                     s_mul(v6,W8[30])),
-//                                                     s_mul(v7,W8[35]));
-//   v[6] = s_add(s_add(s_add(s_add(s_add(s_add(s_add( v0,
-//                                                     s_mul(v1,W8[6])),
-//                                                     s_mul(v2,W8[12])),
-//                                                     s_mul(v3,W8[18])),
-//                                                     s_mul(v4,W8[24])),
-//                                                     s_mul(v5,W8[30])),
-//                                                     s_mul(v6,W8[36])),
-//                                                     s_mul(v7,W8[42]));
-//   v[7] = s_add(s_add(s_add(s_add(s_add(s_add(s_add( v0,
-//                                                     s_mul(v1,W8[7])),
-//                                                     s_mul(v2,W8[14])),
-//                                                     s_mul(v3,W8[21])),
-//                                                     s_mul(v4,W8[28])),
-//                                                     s_mul(v5,W8[35])),
-//                                                     s_mul(v6,W8[42])),
-//                                                     s_mul(v7,W8[49]));
-// }
+  // register uint64 s[8], temp;
+  // s[0] = s_add(v[0], v[4]);
+  // s[1] = s_sub(v[0], v[4]);
+  // s[2] = s_add(v[2], v[6]);
+  // s[3] = s_sub(v[2], v[6]);
+  // s[4] = s_add(v[1], v[5]);
+  // s[5] = s_sub(v[1], v[5]);
+  // s[6] = s_add(v[3], v[7]);
+  // s[7] = s_sub(v[3], v[7]);
+  // v[0] = s_add(s[0], s[2]);
+  // v[2] = s_sub(s[0], s[2]);
+  // temp = s_mul(s[3], W4);
+  // v[1] = s_add(s[1], temp);
+  // v[3] = s_sub(s[1], temp);
+  // v[4] = s_add(s[4], s[6]);
+  // v[6] = s_sub(s[4], s[6]);
+  // temp = s_mul(s[7], W4);
+  // v[5] = s_add(s[5], temp);
+  // v[7] = s_sub(s[5], temp);
+  // s[0] = s_add(v[0], v[4]);
+  // s[4] = s_sub(v[0], v[4]);
+  // temp = s_mul(v[5], W2);
+  // s[1] = s_add(v[1], temp);
+  // s[5] = s_sub(v[1], temp);
+  // temp = s_mul(v[6], W4);
+  // s[2] = s_add(v[2], temp);
+  // s[6] = s_sub(v[2], temp);
+  // temp = s_mul(v[7], 72);
+  // s[3] = s_add(v[3], temp);
+  // s[7] = s_sub(v[3], temp);
+  // v[0] = s[0];
+  // v[1] = s[1];
+  // v[2] = s[2];
+  // v[3] = s[3];
+  // v[4] = s[4];
+  // v[5] = s[5];
+  // v[6] = s[6];
+  // v[7] = s[7];
+}
 
 // template<>
 // __device__ void butterfly<8,INVERSE>(uint64_t *v){
@@ -599,6 +698,9 @@ __host__ __device__ void NTTIteration(cuyasheint_t *W,
 	uint64_t v[RADIX] = {0};
 	const int idxS = j+residue_index;
   int w_index = ((j%Ns)*N)/(Ns*RADIX);
+  const int idxD = expand(j,Ns,RADIX)+residue_index;
+  if(idxD == 151 || idxD+Ns == 151)
+    v[0] = v[0];
 
   for(int r=0; r<RADIX; r++)
     if(type == FORWARD)
@@ -608,7 +710,7 @@ __host__ __device__ void NTTIteration(cuyasheint_t *W,
 
   butterfly<RADIX,type>(v);
 
-	const int idxD = expand(j,Ns,RADIX)+residue_index;
+	// const int idxD = expand(j,Ns,RADIX)+residue_index;
 	for(int r=0; r<RADIX;r++)
   		data1[idxD+r*Ns] = v[r];
   
@@ -651,7 +753,7 @@ __host__ void CUDAFunctions::callNTT(const int N, const int NPolis,int RADIX, cu
   }
 }
 
-__global__ void polynomialNTTMul(cuyasheint_t *a,const cuyasheint_t *b,const int size){
+__global__ void polynomialNTTMul(cuyasheint_t *c, const cuyasheint_t *a,const cuyasheint_t *b,const int size){
   // We have one thread per polynomial coefficient on 32 threads-block.
   // For CRT polynomial adding, all representations should be concatenated aligned
   const int tid = threadIdx.x + blockDim.x*blockIdx.x;
@@ -661,9 +763,7 @@ __global__ void polynomialNTTMul(cuyasheint_t *a,const cuyasheint_t *b,const int
       uint64_t a_value = a[tid];
       uint64_t b_value = b[tid];
 
-      // In-place
-      a[tid] = s_mul(a_value,b_value);
-      // a[tid] = a_value*b_value % 18446744069414584321;
+      c[tid] = s_mul(a_value,b_value);
   }
 }
 
@@ -686,7 +786,7 @@ __global__ void polynomialNTTAdd(cuyasheint_t *a,const cuyasheint_t *b,const int
 
 __global__ void polynomialOPInteger(const int opcode,
                                       const cuyasheint_t *a,
-                                      const cuyasheint_t *integer_array,
+                                      const cuyasheint_t integer_array,
                                       cuyasheint_t *output,
                                       const int N,
                                       const int NPolis){
@@ -699,7 +799,7 @@ __global__ void polynomialOPInteger(const int opcode,
 
   if(tid < size ){
       // Coalesced access to global memory. Doing this way we reduce required bandwich.
-    cuyasheint_t operand = integer_array[rid] % CRTPrimesConstant[rid];
+    cuyasheint_t operand = integer_array;
 
     switch(opcode)
     {
@@ -731,7 +831,7 @@ __host__ cuyasheint_t* CUDAFunctions::callPolynomialOPInteger(
                                                               const int opcode,
                                                               cudaStream_t stream,
                                                               cuyasheint_t *a,
-                                                              cuyasheint_t *integer_array,
+                                                              cuyasheint_t integer_array,
                                                               const int N,
                                                               const int NPolis)
 {
@@ -747,7 +847,7 @@ __host__ cuyasheint_t* CUDAFunctions::callPolynomialOPInteger(
                                   size*sizeof(cuyasheint_t));        
   assert(result == cudaSuccess);
 
-  polynomialOPInteger<<< gridDim,blockDim, 1, stream>>> ( opcode,
+  polynomialOPInteger<<< gridDim,blockDim, 0, stream>>> ( opcode,
                                                           a,
                                                           integer_array,
                                                           d_pointer,
@@ -756,6 +856,127 @@ __host__ cuyasheint_t* CUDAFunctions::callPolynomialOPInteger(
   assert(cudaGetLastError() == cudaSuccess);
 
   return d_pointer;
+}
+__host__ void CUDAFunctions::callPolynomialOPIntegerInplace(
+                                                              const int opcode,
+                                                              cudaStream_t stream,
+                                                              cuyasheint_t *a,
+                                                              cuyasheint_t integer_array,
+                                                              const int N,
+                                                              const int NPolis)
+{
+  // This method applies a 0-degree operation over all CRT residues
+  const int size = N*NPolis;
+
+  const int ADDGRIDXDIM = (size%ADDBLOCKXDIM == 0? size/ADDBLOCKXDIM : size/ADDBLOCKXDIM + 1);
+  const dim3 gridDim(ADDGRIDXDIM);
+  const dim3 blockDim(ADDBLOCKXDIM);
+
+  polynomialOPInteger<<< gridDim,blockDim, 0, stream>>> ( opcode,
+                                                          a,
+                                                          integer_array,
+                                                          a,
+                                                          N,
+                                                          NPolis);
+  assert(cudaGetLastError() == cudaSuccess);
+  return;
+}
+
+__global__ void polynomialcuFFTOPInteger( const int opcode,
+                                          const Complex *a,
+                                          const cuyasheint_t integer,
+                                          Complex *output,
+                                          const int N,
+                                          const int NPolis){
+  // We have one thread per polynomial coefficient on 32 threads-block.
+  // For CRT polynomial adding, all representations should be concatenated aligned
+  const int size = N*NPolis;
+  const int tid = threadIdx.x + blockDim.x*blockIdx.x;
+  const int cid = tid % N; // Coefficient id
+  // const int rid = tid / N; // Residue id
+
+  if(tid < size ){
+      // Coalesced access to global memory. Doing this way we reduce required bandwich.
+    Complex operand = {__ull2double_rn(integer),0};
+
+    switch(opcode)
+    {
+    case ADD:
+      if(cid == 0)
+        output[tid] = ComplexAdd(a[tid],operand) ;
+      break;
+    case SUB:
+      if(cid == 0){
+        output[tid] = ComplexSub(a[tid],operand);
+      }
+      break;
+    case MUL:
+        output[tid] = ComplexMul(a[tid] , operand);
+      break;
+    default:
+      //This case shouldn't be used. 
+      assert(1 == 0);
+      break;
+    }
+  }
+
+}
+
+__host__ Complex* CUDAFunctions::callPolynomialcuFFTOPInteger(
+                                                              const int opcode,
+                                                              cudaStream_t stream,
+                                                              Complex *a,
+                                                              cuyasheint_t integer,
+                                                              const int N,
+                                                              const int NPolis)
+{
+  // This method applies a 0-degree operation over all CRT residues
+  const int size = N*NPolis;
+
+  const int ADDGRIDXDIM = (size%ADDBLOCKXDIM == 0? size/ADDBLOCKXDIM : size/ADDBLOCKXDIM + 1);
+  const dim3 gridDim(ADDGRIDXDIM);
+  const dim3 blockDim(ADDBLOCKXDIM);
+
+  Complex *d_pointer;
+  cudaError_t result = cudaMalloc((void**)&d_pointer,
+                                  size*sizeof(Complex));        
+  assert(result == cudaSuccess);
+
+  polynomialcuFFTOPInteger<<< gridDim,blockDim, 0, stream>>> ( opcode,
+                                                          a,
+                                                          integer,
+                                                          d_pointer,
+                                                          N,
+                                                          NPolis);
+  assert(cudaGetLastError() == cudaSuccess);
+
+  return d_pointer;
+}
+
+__host__ void CUDAFunctions::callPolynomialcuFFTOPIntegerInplace(
+                                                                      const int opcode,
+                                                                      cudaStream_t stream,
+                                                                      Complex *a,
+                                                                      cuyasheint_t integer,
+                                                                      const int N,
+                                                                      const int NPolis)
+{
+  // This method applies a 0-degree operation over all CRT residues
+  const int size = N*NPolis;
+
+  const int ADDGRIDXDIM = (size%ADDBLOCKXDIM == 0? size/ADDBLOCKXDIM : size/ADDBLOCKXDIM + 1);
+  const dim3 gridDim(ADDGRIDXDIM);
+  const dim3 blockDim(ADDBLOCKXDIM);
+
+  polynomialcuFFTOPInteger<<< gridDim,blockDim, 0, stream>>> ( opcode,
+                                                                a,
+                                                                integer,
+                                                                a,
+                                                                N,
+                                                                NPolis);
+  assert(cudaGetLastError() == cudaSuccess);
+
+  return;
 }
 
 __global__ void polynomialOPDigit(const int opcode,
@@ -829,24 +1050,28 @@ __host__ cuyasheint_t* CUDAFunctions::applyNTT( cuyasheint_t *d_a,
                                                 const int NPolis,
                                                 int type,
                                                 cudaStream_t stream){
-  const int size = N*NPolis;
-  cuyasheint_t *aux = CUDAFunctions::d_mulAux;
+  if(N != CUDAFunctions::N)
+    CUDAFunctions::init(N/2);
 
   cudaError_t result;
+  const int size = N*NPolis;
+  // cuyasheint_t *aux = CUDAFunctions::d_mulAux;
+  cuyasheint_t *aux;
+  result = cudaMalloc((void**)&aux,size*sizeof(cuyasheint_t));
+
   result = cudaMemsetAsync(aux,0,size*sizeof(cuyasheint_t),stream);
   assert(result == cudaSuccess);
 
   int RADIX;
   /*if(N % 8 == 0)
     RADIX = 8;
-  else*/ if(N % 4 == 0 && N > 4){
+  else*/
+  if(is_power_of(N,4))
     RADIX = 4;
-  }else if(N % 2 == 0 && N > 2){
-      RADIX = 2;
-    } else{
-      throw std::invalid_argument("N not supported");
+  else{
+    assert(is_power_of(N,2));
+    RADIX = 2;
     }
-  // const int RADIX = 2;
   dim3 blockDim(std::min(N/RADIX,1024));
   dim3 gridDim(NPolis);
 
@@ -856,29 +1081,29 @@ __host__ cuyasheint_t* CUDAFunctions::applyNTT( cuyasheint_t *d_a,
       /*if(RADIX == 8)
         NTT<8,FORWARD><<<gridDim,blockDim,1,stream >>>(CUDAFunctions::d_W,CUDAFunctions::d_WInv,N,Ns,d_a,aux);
       else*/ if(RADIX == 4)
-        NTT<4,FORWARD><<<gridDim,blockDim,1,stream >>>(CUDAFunctions::d_W,CUDAFunctions::d_WInv,N,Ns,d_a,aux);
+        NTT<4,FORWARD><<<gridDim,blockDim,0,stream >>>(CUDAFunctions::d_W,CUDAFunctions::d_WInv,N,Ns,d_a,aux);
       else{
         assert(RADIX == 2);
-        NTT<2,FORWARD><<<gridDim,blockDim,1,stream >>>(CUDAFunctions::d_W,CUDAFunctions::d_WInv,N,Ns,d_a,aux);
+        NTT<2,FORWARD><<<gridDim,blockDim,0,stream >>>(CUDAFunctions::d_W,CUDAFunctions::d_WInv,N,Ns,d_a,aux);
       }
     }else{      
       /*if(RADIX == 8)
-        NTT<8,FORWARD><<<gridDim,blockDim,1,stream >>>(CUDAFunctions::d_W,CUDAFunctions::d_WInv,N,Ns,d_a,aux);
+        NTT<8,FORWARD><<<gridDim,blockDim,0,stream >>>(CUDAFunctions::d_W,CUDAFunctions::d_WInv,N,Ns,d_a,aux);
       else*/ if(RADIX == 4)
-        NTT<4,INVERSE><<<gridDim,blockDim,1,stream >>>(CUDAFunctions::d_W,CUDAFunctions::d_WInv,N,Ns,d_a,aux);
+        NTT<4,INVERSE><<<gridDim,blockDim,0,stream >>>(CUDAFunctions::d_W,CUDAFunctions::d_WInv,N,Ns,d_a,aux);
       else{
         assert(RADIX == 2);
-        NTT<2,INVERSE><<<gridDim,blockDim,1,stream >>>(CUDAFunctions::d_W,CUDAFunctions::d_WInv,N,Ns,d_a,aux);
+        NTT<2,INVERSE><<<gridDim,blockDim,0,stream >>>(CUDAFunctions::d_W,CUDAFunctions::d_WInv,N,Ns,d_a,aux);
       }
     }
     assert(cudaGetLastError() == cudaSuccess);
     std::swap(aux,d_a);
   }
   if(type == INVERSE){
-    std::swap(aux,d_a);
+    // std::swap(aux,d_a);
     dim3 blockDimMul(ADDBLOCKXDIM);
     dim3 gridDimMul((size)/ADDBLOCKXDIM+1); // We expect that ADDBLOCKXDIM always divide size
-    NTTScale<<< gridDimMul,blockDimMul,1,stream >>>(d_a,size,N);
+    NTTScale<<< gridDimMul,blockDimMul,0,stream >>>(d_a,size,N);
     assert(cudaGetLastError() == cudaSuccess);
   }
   return d_a;
@@ -899,7 +1124,6 @@ __host__ void CUDAFunctions::executeCopyIntegerToComplex(   Complex *d_a,
 __host__ void CUDAFunctions::executeCopyAndNormalizeComplexRealPartToInteger(   cuyasheint_t *d_a, 
                                                                                 cufftDoubleComplex *a,
                                                                                 const int size,
-                                                                                int signal_size,
                                                                                 int N,
                                                                                 cudaStream_t stream){
   dim3 blockDim(32);
@@ -908,7 +1132,6 @@ __host__ void CUDAFunctions::executeCopyAndNormalizeComplexRealPartToInteger(   
   copyAndNormalizeComplexRealPartToInteger<<< gridDim,blockDim,0,stream >>>( d_a,
                                                                             a,
                                                                             size,
-                                                                            1.0f/signal_size,
                                                                             N);
 
   assert(cudaGetLastError() == cudaSuccess);
@@ -924,16 +1147,15 @@ __host__ void CUDAFunctions::executeNTTScale(   cuyasheint_t *d_result,
   assert(cudaGetLastError() == cudaSuccess);
 }
 
-__host__ void CUDAFunctions::executeCuFFTPolynomialMul( Complex *a, 
+__host__ void CUDAFunctions::executeCuFFTPolynomialMul( Complex *c, 
+                                                        Complex *a, 
                                                         Complex *b, 
-                                                        Complex *c, 
-                                                        int size_c, 
                                                         int size, 
                                                         cudaStream_t stream){
   dim3 blockDim(32);
   dim3 gridDim(size/32 + (size % 32 == 0? 0:1));
 
-  polynomialcuFFTMul<<<gridDim,blockDim,0,stream>>>(a,b,c,size_c,size);
+  polynomialcuFFTMul<<<gridDim,blockDim,0,stream>>>(c,a,b,size);
 
   assert(cudaGetLastError() == cudaSuccess);
 }
@@ -944,7 +1166,7 @@ __host__ void CUDAFunctions::executePolynomialMul(cuyasheint_t *c,
                                                   cudaStream_t stream){
   dim3 blockDimMul(ADDBLOCKXDIM);
   dim3 gridDimMul((size)/ADDBLOCKXDIM+1); // We expect that ADDBLOCKXDIM always divide size
-  polynomialNTTMul<<<gridDimMul,blockDimMul,0,stream>>>(a,b,size);
+  polynomialNTTMul<<<gridDimMul,blockDimMul,0,stream>>>(c,a,b,size);
   assert(cudaGetLastError() == cudaSuccess);
 }
 
@@ -959,15 +1181,27 @@ __host__ void CUDAFunctions::executePolynomialAdd(cuyasheint_t *c,
   assert(cudaGetLastError() == cudaSuccess);
 }
 
+/**
+ * Returns true if a is power of b
+ * @param  a [description]
+ * @param  b [description]
+ * @return   [description]
+ */
+__host__ bool is_power_of(uint64_t a, uint64_t b){
+  assert(b > 1);
+  
+  uint64_t n = a;
+  while (n % b == 0)
+    n /= b;
+  return (n==1);
+}
+
+
+
 __host__ cuyasheint_t* CUDAFunctions::callPolynomialMul(cuyasheint_t *output,
                                                         cuyasheint_t *a,
-                                                        const bool realign_A,
-                                                        const int A_N,
                                                         cuyasheint_t *b,
-                                                        const bool realign_B,
-                                                        const int B_N,
-                                                        const int N,
-                                                        const int NPolis,
+                                                        const int size,
                                                         cudaStream_t stream){
   // This method expects that both arrays are aligned
 
@@ -985,219 +1219,39 @@ __host__ cuyasheint_t* CUDAFunctions::callPolynomialMul(cuyasheint_t *output,
   assert((N>0)&&((N & (N - 1)) == 0));//Check if N is power of 2
   assert(N == CUDAFunctions::N);
   cuyasheint_t *d_result = output;
-  cudaError_t result;
+  // cudaError_t result;
 
   // #ifdef NTTMUL
   if(transform == NTTMUL){
 
-    const int size = N*NPolis;
-    cuyasheint_t *d_a = CUDAFunctions::d_mulA;
-    cuyasheint_t *d_b = CUDAFunctions::d_mulB;
-    cuyasheint_t *aux = CUDAFunctions::d_mulAux;
-
-
-     
-    // cuyasheint_t *mem;
-    // result = cudaMalloc((void**)&mem,(4*size)*sizeof(cuyasheint_t));
-    // assert(result == cudaSuccess);
-
-    // d_result = mem + 0*size;
-    // d_a =      mem + 1*size;
-    // d_b =      mem + 2*size;
-    // aux =      mem + 3*size;
-
-    result = cudaMemsetAsync(aux,0,size*sizeof(cuyasheint_t),stream);
-    assert(result == cudaSuccess);
-    result = cudaMemsetAsync(d_result,0,size*sizeof(cuyasheint_t),stream);
-    assert(result == cudaSuccess);
-
-    // result = cudaMemsetAsync(mem,0,(4*size)*sizeof(cuyasheint_t),stream);
-    // assert(result == cudaSuccess);
-
-    result = cudaMemcpyAsync(d_a,a,size*sizeof(cuyasheint_t),cudaMemcpyDeviceToDevice,stream);
-    assert(result == cudaSuccess);
-    result = cudaMemcpyAsync(d_b,b,size*sizeof(cuyasheint_t),cudaMemcpyDeviceToDevice,stream);
-    assert(result == cudaSuccess);
-
-    int RADIX;
-    /*if(N % 8 == 0)
-      RADIX = 8;
-    else*/ 
-    // if(N % 4 == 0)
-      // RADIX = 4;
-    // else{
-      assert(N % 2 == 0);
-      RADIX = 2;
-    // }
-    // const int RADIX = 2;
-    dim3 blockDim(std::min(N/RADIX,1024));
-    dim3 gridDim(NPolis);
-
-    // Forward
-    for(int Ns=1; Ns<N; Ns*=RADIX){
-      /*if(RADIX == 8)
-        NTT<8,FORWARD><<<gridDim,blockDim,1,stream >>>(CUDAFunctions::d_W,CUDAFunctions::d_WInv,N,Ns,d_a,aux);
-      else*/ if(RADIX == 4)
-        NTT<4,FORWARD><<<gridDim,blockDim,0,stream >>>(CUDAFunctions::d_W,CUDAFunctions::d_WInv,N,Ns,d_a,aux);
-      else{
-        assert(RADIX == 2);
-        NTT<2,FORWARD><<<gridDim,blockDim,0,stream >>>(CUDAFunctions::d_W,CUDAFunctions::d_WInv,N,Ns,d_a,aux);
-      }
-      assert(cudaGetLastError() == cudaSuccess);
-      std::swap(aux,d_a);
-    }
-
-    result = cudaMemsetAsync(aux,0,size*sizeof(cuyasheint_t),stream);
-    assert(result == cudaSuccess);
-
-    for(int Ns=1; Ns<N; Ns*=RADIX){
-      /*if(RADIX == 8) 
-        NTT<8,FORWARD><<<gridDim,blockDim,0,stream >>>(CUDAFunctions::d_W,CUDAFunctions::d_WInv,N,Ns,d_b,aux);
-      else*/ if(RADIX == 4)
-        NTT<4,FORWARD><<<gridDim,blockDim,0,stream >>>(CUDAFunctions::d_W,CUDAFunctions::d_WInv,N,Ns,d_b,aux);
-      else{
-        assert(RADIX == 2);
-        NTT<2,FORWARD><<<gridDim,blockDim,0,stream >>>(CUDAFunctions::d_W,CUDAFunctions::d_WInv,N,Ns,d_b,aux);
-      }
-      assert(cudaGetLastError() == cudaSuccess);
-      std::swap(aux,d_b);
-    }
-
     // Multiply
     dim3 blockDimMul(ADDBLOCKXDIM);
     dim3 gridDimMul((size)/ADDBLOCKXDIM+1); // We expect that ADDBLOCKXDIM always divide size
-    polynomialNTTMul<<<gridDimMul,blockDimMul,0,stream>>>(d_a,d_b,size);
+    polynomialNTTMul<<<gridDimMul,blockDimMul,0,stream>>>(output,a,b,size);
     assert(cudaGetLastError() == cudaSuccess);
 
-    // Inverse
-    for(int Ns=1; Ns<N; Ns*=RADIX){
-      /*if(RADIX == 8) 
-        NTT<8,INVERSE><<<gridDim,blockDim,0,stream >>>(CUDAFunctions::d_W,CUDAFunctions::d_WInv,N,Ns,d_a,d_result);
-      else*/ if(RADIX == 4)
-        NTT<4,INVERSE><<<gridDim,blockDim,0,stream >>>(CUDAFunctions::d_W,CUDAFunctions::d_WInv,N,Ns,d_a,d_result);
-      else{
-        assert(RADIX == 2);
-        NTT<2,INVERSE><<<gridDim,blockDim,0,stream >>>(CUDAFunctions::d_W,CUDAFunctions::d_WInv,N,Ns,d_a,d_result);
-      }
-      assert(cudaGetLastError() == cudaSuccess);
-      std::swap(d_a,d_result);
-    }
-
-    std::swap(d_a,d_result);
-
-    NTTScale<<< gridDimMul,blockDimMul,0,stream >>>(d_result,size,N);
-    
-    // cudaFree(d_a);
-    // cudaFree(d_b);
-    // cudaFree(aux);
-    result = cudaDeviceSynchronize();
+    // result = cudaDeviceSynchronize();
   }else{
   
-    //////////////////////
-    // cuFFT Setup init //
-    //////////////////////
-    const int size = N*NPolis;
-    const int size_c = N;
-    const int signal_size = N;
+    /////////////
+    // cuFFT  //
+    ///////////
+    // dim3 blockDim(32);
+    // dim3 gridDim(size/32 + (size % 32 == 0? 0:1));
 
-    Complex *d_a = CUDAFunctions::d_mulComplexA;
-    Complex *d_b = CUDAFunctions::d_mulComplexB;
-    Complex *d_c = CUDAFunctions::d_mulComplexC;
-    
-    result = cudaMemsetAsync(d_a,0,size*sizeof(Complex),stream);
-    assert(result == cudaSuccess);
-    result = cudaMemsetAsync(d_b,0,size*sizeof(Complex),stream);
-    assert(result == cudaSuccess);
-    result = cudaMemsetAsync(d_c,0,size*sizeof(Complex),stream);
-    assert(result == cudaSuccess);
-
-    dim3 blockDim(32);
-    dim3 gridDim(size/32 + (size % 32 == 0? 0:1));
-
-    /**
-     * Realign operands
-     */
-    if(realign_A){
-      int size;
-      const int newSpacing = N;
-      const int oldSpacing = A_N;
-
-      if(newSpacing < oldSpacing)
-        size = newSpacing*NPolis;
-      else
-        size = oldSpacing*NPolis;
-
-      const int ADDGRIDXDIM = (size%ADDBLOCKXDIM == 0? size/ADDBLOCKXDIM : size/ADDBLOCKXDIM + 1);
-      dim3 gridDim(ADDGRIDXDIM);
-      dim3 blockDim(ADDBLOCKXDIM);
-      copyAndRealignIntegerToComplex<<< gridDim,blockDim,1,stream >>>(d_a,a,A_N,N,NPolis);
-    }else
-      copyIntegerToComplex<<< gridDim,blockDim,1,stream >>>(d_a,a,size);
-    assert(cudaGetLastError() == cudaSuccess);
-
-    if(realign_B){
-      int size;
-      const int newSpacing = N;
-      const int oldSpacing = B_N;
-
-      if(newSpacing < oldSpacing)
-        size = newSpacing*NPolis;
-      else
-        size = oldSpacing*NPolis;
-
-      const int ADDGRIDXDIM = (size%ADDBLOCKXDIM == 0? size/ADDBLOCKXDIM : size/ADDBLOCKXDIM + 1);
-      dim3 gridDim(ADDGRIDXDIM);
-      dim3 blockDim(ADDBLOCKXDIM);
-      copyAndRealignIntegerToComplex<<< gridDim,blockDim,1,stream >>>(d_b,b,B_N,N,NPolis);
-    }
-    else
-      copyIntegerToComplex<<< gridDim,blockDim,1,stream >>>(d_b,b,size);
-    assert(cudaGetLastError() == cudaSuccess);
-
-    /**
-     * Stream set
-     */
-    cufftResult fftResult;
-    fftResult = cufftSetStream(CUDAFunctions::plan, stream);
-    assert(fftResult == CUFFT_SUCCESS);
-
-    /////////////////////
-    // cuFFT Setup end //
-    /////////////////////
-    ///
-    /**
-     * FFT
-     */
-    fftResult = cufftExecZ2Z(CUDAFunctions::plan, (cufftDoubleComplex *)(d_a), (cufftDoubleComplex *)(d_a), CUFFT_FORWARD);
-    assert(fftResult == CUFFT_SUCCESS);
-
-    fftResult = cufftExecZ2Z(CUDAFunctions::plan, (cufftDoubleComplex *)(d_b), (cufftDoubleComplex *)(d_b), CUFFT_FORWARD);
-    assert(fftResult == CUFFT_SUCCESS);
-
-    /**
-     * MUL
-     */
-    polynomialcuFFTMul<<<gridDim,blockDim,1,stream>>>(d_a,d_b,d_c,size_c,size);
-    assert(cudaGetLastError() == cudaSuccess);
-
-    /**
-     * IFFT
-     */
-    fftResult = cufftExecZ2Z(CUDAFunctions::plan, (cufftDoubleComplex *)(d_c), (cufftDoubleComplex *)(d_c), CUFFT_INVERSE);
-    assert(fftResult == CUFFT_SUCCESS);
-
-    /**
-     * Normalize
-     */
-    copyAndNormalizeComplexRealPartToInteger<<< gridDim,blockDim,1,stream >>>(d_result,(cufftDoubleComplex *)d_c,size,1.0f/signal_size,N);
-    assert(cudaGetLastError() == cudaSuccess);
-
+    // polynomialcuFFTMul<<<gridDim,blockDim,0,stream>>>(d_a,d_b,d_c,size);
+    // assert(cudaGetLastError() == cudaSuccess);
   }
 
   return d_result;
 }
 
-__host__ void CUDAFunctions::init(int N){
+/**
+ * [CUDAFunctions::init description]
+ * @param N The target polynomial degree
+ */
+__host__ void CUDAFunctions::init(int M){
+  int N = 2*M;
   CUDAFunctions::N = N;
   cudaError_t result;
 
@@ -1413,7 +1467,7 @@ __global__ void polynomialReductionCRT(cuyasheint_t *a,const int half,const int 
     a[rid*N + cid] %= CRTPrimesConstant[rid];
     a[rid*N + cid + half + 1] %= CRTPrimesConstant[rid];
 
-    bool is_neg = (a[rid*N + cid] < a[rid*N + cid + half + 1]);
+    // bool is_neg = (a[rid*N + cid] < a[rid*N + cid + half + 1]);
     a[rid*N + cid] -= a[rid*N + cid + half + 1];
     // a[rid*N + cid] += is_neg*CRTPrimesConstant[rid]*CRTPrimesConstant[rid];
     __syncthreads();
@@ -1474,10 +1528,13 @@ __host__ void Polynomial::reduce(){
   
   // Until we debug reduction on GPU, we need this
   // #warning Polynomial reduction forced to HOST
-  update_host_data();
-  this->set_crt_computed(false);
+  // update_host_data();
+  // set_crt_computed(false);
+  // set_icrt_computed(false);
+  // set_transf_computed(false);
+  // set_itransf_computed(false);
 
-  if(!this->get_crt_computed()){
+  if(!(this->get_crt_computed() || this->get_icrt_computed() || this->get_transf_computed())){
     #ifdef VERBOSE
     std::cout << "Reduce on host." << std::endl;
     #endif
@@ -1500,8 +1557,13 @@ __host__ void Polynomial::reduce(){
       throw "Reduce: I don't know how to compute this!";
     }
     *this %= q;
-    this->normalize();
-    // this->update_crt_spacing(this->deg()+1);
+    set_crt_computed(false);
+    set_icrt_computed(false);
+    set_transf_computed(false);
+    set_itransf_computed(false);
+    set_host_updated(true);
+    normalize();
+    update_crt_spacing(2*phi->deg());
   }else{
 
     #ifdef VERBOSE
@@ -1515,17 +1577,19 @@ __host__ void Polynomial::reduce(){
      // Polynomial reduction applied on CRT residues //
      //////////////////////////////////////////////////
     const int half = phi->deg()-1;
-    const int N = this->get_crt_spacing();
-    const int NPolis = this->CRTPrimes.size();
+    const int N = get_crt_spacing();
+    const int NPolis = CRTPrimes.size();
     int size = (N-half)*NPolis;
 
     if(size > 0){
+      itransf();
+
       dim3 blockDim(ADDBLOCKXDIM);
       dim3 gridDim(size/ADDBLOCKXDIM + (size % ADDBLOCKXDIM == 0? 0:1));
       /**
        * Polynomial reduction
        */
-      polynomialReductionCRT<<< gridDim,blockDim, 0, this->get_stream()>>>( this->get_device_crt_residues(),
+      polynomialReductionCRT<<< gridDim,blockDim, 0, get_stream()>>>( get_device_crt_residues(),
                                                                             half,
                                                                             N,
                                                                             NPolis);
@@ -1536,9 +1600,11 @@ __host__ void Polynomial::reduce(){
        * The polynomial reduction on CRT residues may generate erroneous values because of underflows.
        * To solve this we must apply ICRT at this point and call a routine to adjust the coefficients.  
        */
-      this->set_host_updated(false);
-      this->set_crt_computed(true);
-      this->set_icrt_computed(false);
+      set_crt_computed(true);
+      set_icrt_computed(false);
+      set_transf_computed(false);
+      set_itransf_computed(false);
+      set_host_updated(false);
       
       icrt();
       bn_t Q;
@@ -1550,8 +1616,12 @@ __host__ void Polynomial::reduce(){
       dim3 gridDimFix(size/ADDBLOCKXDIM + (size % ADDBLOCKXDIM == 0? 0:1));
       cuICRTFix<<< gridDimFix,blockDim,0,get_stream()>>>(d_bn_coefs, N, Q,get_reciprocal(q),Q2);      
 
-      set_icrt_computed(true);
       set_crt_computed(false);
+      set_icrt_computed(true);
+      set_transf_computed(false);
+      set_itransf_computed(false);
+      set_host_updated(false);
+
     }
     #else
     //////////////////////////////////////////////////
@@ -1579,14 +1649,16 @@ __host__ void Polynomial::reduce(){
       cudaError_t result = cudaGetLastError();
       assert(result == cudaSuccess);
       
-      this->set_host_updated(false);
-      this->set_crt_computed(false);
-      this->set_icrt_computed(true);
+      set_crt_computed(false);
+      set_icrt_computed(true);
+      set_transf_computed(false);
+      set_itransf_computed(false);
+      set_host_updated(false);
 
       result = cudaDeviceSynchronize();
       assert(result == cudaSuccess);
 
-      this->set_crt_computed(false);
+      set_crt_computed(false);
       modn(q);
     }
 

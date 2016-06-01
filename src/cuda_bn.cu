@@ -1,3 +1,20 @@
+/**
+ * cuYASHE
+ * Copyright (C) 2015-2016 cuYASHE Authors
+ * 
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ * 
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ * 
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
 #include <cuda.h>
 #include <cuda_runtime_api.h>
 #include <cuda_runtime.h>
@@ -162,10 +179,11 @@ __host__ __device__ void bn_zero_non_used(bn_t *a) {
 __host__ __device__ bool bn_is_zero(const bn_t* a) {
 	#ifdef __CUDA_ARCH__
 	/**
-	 * This version doesn't have branchings, what is good for GPUs
+	 * This version doesn't have branchings
 	 */
-		return !isEqual( isEqual(a->used,0) + isEqual(a->used,1)*isEqual(a->dp[0],0)
-						,false);
+		// return !isEqual( isEqual(a->used,0) + isEqual(a->used,1)*isEqual(a->dp[0],0)
+		// 				,false);
+		return a->used == 0;
 	 // bool testA = a->used == 0;
 	 // bool testB = (a->used == 1) && (a->dp[0] == 0);
 	 // return testA || testB;
@@ -1129,7 +1147,7 @@ __device__ void bn_mod_barrt(	bn_t *C, const bn_t *A,const int NCoefs,
 		int mu;
 		cuyasheint_t q[DSTD_BNT_WORDS_ALLOC],t[DSTD_BNT_WORDS_ALLOC],carry;
 
-		#pragma unroll (DSTD_BNT_WORDS_ALLOC)
+		#pragma unroll DSTD_BNT_WORDS_ALLOC
 		for(int i = 0; i < DSTD_BNT_WORDS_ALLOC; i++){
 			q[i] = 0;
 			t[i] = 0;
