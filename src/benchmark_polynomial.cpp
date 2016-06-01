@@ -182,13 +182,7 @@ int main(int argc,char* argv[]){
 
 
   #ifndef CUHEBENCHMARK
-<<<<<<< HEAD
-    //for(int d = 1024;d <= 8192;d *= 2){
      for(int d = 4096;d <= 4096;d *= 2){
-=======
-    for(int d = 1024;d <= 8192;d *= 2){
-     // for(int d = 4096;d <= 4096;d *= 2){
->>>>>>> 0afc553e8609adda85929439f18f40f6d2acba2f
   #else
     #if CUHEBENCHMARK == CUHEA
       for(int d = 4096;d <= 4096;d *= 2){
