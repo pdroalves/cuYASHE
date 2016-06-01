@@ -12,9 +12,9 @@ NTL = -Intl -lntl -lgmp
 LCUDA = -lcuda -lcudart -lcudadevrt -L/usr/local/cuda/lib64 -lcurand
 ICUDA = -I/usr/local/cuda/include
 CUDA_ARCH = -arch=sm_35
-ICUYASHE = -I/home/pdroalves/mestrado/cuYASHE/src
-LCUYASHE = -L/home/pdroalves/mestrado/cuYASHE/src
-CUYASHE = /home/pdroalves/mestrado/cuYASHE/src
+ICUYASHE = -I$(HOME)/git/cuyashe/src
+LCUYASHE = -L$(HOME)/git/cuyashe/src
+CUYASHE = $(HOME)/git/cuyashe/src
 
 BIN = bin
 SRC = src

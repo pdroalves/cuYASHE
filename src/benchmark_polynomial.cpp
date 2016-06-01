@@ -16,7 +16,8 @@
 
 #define BILLION  1000000000L
 #define MILLION  1000000L
-#define N 100
+//#define N 100
+#define N 1
 
 #define CUHEA 0
 #define CUHEB 1
@@ -159,8 +160,8 @@ int main(int argc,char* argv[]){
 
 
   #ifndef CUHEBENCHMARK
-    for(int d = 1024;d <= 8192;d *= 2){
-    // for(int d = 4096;d <= 4096;d *= 2){
+    //for(int d = 1024;d <= 8192;d *= 2){
+     for(int d = 4096;d <= 4096;d *= 2){
   #else
     #if CUHEBENCHMARK == CUHEA
       for(int d = 8192;d <= 8192;d *= 2){
