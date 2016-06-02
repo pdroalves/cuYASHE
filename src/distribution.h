@@ -33,7 +33,7 @@ enum kind_t
   KINDS_COUNT
 };
 
-#define MAX_DEGREE 16384
+#define MAX_DEGREE 32768 // This is just an expected value. It may be increased, if needed.
 #define SEED (unsigned long long)(7226776555987513888)
 
 class Distribution{

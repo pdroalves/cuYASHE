@@ -232,36 +232,6 @@ BOOST_AUTO_TEST_CASE(multipleAdds)
   BOOST_REQUIRE(b == (a*NTESTS)%(b.get_mod()));
 }
 
-BOOST_AUTO_TEST_CASE(multipleAddsWithDifferentDegrees)
-{
-
-  Polynomial b;
-  ZZ_pEX b_ntl;
-
-  for(int count = 0; count < NTESTS;count ++){
-    Polynomial a;
-    Polynomial::random(&a,rand() % (degree-1));
-
-    ZZ_pEX a_ntl;
-    for(int i = 0;i <= a.deg();i++)
-      NTL::SetCoeff(a_ntl,i,conv<ZZ_p>(a.get_coeff(i)));
-
-    b += a;
-    b_ntl += a_ntl;
-  }
-
-  #ifdef VERBOSE
-  std::cout << "b: " << b.to_string() << std::endl;
-  std::cout << "b_ntl: " << b_ntl << std::endl;
-  #endif
-  
-  b.normalize();
-   
-  BOOST_REQUIRE(NTL::deg(b_ntl) == b.deg());
-  for(int i = 0;i <= b.deg();i++)
-    BOOST_REQUIRE(conv<ZZ>(NTL::rep(b_ntl[i])[0]) == b.get_coeff(i));
-}
-
 BOOST_AUTO_TEST_CASE(zeroAdd)
 {
 
@@ -281,16 +251,6 @@ BOOST_AUTO_TEST_CASE(zeroAdd)
   BOOST_REQUIRE(r == a);
 
 }
-
-BOOST_AUTO_TEST_CASE(zeroJustCRT)
-{
-  Polynomial a;
-  a.update_device_data();
-  a.set_host_updated(false);
-  a.normalize();
-  BOOST_REQUIRE(a.deg() < 0);
-}
-
 BOOST_AUTO_TEST_CASE(getDegreeDevice)
 { 
 
@@ -574,173 +534,6 @@ BOOST_AUTO_TEST_CASE(addAndMultiplyByPolynomial)
   }
 }
 
-// BOOST_AUTO_TEST_CASE(randomPolynomialOperations)
-// {
-
-//   CUDAFunctions::init(degree);
-
-//   long value;
-//   ZZ valueZZ;
-
-//   /////////////
-//   // cuYASHE //
-//   /////////////
-//   Polynomial a;
-//   Polynomial b;
-//   Polynomial c;
-
-//   /**
-//    * Generate some set of coefficients
-//    */
-//   Polynomial::random(&a,degree-1);
-//   Polynomial::random(&b,degree-1);
-
-//   a.update_device_data();
-//   b.update_device_data();
-//   c = a+b;
-
-//   /////////
-//   // NTL //
-//   /////////
-//   ZZ_pEX b_ntl;
-//   ZZ_pEX a_ntl;
-//   ZZ_pEX c_ntl;
-//   for(int i = 0;i <= a.deg();i++)
-//     NTL::SetCoeff(a_ntl,i,conv<ZZ_p>(a.get_coeff(i)));
-//   for(int i = 0;i <= b.deg();i++)
-//     NTL::SetCoeff(b_ntl,i,conv<ZZ_p>(b.get_coeff(i)));
-//   c_ntl = a_ntl + b_ntl;
-
-
-//   for(int count = 0; count < 2*NTESTS; count++){
-//     /** Get a random operation and a random variable */
-//     int random_op_bit = rand()%2;
-//     // int random_ab = rand()%4;
-//     int random_ab = 3;
-
-//     // std::cout << "random_op: " << random_op_bit << std::endl;
-//     // std::cout << "random_ab: " << random_ab << std::endl;
-
-//     switch(random_op_bit){
-//       case 1:
-//       ////////////
-//       // 1: mul //
-//       ////////////
-
-//       switch(random_ab){
-//         case 0:
-//           /** 
-//            * 0: a
-//            */
-          
-//           // std::cout << " random *=a " << std::endl;
-//           c *= a;
-//           c_ntl *= a_ntl;
-//         break;
-//         case 1:
-//         /**
-//          * 1: b
-//          */
-//         // std::cout << " random *=b " << std::endl;
-//         // std::cout << b.to_string() << std::endl;
-//         // std::cout << b_ntl << std::endl;
-
-//         c *= b;
-//         c_ntl *= b_ntl;
-//         break;
-//         case 2:
-//         /**
-//          * 2: some integer
-//          */
-//         // std::cout << " random *= %c " << std::endl;
-//         value = conv<long>(ZZ(rand()) % c.get_mod());
-//         c *= value;
-//         c_ntl *= value;
-//         break;
-//         case 3:
-//         /**
-//          * 3: some ZZ
-//          */
-//         // std::cout << " random *= %c " << std::endl;
-//         valueZZ = (ZZ(rand()) % c.get_mod());
-//         c *= valueZZ;
-//         c_ntl *= conv<ZZ_p>(valueZZ);
-//         break;
-//       }
-//       break;
-//       case 0:
-//       ////////////
-//       // 0: add //
-//       ////////////
-
-//       switch(random_ab){
-//         case 0:
-//         /**
-//          * 0: a
-//          */
-//         // std::cout << " random += a " << std::endl;
-//         c += a;
-//         c_ntl += a_ntl;
-//         break;
-//         case 1:
-//         /**
-//          * 1: b
-//          */
-//         // std::cout << " random += b " << std::endl;
-//         c += b;
-//         c_ntl += b_ntl;
-//         break;
-//         case 2:
-//         /**
-//          * 2: some integer
-//          */
-//         // std::cout << " random += %c " << std::endl;
-//         value = conv<long>(ZZ(rand()) % c.get_mod());
-        
-//         // std::cout << c.to_string() << std::endl;
-//         // std::cout << c_ntl << std::endl;
-
-//         c += value;
-//         c_ntl += value;
-//         break;
-//         case 3:
-//         /**
-//          * 3: some ZZ
-//          */
-//         valueZZ = (ZZ(rand()) % c.get_mod());
-//         c += valueZZ;
-//         c_ntl += conv<ZZ_p>(valueZZ);
-//         break;
-//       }
-//       break;
-
-//     }
-
-//     c.reduce();
-//     c.normalize();
-
-//     c_ntl %= conv<ZZ_pEX>(ZZ_pE::modulus());
-
-//     // std::cout << "c: " << c.to_string() << " degree: " << c.deg() <<std::endl;
-//     // std::cout << "c_ntl: " << c_ntl << " degree: " << NTL::deg(c_ntl) << std::endl << std::endl;
-
-//     BOOST_REQUIRE(NTL::deg(c_ntl) == c.deg());
-//     for(int i = 0;i <= c.deg();i++){
-//       ZZ ntl_value;
-//       if( NTL::IsZero(NTL::coeff(c_ntl,i)) )
-//       // Without this, NTL raises an exception when we call rep()
-//         ntl_value = 0L;
-//       else
-//         ntl_value = conv<ZZ>(NTL::rep(NTL::coeff(c_ntl,i))[0]);
-
-//       // std::cout << c.get_coeff(i) << " == " << ntl_value << std::endl;
-//       BOOST_REQUIRE(c.get_coeff(i) == ntl_value);
-//     }
-
-//     c.update_device_data();
-//   }
-// }
-
 BOOST_AUTO_TEST_CASE(modularInversion)
 {
 
@@ -891,8 +684,8 @@ BOOST_AUTO_TEST_CASE(phiReduceGPU)
     ZZ_pEX a_ntl;
     for(int i = 0;i <= a.deg();i++)
       NTL::SetCoeff(a_ntl,i,conv<ZZ_p>(a.get_coeff(i)));
-    std::cout << "a_ntl = " << a_ntl << std::endl;;
-    std::cout << "a = " << a.to_string() << std::endl;;
+    // std::cout << "a_ntl = " << a_ntl << std::endl;;
+    // std::cout << "a = " << a.to_string() << std::endl;;
 
     a.update_device_data();
     a.set_host_updated(false);
@@ -900,8 +693,8 @@ BOOST_AUTO_TEST_CASE(phiReduceGPU)
     a.reduce();
     a_ntl %= conv<ZZ_pEX>(ZZ_pE::modulus());
 
-    std::cout << "a_ntl = " << a_ntl << std::endl;;
-    std::cout << "a = " << a.to_string() << std::endl;;
+    // std::cout << "a_ntl = " << a_ntl << std::endl;;
+    // std::cout << "a = " << a.to_string() << std::endl;;
 
     BOOST_REQUIRE(NTL::deg(a_ntl) == a.deg());
     for(int i = 0;i <= a.deg();i++){
@@ -916,44 +709,6 @@ BOOST_AUTO_TEST_CASE(phiReduceGPU)
     }
   }
 }
-
-// BOOST_AUTO_TEST_CASE(remainder)
-// {
-//   /** 
-//    * verifies the % operation for cuyasheint_t, ZZ and bn_t
-//    */
-  
-//   ///////////////////
-//   // cuyasheint_t  //
-//   ///////////////////
-//   Polynomial a;
-//   Polynomial::random(&a,degree-1);
-//   ZZ_pEX a_ntl;
-//   for(int i = 0;i <= a.deg();i++)
-//     NTL::SetCoeff(a_ntl,i,conv<ZZ_p>(a.get_coeff(i)));
-//   std::cout << "a: " <<a.to_string() << std::endl; 
-//   std::cout << "a_ntl: " <<a_ntl << std::endl; 
-
-//   for(int i = 0; i < NTESTS;i++){
-//     cuyasheint_t d = rand();
-
-//     Polynomial b = a % d;
-//     ZZ_pEX b_ntl = a_ntl % conv<ZZ_pEX>(d);
-//     std::cout << "b: " <<b.to_string() << std::endl; 
-//     std::cout << "b_ntl: " <<b_ntl << std::endl; 
-//     BOOST_REQUIRE(NTL::deg(b_ntl) == b.deg());
-//     for(int i = 0;i <= b.deg();i++){
-
-//       ZZ ntl_value;
-//       if( NTL::IsZero(NTL::coeff(b_ntl,i)) )
-//       // Without this, NTL raises an exception when we call rep()
-//         ntl_value = 0L;
-//       else
-//         ntl_value = conv<ZZ>(NTL::rep(NTL::coeff(b_ntl,i))[0]);
-//       BOOST_REQUIRE(b.get_coeff(i) == ntl_value);
-//     }
-//   }
-// }
 
 
 BOOST_AUTO_TEST_SUITE_END()
@@ -970,10 +725,10 @@ BOOST_AUTO_TEST_CASE(encryptDecrypt)
     Ciphertext c = cipher.encrypt(a);
     Polynomial a_decrypted = cipher.decrypt(c);
 
-    #ifdef VERBOSE
+    // #ifdef VERBOSE
     std::cout << "a: " << a.to_string() << std::endl;
     std::cout << "a_decrypted: " << a_decrypted.to_string() << std::endl;
-    #endif
+    // #endif
     BOOST_REQUIRE( a_decrypted == a);
   }
 }

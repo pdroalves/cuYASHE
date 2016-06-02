@@ -31,8 +31,7 @@
 
 #define BILLION  1000000000L
 #define MILLION  1000000L
-#define N 100
-
+#define N 2
 
 double runEncrypt(Yashe cipher, int d){
   struct timespec start, stop;
@@ -204,7 +203,9 @@ int main(int argc, char* argv[]){
     cout << fixed;
     cout.precision(2);
     ZZ q;
-    NTL::power2(q,127);
+    NTL::power2(q,1279);
+    // NTL::power2(q,521);
+    // NTL::power2(q,127);
     q -= conv<ZZ>("1");
     Polynomial::global_mod = q;
     ZZ_p::init(q); // Defines GF(q)
@@ -274,8 +275,8 @@ int main(int argc, char* argv[]){
     std::cout << "Writing keyswitch data to " << keyswitch_filename << std::endl;
     ZZ_p::init(q); // Defines GF(q)
        
-    for(int d = 1024;d <= 8192;d *= 2){
-    // for(int d = 4096;d <= 4096;d *= 2){
+    // for(int d = 1024;d <= 8192;d *= 2){
+    for(int d = 16384;d <= 16384;d *= 2){
 
     //////////////////////
     // Polynomial setup //
@@ -299,7 +300,7 @@ int main(int argc, char* argv[]){
     Polynomial::gen_crt_primes(Polynomial::global_mod,d);
     CUDAFunctions::init(d);
     
-    std::cout << "CRT primes generated in " << diff << " ms." << std::endl;
+    std::cout << Polynomial::CRTPrimes.size() <<  " CRT primes generated in " << diff << " ms." << std::endl;
     std::cout << "q: " << NTL::NumBytes(q)*8 << " bits" << std::endl;
 
     //////////////////
@@ -327,31 +328,31 @@ int main(int argc, char* argv[]){
     Distribution xkey = Distribution(NARROW);
     Polynomial p(d+1);
 
-    clock_gettime( CLOCK_REALTIME, &start);
-    for(int i = 0; i < N;i++){
-      xkey.get_sample(&p,d+1);
-      cudaDeviceSynchronize();
-    }
-    clock_gettime( CLOCK_REALTIME, &stop);
-    diff = compute_time_ms(start,stop)/N;
-    std::cout << "get_sample) " << diff << " ms" << std::endl;
+    // clock_gettime( CLOCK_REALTIME, &start);
+    // for(int i = 0; i < N;i++){
+    //   xkey.get_sample(&p,d+1);
+    //   cudaDeviceSynchronize();
+    // }
+    // clock_gettime( CLOCK_REALTIME, &stop);
+    // diff = compute_time_ms(start,stop)/N;
+    // std::cout << "get_sample) " << diff << " ms" << std::endl;
         
 
-    diff = runEncrypt(cipher, d);
-    std::cout << "Encrypt) Time measured with memory copy: " << diff << " ms" << std::endl;
-    encrypt << d << " " << diff << std::endl;
+    // diff = runEncrypt(cipher, d);
+    // std::cout << "Encrypt) Time measured with memory copy: " << diff << " ms" << std::endl;
+    // encrypt << d << " " << diff << std::endl;
     
-          size_t t,f;
-      cudaMemGetInfo(&f, &t);
-      cout << "Used memory: " << (t-f)/(1024*1024) << std::endl;
-      cout << "Free memory: " << f/(1024*1024) << std::endl;
-    diff = runDecrypt(cipher, d);
-    std::cout << "Decrypt) Time measured with memory copy: " << diff << " ms" << std::endl;
-    decrypt << d << " " << diff << std::endl;;
+    //       size_t t,f;
+    //   cudaMemGetInfo(&f, &t);
+    //   cout << "Used memory: " << (t-f)/(1024*1024) << std::endl;
+    //   cout << "Free memory: " << f/(1024*1024) << std::endl;
+    // diff = runDecrypt(cipher, d);
+    // std::cout << "Decrypt) Time measured with memory copy: " << diff << " ms" << std::endl;
+    // decrypt << d << " " << diff << std::endl;;
 
-      cudaMemGetInfo(&f, &t);
-      cout << "Used memory: " << (t-f)/(1024*1024) << std::endl;
-      cout << "Free memory: " << f/(1024*1024) << std::endl;
+    //   cudaMemGetInfo(&f, &t);
+    //   cout << "Used memory: " << (t-f)/(1024*1024) << std::endl;
+    //   cout << "Free memory: " << f/(1024*1024) << std::endl;
     diff = runAdditionWithoutMemoryCopy(cipher, d);
     std::cout << "Homomorphic Addition) Time measured without memory copy: " << diff << " ms" << std::endl;
     add_without_memcopy << d << " " << diff << std::endl;;

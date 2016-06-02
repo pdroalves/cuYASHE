@@ -68,6 +68,4 @@ __host__ void callCiphertextMulAux(	bn_t *g,
 									ZZ q,
 									int N, 
 									cudaStream_t stream);
-__host__ void callMersenneDiv(bn_t *g, ZZ q,int N, cudaStream_t stream);
-
 #endif

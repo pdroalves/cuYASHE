@@ -677,6 +677,53 @@ __device__ void bn_64bits_mulmod(cuyasheint_t *result,
 	*result = bn_mod1_low(r,4,(uint64_t)m);
 }
 
+__device__ inline uint64_t div128_64(uint64_t a_hi, uint64_t a_lo, uint64_t b){
+
+	  // quotient
+  uint64_t q = a_lo << 1;
+
+  // remainder
+  uint64_t rem = a_hi;
+
+  uint64_t carry = a_lo >> 63;
+  uint64_t temp_carry = 0;
+  int i;
+
+  for(i = 0; i < 64; i++)
+  {
+    temp_carry = rem >> 63;
+    rem <<= 1;
+    rem |= carry;
+    carry = temp_carry;
+
+    if(carry == 0)
+    {
+      if(rem >= b)
+      {
+        carry = 1;
+      }
+      else
+      {
+        temp_carry = q >> 63;
+        q <<= 1;
+        q |= carry;
+        carry = temp_carry;
+        continue;
+      }
+    }
+
+    rem -= b;
+    rem -= (1 - carry);
+    carry = 1;
+    temp_carry = q >> 63;
+    q <<= 1;
+    q |= carry;
+    carry = temp_carry;
+  }
+
+  return q;
+}
+
 // Div
 /**
  * Divides a digit vector by another digit vector. 
@@ -691,27 +738,24 @@ __device__ void bn_64bits_mulmod(cuyasheint_t *result,
  * @param b  [description]
  * @param sb [description]
  */
-__device__ void bn_divn_low( 	uint32_t *c, 
-								uint32_t *d, 
-								uint32_t *a, 
-								int sa, 
-								uint32_t *b, 
-								int sb
-							) {
+__device__ void bn_divn_low(cuyasheint_t *c, cuyasheint_t *d, cuyasheint_t *a, int sa, cuyasheint_t *b, int sb) {
 	int norm, i, n, t, sd;
-	uint32_t carry, t1[3], t2[3];
+	cuyasheint_t carry, t1[3], t2[3];
+
+	if(sa == 0 || sb == 0)
+		return;
 
 	/* Normalize x and y so that the leading digit of y is bigger than
 	 * 2^(BN_DIGIT-1). */
-	norm = util_bits_dig(b[sb - 1]) % 32;
+	norm = util_bits_dig(b[sb - 1]) % BN_DIGIT;
 
-	if (norm < (int)(32 - 1)) {
-		norm = (32 - 1) - norm;
-		carry = bn_lshb_low<uint32_t>(a,  a, sa, norm);
+	if (norm < (int)(BN_DIGIT - 1)) {
+		norm = (BN_DIGIT - 1) - norm;
+		carry = bn_lshb_low(a, a, sa, norm);
 		if (carry) {
 			a[sa++] = carry;
 		}
-		carry = bn_lshb_low<uint32_t>(b, b, sb, norm);
+		carry = bn_lshb_low(b, b, sb, norm);
 		if (carry) {
 			b[sb++] = carry;
 		}
@@ -724,16 +768,16 @@ __device__ void bn_divn_low( 	uint32_t *c,
 
 	/* Shift y so that the most significant digit of y is aligned with the
 	 * most significant digit of x. */
-	bn_lshd_low<uint32_t>(b, b, sb, (n - t));
+	bn_lshd_low<cuyasheint_t>(b, b, sb, (n - t)+2);
 
 	/* Find the most significant digit of the quotient. */
-	while (bn_cmpn_low<uint32_t>(a, b, sa) != CMP_LT) {
+	while (bn_cmpn_low(a, b, sa) != CMP_LT) {
 		c[n - t]++;
-		bn_subn_low((cuyasheint_t*)a, (cuyasheint_t*)a, (cuyasheint_t*)b, sa);
+		bn_subn_low(a, a, b, sa);
 	}
 	/* Shift y back. */
 
-	bn_rshd_low<uint32_t>(b, b, sb + (n - t), (n - t));
+	bn_rshd_low<cuyasheint_t>(b, b, sb + (n - t), (n - t));
 
 	/* Find the remaining digits. */
 	for (i = n; i >= (t + 1); i--) {
@@ -742,50 +786,49 @@ __device__ void bn_divn_low( 	uint32_t *c,
 		}
 
 		if (a[i] == b[t]) {
-			c[i - t - 1] = ((((uint64_t)1) << 32) - 1);
+			c[i - t - 1] = -1;
 		} else {
-			uint64_t tmp;
-			tmp = ((uint64_t)a[i]) << ((uint64_t)32);
-			tmp |= (uint64_t)(a[i - 1]);
-			tmp /= (uint64_t)(b[t]);
-			c[i - t - 1] = (uint32_t)tmp;
+			cuyasheint_t tmp_hi,tmp_low;
+			tmp_hi = a[i];
+			tmp_low = a[i-1];
+			c[i - t - 1] = div128_64(tmp_hi, tmp_low, b[t]);
 		}
-
 		c[i - t - 1]++;
+
 		do {
 			c[i - t - 1]--;
 			t1[0] = (t - 1 < 0) ? 0 : b[t - 1];
 			t1[1] = b[t];
 
-			carry = bn_mul1_low_32(t1, t1, c[i - t - 1], 2);
+			carry = bn_mul1_low(t1, t1, c[i - t - 1], 2);
 			t1[2] = carry;
 
 			t2[0] = (i - 2 < 0) ? 0 : a[i - 2];
 			t2[1] = (i - 1 < 0) ? 0 : a[i - 1];
 			t2[2] = a[i];
-		} while (bn_cmpn_low<uint32_t>(t1, t2, 3) == CMP_GT);
+		} while (bn_cmpn_low(t1, t2, 3) == CMP_GT);
 
-		carry = bn_mul1_low_32(d, b, c[i - t - 1], sb);
+		carry = bn_mul1_low(d, b, c[i - t - 1], sb);
 		sd = sb;
 		if (carry) {
 			d[sd++] = carry;
 		}
 
-		carry = bn_subn_low_32((a + (i - t - 1)), (a + (i - t - 1)), d, sd);
+		carry = bn_subn_low(a + (i - t - 1), a + (i - t - 1), d, sd);
 		sd += (i - t - 1);
 		if (sa - sd > 0) {
-			carry = bn_sub1_low_32((a + sd), (a + sd), carry, sa - sd);
+			carry = bn_sub1_low(a + sd, a + sd, carry, sa - sd);
 		}
 
 		if (carry) {
 			sd = sb + (i - t - 1);
-			carry = bn_addn_low_32((a + (i - t - 1)), (a + (i - t - 1)), b, sb);
-			carry = bn_add1_low_32((a + sd), (a + sd), carry, sa - sd);
+			carry = bn_addn_low(a + (i - t - 1), a + (i - t - 1), b, sb);
+			carry = bn_add1_low(a + sd, a + sd, carry, sa - sd);
 			c[i - t - 1]--;
 		}
 	}
 	/* Remainder should be not be longer than the divisor. */
-	bn_rshb_low_32(d, a, sb, norm);
+	bn_rshb_low(d, a, sb, norm);
 }
 // Add
 
@@ -1126,112 +1169,99 @@ __device__ void bn_muln_low(cuyasheint_t *c,
  * @param su [description]
  */
 
-__device__ void bn_mod_barrt(	bn_t *C, const bn_t *A,const int NCoefs,
+__device__ void bn_mod_barrt(	cuyasheint_t *c, int *sc, const cuyasheint_t *a,const int sa,
 								const cuyasheint_t * m,  int sm, const cuyasheint_t * u, int su
 							) {
 
-	/**
-	 * Each thread handles one coefficient
-	 */
+	if(bn_cmpn_low(a, m, sm) == CMP_LT)
+		return;
 	
-	const int cid = threadIdx.x + blockDim.x*blockIdx.x;
+	int mu;
+	cuyasheint_t q[DSTD_BNT_WORDS_ALLOC],t[DSTD_BNT_WORDS_ALLOC],carry;
 
-	if(cid < NCoefs){
-		cuyasheint_t *a = A[cid].dp;
-		int sa = A[cid].used;
-		cuyasheint_t *c = C[cid].dp;
-
-		if(bn_cmpn_low(a, m, sm) == CMP_LT)
-			return;
-		
-		int mu;
-		cuyasheint_t q[DSTD_BNT_WORDS_ALLOC],t[DSTD_BNT_WORDS_ALLOC],carry;
-
-		#pragma unroll DSTD_BNT_WORDS_ALLOC
-		for(int i = 0; i < DSTD_BNT_WORDS_ALLOC; i++){
-			q[i] = 0;
-			t[i] = 0;
-		}
-		int sq, st;
-		int i;
-
-		mu = sm;
-		sq = sa - (mu - 1);
-		
-		// bn_rsh
-		for (i = 0; i < sq; i++) 
-			q[i] = a[i + (mu - 1)];
-		//
-		
-		if (sq > su) {
-			// The first mu+1 coeficients are completely useless. 
-			// There is a right shift after this.
-			bn_muld_low(t, q, sq, u, su, mu, sq + su);
-		} else {
-			bn_muld_low(t, u, su, q, sq, mu - (su-sq), sq + su);
-		}
-		st = sq + su;
-
-		// bn_trim
-		while (st > 0 && t[st - 1] == 0)
-			--(st);
-		//
-
-		// bn_rsh
-		sq = st - (mu + 1);
-		for (i = 0; i < sq; i++)
-			q[i] = t[i + (mu + 1)];
-		//
-		
-		if (sq > sm) 
-			bn_muld_low(t, q, sq, m, sm, 0, sq + 1);
-		else 
-			bn_muld_low(t, m, sm, q, sq, 0, mu + 1);
-		
-		st = mu + 1;
-		// bn_trim
-		while (st > 0 && t[st - 1] == 0)
-			st--;
-		//
-		
-		// bn_mod_2b
-		sq = mu + 1;
-		for (i = 0; i < sq; i++) 
-			q[i] = t[i];
-		//
-		
-		// bn_mod_2b
-		st = mu + 1;
-		for (i = 0; i < sq; i++)
-			t[i] = a[i];
-		//
-
-		carry = bn_subn_low(t, t, q, sq);
-		// bn_trim
-		while (st > 0 && t[st - 1] == 0)
-			st--;
-		//
-		
-		// If BN_NEG
-		if (carry) {
-			// bn_set_dig + bn_lsh
-			sq = (mu + 1);
-			for (i = 0; i < sq - 1; i++) {
-				q[i] = 0;
-			}
-			q[sq - 1] = 1;
-			//
-			bn_subn_low(t, q, t, sq);
-		}
-
-		while (bn_cmpn_low(t, m, sm) != CMP_LT)
-			bn_subn_low(t, t, m, sm);
-
-		for (i = 0; i < st; i++)
-			c[i] = t[i];
-
-		C[cid].used = st;
+	#pragma unroll 200
+	for(int i = 0; i < DSTD_BNT_WORDS_ALLOC; i++){
+		q[i] = 0;
+		t[i] = 0;
 	}
+	int sq, st;
+	int i;
+
+	mu = sm;
+	sq = sa - (mu - 1);
+	
+	// bn_rsh
+	for (i = 0; i < sq; i++) 
+		q[i] = a[i + (mu - 1)];
+	//
+	
+	if (sq > su) {
+		// The first mu+1 coeficients are completely useless. 
+		// There is a right shift after this.
+		bn_muld_low(t, q, sq, u, su, mu, sq + su);
+	} else {
+		bn_muld_low(t, u, su, q, sq, mu - (su-sq), sq + su);
+	}
+	st = sq + su;
+
+	// bn_trim
+	while (st > 0 && t[st - 1] == 0)
+		--(st);
+	//
+
+	// bn_rsh
+	sq = st - (mu + 1);
+	for (i = 0; i < sq; i++)
+		q[i] = t[i + (mu + 1)];
+	//
+	
+	if (sq > sm) 
+		bn_muld_low(t, q, sq, m, sm, 0, sq + 1);
+	else 
+		bn_muld_low(t, m, sm, q, sq, 0, mu + 1);
+	
+	st = mu + 1;
+	// bn_trim
+	while (st > 0 && t[st - 1] == 0)
+		st--;
+	//
+	
+	// bn_mod_2b
+	sq = mu + 1;
+	for (i = 0; i < sq; i++) 
+		q[i] = t[i];
+	//
+	
+	// bn_mod_2b
+	st = mu + 1;
+	for (i = 0; i < sq; i++)
+		t[i] = a[i];
+	//
+
+	carry = bn_subn_low(t, t, q, sq);
+	// bn_trim
+	while (st > 0 && t[st - 1] == 0)
+		st--;
+	//
+	
+	// If BN_NEG
+	if (carry) {
+		// bn_set_dig + bn_lsh
+		sq = (mu + 1);
+		for (i = 0; i < sq - 1; i++) {
+			q[i] = 0;
+		}
+		q[sq - 1] = 1;
+		//
+		bn_subn_low(t, q, t, sq);
+	}
+
+	while (bn_cmpn_low(t, m, sm) != CMP_LT)
+		bn_subn_low(t, t, m, sm);
+
+	for (i = 0; i < st; i++)
+		c[i] = t[i];
+	*sc = st;
 }
 
 /**
@@ -1251,7 +1281,7 @@ __global__ void cuModN(bn_t * c, bn_t * a, const int NCoefs,
 	 */
 	const unsigned int tid = threadIdx.x + blockIdx.x*blockDim.x;
 	if(tid < NCoefs){
-		bn_mod_barrt(c,a,NCoefs,m,get_used_index(m,sm)+1,u,get_used_index(u,su)+1);
+		bn_rem(c,a,NCoefs,m,get_used_index(m,sm)+1,u,get_used_index(u,su)+1);
 		bn_zero_non_used(&a[tid]);
 	}
 }
@@ -1392,6 +1422,59 @@ __global__ void cuPreICRT(	cuyasheint_t *inner_results,
 	}
 }
 
+// Div
+/**
+ * Divides a digit vector by another digit vector. 
+ * Computes c = floor(a / b) and d = a mod b. 
+ * 
+ * The dividend and the divisor are destroyed inside the function.
+ * 
+ * @param c  [description]
+ * @param d  [description]
+ * @param a  [description]
+ * @param sa [description]
+ * @param b  [description]
+ * @param sb [description]
+ */
+// __device__ void bn_divn_low( 	uint32_t *c, 
+// 								uint32_t *d, 
+// 								uint32_t *a, 
+// 								int sa, 
+// 								uint32_t *b, 
+// 								int sb
+// 							) {
+
+__device__ void bn_rem(	bn_t *R, const bn_t *A,const int NCoefs,
+								const cuyasheint_t * m,  int sm, const cuyasheint_t * u, int su
+							) {
+
+	/**
+	 * Each thread handles one coefficient
+	 */
+	
+	const int cid = threadIdx.x + blockDim.x*blockIdx.x;
+
+	if(cid < NCoefs){
+		cuyasheint_t *a = A[cid].dp;
+		int sa = A[cid].used;
+
+		// Remainder
+		cuyasheint_t *rem = R[cid].dp;
+		int sr = R[cid].used;
+
+		// Quotient
+		// cuyasheint_t quot[STD_BNT_WORDS_ALLOC];
+
+		// bn_divn_low(quot, rem, a, sa, M, M_used);
+		// if (bn_cmpn_low<cuyasheint_t>(a, quot, sa) == CMP_LT) {
+
+			bn_mod_barrt( rem, &sr, a, sa, M, M_used, u, u_used );
+			R[cid].used = sr;
+		// }
+	}
+
+}
+
 /**
  * cuICRT computes ICRT on GPU
  * @param poly      output: An array of coefficients 
@@ -1443,8 +1526,8 @@ __global__ void cuICRT(	bn_t *poly,
  	 	/**
  	 	 * At this point a thread i finished the computation of coefficient i
  	 	 */
- 		poly[cid] = coef;
-		bn_mod_barrt(	poly,
+ 	 	poly[cid] = coef;
+		bn_rem(	poly,
 						poly,
 						N,
 						M,
@@ -1456,6 +1539,8 @@ __global__ void cuICRT(	bn_t *poly,
 
 }
 	
+
+
 void callCRT(bn_t *coefs,const int used_coefs,cuyasheint_t *d_polyCRT,const int N, const int NPolis,cudaStream_t stream){
 	const int size = N*NPolis;
 

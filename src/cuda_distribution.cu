@@ -31,7 +31,8 @@ __host__ void Distribution::call_setup_kernel(){
 	const dim3 blockDim(ADDBLOCKXDIM);
 
 	setup_kernel<<<gridDim,blockDim,0>>>(states,SEED);
-	assert(cudaGetLastError() == cudaSuccess);
+	cudaError_t result = cudaGetLastError();
+	assert(result == cudaSuccess);
 }
 
 

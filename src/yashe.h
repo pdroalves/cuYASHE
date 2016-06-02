@@ -43,6 +43,8 @@ class Yashe{
     static Polynomial h;
     static Polynomial f;
     static Polynomial ff;
+    static Polynomial tf;
+    static Polynomial tff;
     static int lwq;
     static ZZ WDMasking;
     static std::vector<Polynomial> P;

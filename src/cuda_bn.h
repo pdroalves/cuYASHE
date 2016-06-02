@@ -62,9 +62,6 @@ __host__ __device__ void bn_bitwise_and(bn_t *a, bn_t *b);
 __host__ __device__ void bn_truncate(bn_t *a, int bits);
 __host__ __device__ uint64_t bn_rshb_low(uint64_t *c, const uint64_t *a, int size, int bits);
 __host__ __device__ uint32_t bn_rshb_low_32(uint32_t *c, const uint32_t *a, int size, int bits);
-__host__ __device__ void bn_rshd_low(cuyasheint_t *c, const cuyasheint_t *a, int size, int digits);
-__host__ __device__ void bn_lshd_low(cuyasheint_t *c, const cuyasheint_t *a, int size, int digits);	
-__host__ __device__  cuyasheint_t bn_lshb_low(cuyasheint_t *c, const cuyasheint_t *a, int size, int bits);
 __host__ __device__ uint64_t bn_addn_low(uint64_t *c, uint64_t *a, uint64_t *b, const int size );
 __host__ __device__ uint32_t bn_addn_low_32(uint32_t *c, uint32_t *a, uint32_t *b, const int size );
 __host__ __device__ uint64_t bn_subn_low(	uint64_t * c, const uint64_t * a, const uint64_t * b,  int size);
@@ -81,7 +78,7 @@ __device__ void bn_muld_low(cuyasheint_t * c,
 									int sb, 
 									int l, 
 									int h);
-__device__ void bn_mod_barrt(	bn_t *C, 
+__device__ void bn_rem(	bn_t *C, 
 								const bn_t *A,const int NCoefs,
 								const cuyasheint_t * m, 
 								int sm, 

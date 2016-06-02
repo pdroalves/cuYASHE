@@ -105,12 +105,9 @@ __device__ __inline__ void mersenneDiv(	bn_t *x,
 									x->dp,
 									x->used,
 									q_bits);
-		if(carry)
-			bn_rshb_low(x->dp,
-						x->dp,
-						x->used,
-						q_bits);
-		x->dp -= (q_bits / WORD) + (q_bits % WORD != 0);
+		x->used -= (q_bits / WORD);
+		
+		// x is the quotient		
 }
 
 /**
@@ -129,11 +126,13 @@ __global__ void cuCiphertextMulAux(
 									int N){
 	/**
 	 * This kernel should be executed with N threads
+	 * It supposes that q is a mersenne prime
 	 */
 	const int tid = threadIdx.x + blockIdx.x*blockDim.x;
 
 	if(tid < N){
 		// Divides g by q
+		// bn_t rem[STD_BNT_WORDS_ALLOC];
 		bn_t *coef = &g[tid];
 		mersenneDiv(coef,q_bits);
 
@@ -143,28 +142,6 @@ __global__ void cuCiphertextMulAux(
 			bn_add1_low(coef->dp, coef->dp, 1, coef->used);
 		}
 
-	}
-}
-
-/**
- * Divides a big integer g by a mersenne prime q
- * @param g      [description]
- * @param q_bits [description]
- * @param N      [description]
- */
-__global__ void cuMersenneDiv( bn_t *g, 
-								int q_bits,
-								int N){
-	/**
-	 * This kernel should be executed with N threads
-	 *
-	 * It supposes that q is a mersenne prime
-	 */
-	const int tid = threadIdx.x + blockIdx.x*blockDim.x;
-
-	if(tid < N){
-		bn_t *coef = &g[tid];
-		mersenneDiv(coef,q_bits);
 	}
 }
 
@@ -183,16 +160,5 @@ __host__ void callCiphertextMulAux(bn_t *g, ZZ q,int N, cudaStream_t stream){
 	const dim3 blockDim(128);
 
 	cuCiphertextMulAux<<<gridDim, blockDim, 0, stream>>>(g, NTL::NumBits(q),Yashe::qDiv2, N);
-	assert(cudaGetLastError() == cudaSuccess);
-}
-
-__host__ void callMersenneDiv(bn_t *g, ZZ q,int N, cudaStream_t stream){
-
-	const int size = N;
-	const int ADDGRIDXDIM = (size%128 == 0? size/128 : size/128 + 1);
-	const dim3 gridDim(ADDGRIDXDIM);
-	const dim3 blockDim(128);
-
-	cuMersenneDiv<<<gridDim, blockDim,0, stream>>>(g,NTL::NumBits(q),N);
 	assert(cudaGetLastError() == cudaSuccess);
 }

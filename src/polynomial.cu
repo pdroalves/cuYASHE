@@ -300,15 +300,6 @@ void Polynomial::transf(){
   int N = (get_crt_spacing());
 
   #ifdef NTTMUL_TRANSFORM
-  // std::cout << "Transform" << std::endl;
-
-  // int size = N*Polynomial::CRTPrimes.size();
-
-  // cudaError_t result = cudaMemsetAsync(CUDAFunctions::d_mulAux,
-  //                                       0,
-  //                                       size*sizeof(cuyasheint_t),
-  //                                       get_stream());  
-  // assert(result == cudaSuccess);
 
   set_device_crt_residues(
     CUDAFunctions::applyNTT( get_device_crt_residues(), N, CRTPrimes.size(), FORWARD, get_stream() )
@@ -330,7 +321,7 @@ void Polynomial::transf(){
   #endif
 
   set_transf_computed(true);
-  set_crt_computed(false); // This is in-place
+  set_crt_computed(false); // I don't remember why this is needed
 }
 
 // Applies FFT
@@ -562,7 +553,8 @@ void Polynomial::update_host_data(){
      * the first element's dp.
      */
     cuyasheint_t *aux = (cuyasheint_t*)malloc(used_coefs*STD_BNT_WORDS_ALLOC*sizeof(cuyasheint_t));
-    result = cudaMemcpy(aux,h_bn_coefs[0].dp,STD_BNT_WORDS_ALLOC*used_coefs*sizeof(cuyasheint_t),cudaMemcpyDeviceToHost);
+    result = cudaMemcpy(aux,h_bn_coefs[0].dp,h_bn_coefs[0].alloc*used_coefs*sizeof(cuyasheint_t),cudaMemcpyDeviceToHost);
+    cudaGetLastError();
 
     /**
      * We can't use "set_coeffs(int)" here. 
@@ -732,7 +724,8 @@ bn_t get_reciprocal(bn_t q){
 void compute_reciprocal(ZZ q){
       ZZ u_ZZ;
 
-      int nwords = NTL::NumBits(q)/WORD + (NTL::NumBits(q)%WORD != 0);
+      // int nwords = NTL::NumBits(q)/WORD + (NTL::NumBits(q)%WORD != 0);
+      int nwords = NTL::NumBits(q)/WORD + 1;
 
       ZZ x = power2_ZZ(2*WORD*nwords);
       u_ZZ = x/q;

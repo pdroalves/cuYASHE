@@ -289,10 +289,12 @@ class Polynomial{
         cudaError_t result = cudaMemcpyAsync(this->d_polyCRT,b.d_polyCRT,b.get_crt_spacing()*Polynomial::CRTPrimes.size()*sizeof(cuyasheint_t),cudaMemcpyDeviceToDevice,b.get_stream());
         assert(result == cudaSuccess);
       }
+      #ifdef CUFFTMUL_TRANSFORM
       if(b.get_transf_computed()){
         cudaError_t result = cudaMemcpyAsync(this->d_polyTransf,b.d_polyTransf,b.get_crt_spacing()*Polynomial::CRTPrimes.size()*sizeof(cuyasheint_t),cudaMemcpyDeviceToDevice,b.get_stream());
         assert(result == cudaSuccess);
       }
+      #endif
 
       if(b.get_host_updated())
         set_coeffs(b.get_coeffs());
@@ -337,7 +339,9 @@ class Polynomial{
       this->d_bn_coefs = b.d_bn_coefs;
       this->h_bn_coefs = b.h_bn_coefs;
       this->d_polyCRT = b.d_polyCRT;
+      #ifdef CUFFTMUL_TRANSFORM
       this->d_polyTransf = b.d_polyTransf;
+      #endif
 
       this->set_crt_computed(b.get_crt_computed());
       this->set_icrt_computed(b.get_icrt_computed());
@@ -690,7 +694,7 @@ class Polynomial{
 
       if(!get_host_updated()){
         #ifdef NTTMUL_TRANSFORM
-        set_device_transf_residues( CUDAFunctions::callPolynomialOPInteger(
+        p->set_device_crt_residues( CUDAFunctions::callPolynomialOPInteger(
                                                       ADD,
                                                       get_stream(),
                                                       get_device_crt_residues(),
@@ -699,7 +703,9 @@ class Polynomial{
                                                       CRTPrimes.size())
           );
         #else
-        set_device_transf_residues( CUDAFunctions::callPolynomialcuFFTOPInteger(
+        if(!get_transf_computed())
+          transf();
+        p->set_device_transf_residues( CUDAFunctions::callPolynomialcuFFTOPInteger(
                                                       ADD,
                                                       get_stream(),
                                                       get_device_transf_residues(),
@@ -708,9 +714,15 @@ class Polynomial{
                                                       CRTPrimes.size())
           );
         #endif
+        p->set_host_updated(false);
+        p->set_transf_computed(true);
       }else{
-        for(int i = 0; i <= deg(); i++)
-          p->set_coeff(i,get_coeff(i)+b);
+        p->set_coeff(0,get_coeff(0)+b);
+        p->set_host_updated(true);
+        p->set_crt_computed(false);
+        p->set_icrt_computed(false);
+        p->set_transf_computed(false);
+        p->set_itransf_computed(false);
       }
 
       return p;
@@ -726,6 +738,8 @@ class Polynomial{
                                                       get_crt_spacing(),
                                                       CRTPrimes.size());
         #else
+        if(!get_transf_computed())
+          transf();
         CUDAFunctions::callPolynomialcuFFTOPIntegerInplace(
                                                       ADD,
                                                       get_stream(),
@@ -735,8 +749,11 @@ class Polynomial{
                                                       CRTPrimes.size());
         #endif
       }else{
-        for(int i = 0; i <= deg(); i++)
-          set_coeff(i,get_coeff(i)+b);
+        set_coeff(0,get_coeff(0)+b);  
+        set_crt_computed(false);
+        set_icrt_computed(false);
+        set_transf_computed(false);
+        set_itransf_computed(false);
       }
 
       return *this;
@@ -746,7 +763,7 @@ class Polynomial{
 
       if(!get_host_updated()){
         #ifdef NTTMUL_TRANSFORM
-        set_device_transf_residues( CUDAFunctions::callPolynomialOPInteger(
+        p->set_device_crt_residues( CUDAFunctions::callPolynomialOPInteger(
                                                       SUB,
                                                       get_stream(),
                                                       get_device_crt_residues(),
@@ -755,7 +772,9 @@ class Polynomial{
                                                       CRTPrimes.size())
           );
         #else
-        set_device_transf_residues( CUDAFunctions::callPolynomialcuFFTOPInteger(
+        if(!get_transf_computed())
+          transf();
+        p->set_device_transf_residues( CUDAFunctions::callPolynomialcuFFTOPInteger(
                                                       SUB,
                                                       get_stream(),
                                                       get_device_transf_residues(),
@@ -764,9 +783,15 @@ class Polynomial{
                                                       CRTPrimes.size())
           );
         #endif
+        p->set_host_updated(false);
+        p->set_transf_computed(true);
       }else{
-        for(int i = 0; i <= deg(); i++)
-          p->set_coeff(i,get_coeff(i)-b);
+        p->set_coeff(0,get_coeff(0)-b);
+        p->set_host_updated(true);
+        p->set_crt_computed(false);
+        p->set_icrt_computed(false);
+        p->set_transf_computed(false);
+        p->set_itransf_computed(false);
       }
 
       return p;
@@ -782,6 +807,8 @@ class Polynomial{
                                                       get_crt_spacing(),
                                                       CRTPrimes.size());
         #else
+        if(!get_transf_computed())
+          transf();
         CUDAFunctions::callPolynomialcuFFTOPIntegerInplace(
                                                       SUB,
                                                       get_stream(),
@@ -791,8 +818,11 @@ class Polynomial{
                                                       CRTPrimes.size());
         #endif
       }else{
-        for(int i = 0; i <= deg(); i++)
-          set_coeff(i,get_coeff(i)-b);
+        set_coeff(0,get_coeff(0)-b);
+        set_crt_computed(false);
+        set_icrt_computed(false);
+        set_transf_computed(false);
+        set_itransf_computed(false);
       }
 
       return *this;
@@ -802,7 +832,7 @@ class Polynomial{
 
       if(!get_host_updated()){
         #ifdef NTTMUL_TRANSFORM
-        set_device_transf_residues( CUDAFunctions::callPolynomialOPInteger(
+        p->set_device_crt_residues( CUDAFunctions::callPolynomialOPInteger(
                                                       MUL,
                                                       get_stream(),
                                                       get_device_crt_residues(),
@@ -811,7 +841,9 @@ class Polynomial{
                                                       CRTPrimes.size())
           );
         #else
-        set_device_transf_residues( CUDAFunctions::callPolynomialcuFFTOPInteger(
+        if(!get_transf_computed())
+          transf();
+        p->set_device_transf_residues( CUDAFunctions::callPolynomialcuFFTOPInteger(
                                                       MUL,
                                                       get_stream(),
                                                       get_device_transf_residues(),
@@ -820,9 +852,16 @@ class Polynomial{
                                                       CRTPrimes.size())
           );
         #endif
+        p->set_host_updated(false);
+        p->set_transf_computed(true);
       }else{
         for(int i = 0; i <= deg(); i++)
           p->set_coeff(i,get_coeff(i)*b);
+        p->set_host_updated(true);
+        p->set_crt_computed(false);
+        p->set_icrt_computed(false);
+        p->set_transf_computed(false);
+        p->set_itransf_computed(false);
       }
 
       return p;
@@ -838,6 +877,8 @@ class Polynomial{
                                                       get_crt_spacing(),
                                                       CRTPrimes.size());
         #else
+        if(!get_transf_computed())
+          transf();
         CUDAFunctions::callPolynomialcuFFTOPIntegerInplace(
                                                       MUL,
                                                       get_stream(),
@@ -849,6 +890,10 @@ class Polynomial{
       }else{
         for(int i = 0; i <= deg(); i++)
           set_coeff(i,get_coeff(i)*b);
+        set_crt_computed(false);
+        set_icrt_computed(false);
+        set_transf_computed(false);
+        set_itransf_computed(false);
       }
 
       return *this;
@@ -1494,7 +1539,10 @@ class Polynomial{
         result = cudaMalloc((void**)&d_polyTransf,new_spacing*(CRTPrimes.size())*sizeof(Complex));        
         assert(result == cudaSuccess);
         #endif
-        result = cudaMalloc((void**)&d_polyCRT,new_spacing*(CRTPrimes.size())*sizeof(cuyasheint_t));        
+        result = cudaMalloc((void**)&d_polyCRT,new_spacing*(CRTPrimes.size())*sizeof(cuyasheint_t));  
+
+        assert(result == cudaSuccess);
+        result = cudaMalloc((void**)&tmp,new_spacing*STD_BNT_WORDS_ALLOC*sizeof(cuyasheint_t));         
         if(result != cudaSuccess){
           size_t t,f;
       cudaMemGetInfo(&f, &t);
@@ -1502,10 +1550,7 @@ class Polynomial{
       cout << "Free memory: " << f/(1024*1024) << std::endl;
 
           std::cout << cudaGetErrorString(result) << " - " << new_spacing*(CRTPrimes.size())*sizeof(cuyasheint_t) << " bytes" << std::endl;
-        }
-
-        assert(result == cudaSuccess);
-        result = cudaMalloc((void**)&tmp,new_spacing*STD_BNT_WORDS_ALLOC*sizeof(cuyasheint_t));        
+        }     
         assert(result == cudaSuccess);
         // tmp = &d_polyCRT[new_spacing*(CRTPrimes.size())];
 

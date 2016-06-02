@@ -60,10 +60,10 @@ extern __constant__ cuyasheint_t u[STD_BNT_WORDS_ALLOC];
 extern __constant__ int u_used;
 extern __constant__ cuyasheint_t CRTPrimesConstant[PRIMES_BUCKET_SIZE];
 
-__constant__ cuyasheint_t W16[225]; 
-__constant__ cuyasheint_t WInv16[225]; 
-__constant__ cuyasheint_t W8[50]; 
-__constant__ cuyasheint_t WInv8[50]; 
+// __constant__ cuyasheint_t W16[225]; 
+// __constant__ cuyasheint_t WInv16[225]; 
+// __constant__ cuyasheint_t W8[50]; 
+// __constant__ cuyasheint_t WInv8[50]; 
 
 // #elif defined(CUFFTMUL)
 cufftHandle CUDAFunctions::plan;
@@ -156,7 +156,7 @@ __global__ void polynomialAddSub(const int OP,const cuyasheint_t *a,const cuyash
 
 __host__ void CUDAFunctions::callPolynomialAddSub(cuyasheint_t *c,cuyasheint_t *a,cuyasheint_t *b,int size,int OP,cudaStream_t stream){
   // This method expects that both arrays are aligned
-  int nthreads = 64;
+  int nthreads = 128;
   int ADDGRIDXDIM = (size%nthreads == 0? size/nthreads : size/nthreads + 1);
   dim3 gridDim(ADDGRIDXDIM);
   dim3 blockDim(nthreads);
@@ -197,7 +197,8 @@ __global__ void polynomialAddSubInPlace(const int OP, cuyasheint_t *a,const cuya
 __host__ void CUDAFunctions::callPolynomialAddSubInPlace(cudaStream_t stream,cuyasheint_t *a,cuyasheint_t *b,int size,int OP){
   // This method expects that both arrays are aligned
   // Add and store in array a
-  int ADDGRIDXDIM = (size%ADDBLOCKXDIM == 0? size/ADDBLOCKXDIM : size/ADDBLOCKXDIM + 1);
+  int nthreads = 128;
+  int ADDGRIDXDIM = (size%nthreads == 0? size/nthreads : size/nthreads + 1);
   dim3 gridDim(ADDGRIDXDIM);
   dim3 blockDim(ADDBLOCKXDIM);
 
@@ -291,8 +292,8 @@ __global__ void copyIntegerToComplex(Complex *a,cuyasheint_t *b,int size){
       // printf("%ld => %f\n\n",b[tid],a[tid].x);
       a[tid].y = 0;
   }else{
-    a[tid].x = 0;
-    a[tid].y = 0;
+    // a[tid].x = 0;
+    // a[tid].y = 0;
   }
 }
 
@@ -1295,69 +1296,69 @@ __host__ void CUDAFunctions::init(int M){
   free(h_W);
   free(h_WInv);
 
-  int RADIX_N = 8;
-  // W used on radix-8 NTT
-  #ifdef VERBOSE
-  std::cout << "Will compute W -- N = 8" << std::endl;
-  std::cout << "P " << PZZ << std::endl;
-  #endif
+  // int RADIX_N = 8;
+  // // W used on radix-8 NTT
+  // #ifdef VERBOSE
+  // std::cout << "Will compute W -- N = 8" << std::endl;
+  // std::cout << "P " << PZZ << std::endl;
+  // #endif
 
-  k = conv<cuyasheint_t>(PZZ-1)/RADIX_N;
-  wNZZ = NTL::PowerMod(ZZ(PRIMITIVE_ROOT),k,PZZ);
+  // k = conv<cuyasheint_t>(PZZ-1)/RADIX_N;
+  // wNZZ = NTL::PowerMod(ZZ(PRIMITIVE_ROOT),k,PZZ);
 
-  wN = conv<cuyasheint_t>(wNZZ);
+  // wN = conv<cuyasheint_t>(wNZZ);
   
-  int VALUES_TO_COMPUTE = (RADIX_N - 1)*(RADIX_N - 1)+1;
-  h_W = (cuyasheint_t*)malloc(VALUES_TO_COMPUTE*sizeof(cuyasheint_t));
-  h_WInv = (cuyasheint_t*)malloc(VALUES_TO_COMPUTE*sizeof(cuyasheint_t));
+  // int VALUES_TO_COMPUTE = (RADIX_N - 1)*(RADIX_N - 1)+1;
+  // h_W = (cuyasheint_t*)malloc(VALUES_TO_COMPUTE*sizeof(cuyasheint_t));
+  // h_WInv = (cuyasheint_t*)malloc(VALUES_TO_COMPUTE*sizeof(cuyasheint_t));
 
-  // Computes 1-th column from W
-  for(int j = 0; j < VALUES_TO_COMPUTE; j++)
-    h_W[j] = conv<cuyasheint_t>(NTL::PowerMod(wNZZ,j,PZZ));
+  // // Computes 1-th column from W
+  // for(int j = 0; j < VALUES_TO_COMPUTE; j++)
+  //   h_W[j] = conv<cuyasheint_t>(NTL::PowerMod(wNZZ,j,PZZ));
 
-  // Computes 1-th column from WInv
-  for(int j = 0; j < VALUES_TO_COMPUTE; j++)
-      h_WInv[j] = conv<cuyasheint_t>(NTL::InvMod(conv<ZZ>(h_W[j]),PZZ ));
+  // // Computes 1-th column from WInv
+  // for(int j = 0; j < VALUES_TO_COMPUTE; j++)
+  //     h_WInv[j] = conv<cuyasheint_t>(NTL::InvMod(conv<ZZ>(h_W[j]),PZZ ));
 
-  result = cudaMemcpyToSymbol (W8,h_W, VALUES_TO_COMPUTE*sizeof(cuyasheint_t));
-  assert(result == cudaSuccess);
-  result = cudaMemcpyToSymbol (WInv8,h_WInv, VALUES_TO_COMPUTE*sizeof(cuyasheint_t));
-  assert(result == cudaSuccess);
+  // result = cudaMemcpyToSymbol (W8,h_W, VALUES_TO_COMPUTE*sizeof(cuyasheint_t));
+  // assert(result == cudaSuccess);
+  // result = cudaMemcpyToSymbol (WInv8,h_WInv, VALUES_TO_COMPUTE*sizeof(cuyasheint_t));
+  // assert(result == cudaSuccess);
 
-  free(h_W);
-  free(h_WInv);
+  // free(h_W);
+  // free(h_WInv);
 
-  RADIX_N = 16;
-  // W used on radix-16 NTT
-  #ifdef VERBOSE
-  std::cout << "Will compute W -- N = 16" << std::endl;
-  std::cout << "P " << PZZ << std::endl;
-  #endif
+  // RADIX_N = 16;
+  // // W used on radix-16 NTT
+  // #ifdef VERBOSE
+  // std::cout << "Will compute W -- N = 16" << std::endl;
+  // std::cout << "P " << PZZ << std::endl;
+  // #endif
 
-  k = conv<cuyasheint_t>(PZZ-1)/RADIX_N;
-  wNZZ = NTL::PowerMod(ZZ(PRIMITIVE_ROOT),k,PZZ);
+  // k = conv<cuyasheint_t>(PZZ-1)/RADIX_N;
+  // wNZZ = NTL::PowerMod(ZZ(PRIMITIVE_ROOT),k,PZZ);
 
-  wN = conv<cuyasheint_t>(wNZZ);
+  // wN = conv<cuyasheint_t>(wNZZ);
   
-  VALUES_TO_COMPUTE = (RADIX_N - 1)*(RADIX_N - 1)+1;
-  h_W = (cuyasheint_t*)malloc(VALUES_TO_COMPUTE*sizeof(cuyasheint_t));
-  h_WInv = (cuyasheint_t*)malloc(VALUES_TO_COMPUTE*sizeof(cuyasheint_t));
+  // VALUES_TO_COMPUTE = (RADIX_N - 1)*(RADIX_N - 1)+1;
+  // h_W = (cuyasheint_t*)malloc(VALUES_TO_COMPUTE*sizeof(cuyasheint_t));
+  // h_WInv = (cuyasheint_t*)malloc(VALUES_TO_COMPUTE*sizeof(cuyasheint_t));
 
-  // Computes 1-th column from W
-  for(int j = 0; j < VALUES_TO_COMPUTE; j++)
-    h_W[j] = conv<cuyasheint_t>(NTL::PowerMod(wNZZ,j,PZZ));
+  // // Computes 1-th column from W
+  // for(int j = 0; j < VALUES_TO_COMPUTE; j++)
+  //   h_W[j] = conv<cuyasheint_t>(NTL::PowerMod(wNZZ,j,PZZ));
 
-  // Computes 1-th column from WInv
-  for(int j = 0; j < VALUES_TO_COMPUTE; j++)
-      h_WInv[j] = conv<cuyasheint_t>(NTL::InvMod(conv<ZZ>(h_W[j]),PZZ ));
+  // // Computes 1-th column from WInv
+  // for(int j = 0; j < VALUES_TO_COMPUTE; j++)
+  //     h_WInv[j] = conv<cuyasheint_t>(NTL::InvMod(conv<ZZ>(h_W[j]),PZZ ));
 
-  result = cudaMemcpyToSymbol (W8,h_W, VALUES_TO_COMPUTE*sizeof(cuyasheint_t));
-  assert(result == cudaSuccess);
-  result = cudaMemcpyToSymbol (WInv8,h_WInv, VALUES_TO_COMPUTE*sizeof(cuyasheint_t));
-  assert(result == cudaSuccess);
+  // result = cudaMemcpyToSymbol (W8,h_W, VALUES_TO_COMPUTE*sizeof(cuyasheint_t));
+  // assert(result == cudaSuccess);
+  // result = cudaMemcpyToSymbol (WInv8,h_WInv, VALUES_TO_COMPUTE*sizeof(cuyasheint_t));
+  // assert(result == cudaSuccess);
 
-  free(h_W);
-  free(h_WInv);
+  // free(h_W);
+  // free(h_WInv);
 
   cufftResult fftResult;
 
@@ -1443,7 +1444,7 @@ __global__ void cuICRTFix(bn_t *a, const int N, bn_t q,bn_t u_q,bn_t q2){
     }  
     a[tid] = coef;
     // result = result % q
-    bn_mod_barrt( a,
+    bn_rem( a,
                   a,
                   N,
                   q.dp,
@@ -1528,11 +1529,11 @@ __host__ void Polynomial::reduce(){
   
   // Until we debug reduction on GPU, we need this
   // #warning Polynomial reduction forced to HOST
-  // update_host_data();
-  // set_crt_computed(false);
-  // set_icrt_computed(false);
-  // set_transf_computed(false);
-  // set_itransf_computed(false);
+  update_host_data();
+  set_crt_computed(false);
+  set_icrt_computed(false);
+  set_transf_computed(false);
+  set_itransf_computed(false);
 
   if(!(this->get_crt_computed() || this->get_icrt_computed() || this->get_transf_computed())){
     #ifdef VERBOSE
