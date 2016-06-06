@@ -97,7 +97,7 @@ void Yashe::generate_keys(){
   h.set_coeff(1,5008);
   h.set_coeff(2,7081);
   h.set_coeff(3,7853);
-  // h.update_device_data();
+  h.update_device_data();
 
   gamma.resize(lwq);
   // for(int k = 0 ; k < lwq; k ++){

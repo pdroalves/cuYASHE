@@ -23,9 +23,9 @@ BENCHMARKYASHEBIN= $(INSTALL)/benchmark_yashe
 
 all: tests benchmarks
 
-tests:  polynomial.o cuda_functions.o cuda_bn.o cuda_distribution.o cuda_ciphertext.o test.o test_ctpt.o test_ntt.o test_mul.o test_crt.o test_reduce.o test_bnt.o ciphertext.o distribution.o yashe.o common.o test_auditoria.o
+tests:  polynomial.o cuda_functions.o cuda_bn.o cuda_distribution.o cuda_ciphertext.o test.o test_ctpt.o test_ntt.o test_mul.o test_crt.o test_reduce.o test_bnt.o ciphertext.o distribution.o yashe.o common.o test_auditing.o
 	$(CUDA_CC) $(CUDA_ARCH) $(LCUDA) $(ICUDA) -o $(TESTBIN) test.o polynomial.o cuda_functions.o cuda_bn.o cuda_distribution.o cuda_ciphertext.o ciphertext.o distribution.o yashe.o common.o  -lcufft -lcurand  --relocatable-device-code true -Xcompiler $(OPENMP) $(NTL) -lboost_unit_test_framework
-	$(CUDA_CC) $(CUDA_ARCH) $(LCUDA) $(ICUDA) -o $(TESTBIN)_auditoria test_auditoria.o polynomial.o cuda_functions.o cuda_bn.o cuda_distribution.o cuda_ciphertext.o ciphertext.o distribution.o yashe.o common.o  -lcufft -lcurand -Xcompiler $(OPENMP) $(NTL)
+	$(CUDA_CC) $(CUDA_ARCH) $(LCUDA) $(ICUDA) -o $(TESTBIN)_auditing test_auditing.o polynomial.o cuda_functions.o cuda_bn.o cuda_distribution.o cuda_ciphertext.o ciphertext.o distribution.o yashe.o common.o  -lcufft -lcurand -Xcompiler $(OPENMP) $(NTL)
 	# $(CUDA_CC) $(CUDA_ARCH) $(LCUDA) $(ICUDA) -o $(TESTBIN)_ctpt test_ctpt.o polynomial.o cuda_functions.o cuda_bn.o cuda_distribution.o cuda_ciphertext.o ciphertext.o distribution.o yashe.o common.o  -lcufft -lcurand -Xcompiler $(OPENMP) $(NTL)
 	# $(CUDA_CC) $(CUDA_ARCH) $(LCUDA) $(ICUDA) -o $(TESTBIN)_crt test_crt.o polynomial.o cuda_functions.o cuda_bn.o cuda_distribution.o cuda_ciphertext.o ciphertext.o distribution.o yashe.o common.o  -lcufft -lcurand -Xcompiler $(OPENMP) $(NTL)
 	# $(CUDA_CC) $(CUDA_ARCH) $(LCUDA) $(ICUDA) -o $(TESTBIN)_reduce test_reduce.o polynomial.o cuda_functions.o cuda_bn.o cuda_distribution.o cuda_ciphertext.o ciphertext.o distribution.o yashe.o common.o  -lcufft -lcurand -Xcompiler $(OPENMP) $(NTL)
@@ -78,8 +78,8 @@ common.o:common.cpp
 test_ctpt.o: test_ctpt.cu
 	# $(CUDA_CC) -c test_ctpt.cu -o test_ctpt.o  $(NTL)
 
-test_auditoria.o: test_auditoria.cu
-	$(CUDA_CC) -c test_auditoria.cu -o test_auditoria.o  $(NTL)
+test_auditing.o: test_auditing.cu
+	$(CUDA_CC) -c test_auditing.cu -o test_auditing.o  $(NTL)
 
 test_crt.o: test_crt.cu
 	# $(CUDA_CC) -c test_crt.cu -o test_crt.o  $(NTL)
@@ -100,4 +100,4 @@ test.o:test.cu
 	$(CUDA_CC) -c test.cu -o test.o  -lboost_unit_test_framework $(NTL)
 
 clean:
-	rm -f $(BIN) $(TESTBIN) $(BENCHMARKPOLYBIN) $(BENCHMARKYASHEBIN) test_bnt test_auditoria test_auditoria.o test_mul test_ntt test_reduce integer.o test_ntt.o test_crt.o  test_ct_mul.o  test_ctpt.o  test_mul.o cuda_distribution.o common.o benchmark_polynomial.o benchmark_yashe.o polynomial.o tests.o test_reduce.o ciphertext.o cuda_functions.o cuda_bn.o distribution.o yashe.o test.o test_bnt.o cuda_ciphertext.o
+	rm -f $(BIN) $(TESTBIN) $(BENCHMARKPOLYBIN) $(BENCHMARKYASHEBIN) test_bnt test_auditing test_auditing.o test_mul test_ntt test_reduce integer.o test_ntt.o test_crt.o  test_ct_mul.o  test_ctpt.o  test_mul.o cuda_distribution.o common.o benchmark_polynomial.o benchmark_yashe.o polynomial.o tests.o test_reduce.o ciphertext.o cuda_functions.o cuda_bn.o distribution.o yashe.o test.o test_bnt.o cuda_ciphertext.o
